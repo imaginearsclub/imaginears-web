@@ -2,16 +2,28 @@ import { DateTime } from "luxon";
 
 export const SITE_TZ = "America/New_York";
 
-/** Format UTC ISO → readable date/time in zone */
-export function formatInZone(isoUTC: string, zone: string = SITE_TZ) {
-    return DateTime.fromISO(isoUTC, { zone: "utc" })
+/** Internal: coerce input into a Luxon DateTime in UTC */
+function toUTCDateTime(input: string | Date) {
+    if (typeof input === "string") {
+        return DateTime.fromISO(input, { zone: "utc" });
+    }
+    if (input instanceof Date) {
+        return DateTime.fromJSDate(input, { zone: "utc" });
+    }
+    // Fallback: try to parse whatever it is as ISO string
+    return DateTime.fromISO(String(input), { zone: "utc" });
+}
+
+/** Format UTC instant (string or Date) → readable date/time in a zone */
+export function formatInZone(instantUTC: string | Date, zone: string = SITE_TZ) {
+    return toUTCDateTime(instantUTC)
         .setZone(zone)
         .toFormat("LLL dd, hh:mm a");
 }
 
-/** Compare two UTC ISO instants */
-export function isSameInstant(a: string, b: string) {
-    return DateTime.fromISO(a).toMillis() === DateTime.fromISO(b).toMillis();
+/** Compare two UTC instants (string or Date) for equality */
+export function isSameInstant(a: string | Date, b: string | Date) {
+    return toUTCDateTime(a).toMillis() === toUTCDateTime(b).toMillis();
 }
 
 /** Convert local date+time (wall clock) in zone → UTC ISO */
