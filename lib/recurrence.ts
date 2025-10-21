@@ -1,5 +1,5 @@
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
-import { addDays, isAfter, isBefore, set } from "date-fns";
+import { addDays, isAfter, isBefore, set, isValid } from "date-fns";
 import type { Event, Weekday } from "@prisma/client";
 
 export type Occurrence = {
@@ -50,7 +50,8 @@ export function expandEventOccurrences(
     limit = 200
 ): Occurrence[] {
     const out: Occurrence[] = [];
-    if (!ev || !(from instanceof Date) || !(until instanceof Date)) return out;
+    // Validate inputs without redundant instanceof checks; ensures Dates are valid
+    if (!ev || !isValid(from) || !isValid(until)) return out;
     if (isAfter(from, until)) return out;
 
     const tz = ev.timezone || "America/New_York";
