@@ -14,20 +14,25 @@ const baseURL: string | undefined = (() => {
     }
     return undefined;
   }
+  // Parse once; avoid throwing inside try so we don't mask specific errors.
+  let parsed: URL | null = null;
   try {
-    const u = new URL(raw);
-    if (env === "production" && u.protocol !== "https:") {
-      throw new Error("BETTER_AUTH_URL must use https in production");
-    }
-    // Only pass the origin to avoid path/query surprises.
-    return u.origin;
+    parsed = new URL(raw);
   } catch {
+    parsed = null;
+  }
+  if (!parsed) {
     if (env === "production") {
       throw new Error("Invalid BETTER_AUTH_URL. Expected absolute https URL");
     }
     // In non‑prod, fall back to the provided string to keep DX flexible
     return raw;
   }
+  if (env === "production" && parsed.protocol !== "https:") {
+    throw new Error("BETTER_AUTH_URL must use https in production");
+  }
+  // Only pass the origin to avoid path/query surprises.
+  return parsed.origin;
 })();
 
 // Org creation policy: default to disallowing arbitrary org creation unless explicitly enabled.
@@ -52,7 +57,7 @@ export const auth = betterAuth({
 
   plugins: [
     organization({
-      // Enable Teams if you want sub-groups.
+      // Enable Teams if you want subgroups.
       teams: { enabled: true },
       // Prevent random users from creating orgs unless explicitly allowed via env.
       allowUserToCreateOrganization: allowOrgCreation,
