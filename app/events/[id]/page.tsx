@@ -5,6 +5,7 @@ import { addDays, format as fmt } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { safeRehypePlugins } from "@/lib/markdown";
 import ScheduleSummary from "@/components/events/ScheduleSummary";
 
 export const runtime = "nodejs";
@@ -103,8 +104,9 @@ export default async function EventPublicPage({ params }: { params: { id: string
                     <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 p-4">
                         <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
+                            rehypePlugins={safeRehypePlugins as any}
                             components={{
-                                a: (props) => <a {...props} className="underline" target="_blank" rel="noreferrer" />,
+                                a: (props) => <a {...props} className="underline" target="_blank" rel="noopener noreferrer nofollow" />,
                                 code: ({ inline, className, children, ...rest }) =>
                                     inline ? (
                                         <code className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800" {...rest}>
