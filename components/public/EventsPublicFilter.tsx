@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import Link from "next/link";
-import { formatInZone, SITE_TZ } from "@/app/utils/timezone";
+import { formatInZone, SITE_TZ, isSameInstant } from "@/app/utils/timezone";
 
 type EventItem = {
     id: string;
@@ -23,24 +23,51 @@ const CATEGORY_LABEL: Record<EventItem["category"], string> = {
     Other: "Other",
 };
 
-const WORLDS = ["Magic Kingdom", "EPCOT", "Tomorrowland", "Fantasyland", "Main Street"] as const;
+// Derive unique worlds from provided events to avoid stale/static options
+// Keeps component resilient to backend/world changes
 
 export default function EventsPublicFilter({ events }: { events: EventItem[] }) {
     const [q, setQ] = useState("");
+    const qDeferred = useDeferredValue(q);
     const [cat, setCat] = useState<"All" | keyof typeof CATEGORY_LABEL>("All");
-    const [world, setWorld] = useState<"All" | typeof WORLDS[number]>("All");
+    const [world, setWorld] = useState<"All" | string>("All");
+
+    const CATEGORY_KEYS = useMemo(() => Object.keys(CATEGORY_LABEL) as Array<keyof typeof CATEGORY_LABEL>, []);
+    const isCategory = (v: string): v is keyof typeof CATEGORY_LABEL => CATEGORY_KEYS.includes(v as any);
+
+    const worlds = useMemo(() => {
+        const set = new Set<string>();
+        for (const e of events) {
+            if (e.world) set.add(e.world);
+        }
+        return Array.from(set).sort((a, b) => a.localeCompare(b));
+    }, [events]);
+
+    const qNorm = useMemo(() => qDeferred.trim().toLowerCase(), [qDeferred]);
 
     const filtered = useMemo(() => {
         return events.filter(e => {
             if (cat !== "All" && e.category !== cat) return false;
             if (world !== "All" && e.world !== world) return false;
-            return !(q && !`${e.title} ${e.world} ${CATEGORY_LABEL[e.category]}`.toLowerCase().includes(q.toLowerCase()));
 
+            if (qNorm) {
+                const hay = `${e.title} ${e.world} ${CATEGORY_LABEL[e.category]}`.toLowerCase();
+                if (!hay.includes(qNorm)) return false;
+            }
+            return true;
         });
-    }, [events, q, cat, world]);
+    }, [events, qNorm, cat, world]);
+
+    const safeFormat = (iso: string) => {
+        try {
+            return formatInZone(iso, SITE_TZ);
+        } catch {
+            return iso;
+        }
+    };
 
     return (
-        <div className="card">
+        <div className="card bg-white text-slate-900 border border-slate-200">
             {/* Controls */}
             <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
                 <div className="flex-1">
@@ -49,14 +76,17 @@ export default function EventsPublicFilter({ events }: { events: EventItem[] }) 
                         value={q}
                         onChange={e => setQ(e.target.value)}
                         placeholder="Search events…"
-                        className="w-full rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 outline-none focus:ring-2 focus:ring-brandStart/50"
+                        className="w-full rounded-2xl border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 px-4 py-3 outline-none focus:ring-2 focus:ring-brandStart/50"
                     />
                 </div>
                 <div className="flex gap-3">
                     <select
                         value={cat}
-                        onChange={e => setCat(e.target.value as any)}
-                        className="rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3"
+                        onChange={e => {
+                                                    const v = e.target.value;
+                                                    setCat(v === "All" ? "All" : (isCategory(v) ? v : "All"));
+                                                }}
+                        className="rounded-2xl border border-slate-300 bg-white text-slate-900 px-4 py-3"
                     >
                         <option value="All">All Categories</option>
                         <option value="Fireworks">Fireworks</option>
@@ -68,11 +98,14 @@ export default function EventsPublicFilter({ events }: { events: EventItem[] }) 
 
                     <select
                         value={world}
-                        onChange={e => setWorld(e.target.value as any)}
-                        className="rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3"
+                        onChange={e => {
+                                                    const v = e.target.value;
+                                                    setWorld(v === "All" ? "All" : (worlds.includes(v) ? v : "All"));
+                                                }}
+                        className="rounded-2xl border border-slate-300 bg-white text-slate-900 px-4 py-3"
                     >
                         <option value="All">All Worlds</option>
-                        {WORLDS.map(w => <option key={w} value={w}>{w}</option>)}
+                        {worlds.map(w => <option key={w} value={w}>{w}</option>)}
                     </select>
                 </div>
             </div>
@@ -80,32 +113,32 @@ export default function EventsPublicFilter({ events }: { events: EventItem[] }) 
             {/* Grid */}
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filtered.length === 0 && (
-                    <div className="col-span-full text-center text-slate-500 dark:text-slate-400">
+                    <div className="col-span-full text-center text-slate-600">
                         No events match your filters.
                     </div>
                 )}
 
                 {filtered.map(e => {
-                    const start = formatInZone(new Date(e.startAt).toISOString(), SITE_TZ);
-                    const endSame = e.startAt === e.endAt;
-                    const end = endSame ? null : formatInZone(new Date(e.endAt).toISOString(), SITE_TZ);
+                    const start = safeFormat(e.startAt);
+                    const endSame = isSameInstant(e.startAt, e.endAt);
+                    const end = endSame ? null : safeFormat(e.endAt);
                     const catLabel = CATEGORY_LABEL[e.category];
 
                     return (
-                        <article key={e.id} className="rounded-2xl border border-slate-200/70 dark:border-slate-800/60 bg-white/70 dark:bg-slate-900/60 p-4 shadow-sm hover:shadow-md transition">
+                        <article key={e.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition">
                             <div className="flex items-center gap-2 text-xs mb-2">
-                <span className="px-2 py-1 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                <span className="px-2 py-1 rounded-full bg-sky-100 text-sky-700">
                   {catLabel}
                 </span>
-                                <span className="text-slate-500 dark:text-slate-400">{e.world}</span>
+                                <span className="text-slate-500">{e.world}</span>
                             </div>
 
                             <h3 className="text-lg font-semibold">{e.title}</h3>
-                            <p className="text-sm text-slate-600 dark:text-slate-300 mt-1 line-clamp-3">
+                            <p className="text-sm text-slate-600 mt-1 line-clamp-3">
                                 {e.shortDescription ?? "Join us for a magical experience!"}
                             </p>
 
-                            <div className="mt-3 text-xs text-slate-600 dark:text-slate-400">
+                            <div className="mt-3 text-xs text-slate-600">
                                 {start}{end ? ` — ${end}` : ""} <span className="text-[10px]">({SITE_TZ})</span>
                             </div>
 
