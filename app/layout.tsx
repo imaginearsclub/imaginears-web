@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import Script from "next/script";
 
 // Force Node.js runtime at the root to avoid accidental Edge usage by children that depend on Node-only modules.
 export const runtime = "nodejs";
@@ -70,7 +71,26 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-dvh grid grid-rows-[auto_1fr_auto] bg-white text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100">
+      <head>
+        <Script id="theme-init" strategy="beforeInteractive">
+          {`
+            try {
+              var d = document.documentElement;
+              var key = 'imaginears.theme';
+              var stored = null;
+              try { stored = sessionStorage.getItem(key); } catch (e) {}
+              var prefersDark = false;
+              try { prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) {}
+              var theme = (stored === 'dark' || stored === 'light') ? stored : (prefersDark ? 'dark' : 'light');
+              if (theme) {
+                if (theme === 'dark') { d.classList.add('dark'); } else { d.classList.remove('dark'); }
+                d.setAttribute('data-theme', theme);
+              }
+            } catch (e) {}
+          `}
+        </Script>
+      </head>
+      <body className="min-h-dvh grid grid-rows-[auto_1fr_auto] antialiased transition-colors duration-300">
         <Header />
         {children}
         <Footer />
