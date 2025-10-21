@@ -10,7 +10,7 @@ export default function ServerCTA() {
             <div className="container py-12 md:py-16 relative z-10">
                 <div className="card card-glass flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10">
                     <div className="grow">
-                        <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white drop-shadow-sm">
+                        <h2 className="text-2xl md:text-3xl font-bold text-slate-900 text-body drop-shadow-sm">
                             Ready to visit the parks?
                         </h2>
                         <p className="mt-2 text-body">
