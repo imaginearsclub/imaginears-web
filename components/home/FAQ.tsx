@@ -22,7 +22,7 @@ export default function FAQ() {
                     {faqs.map((f) => (
                         <div key={f.q} className="card card-glass">
                             <h3 className="text-lg font-semibold">{f.q}</h3>
-                            <p className="mt-2 text-slate-700 dark:text-slate-300">{f.a}</p>
+                            <p className="mt-2 text-body">{f.a}</p>
                         </div>
                     ))}
                 </div>

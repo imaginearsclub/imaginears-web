@@ -90,7 +90,7 @@ export default async function EventTeaser({ title = "Events", limit = 6 }: Props
                             </div>
 
                             {e.shortDescription && (
-                                <p className="mt-3 text-sm text-slate-700 dark:text-slate-300 line-clamp-3">
+                                <p className="mt-3 text-sm text-body line-clamp-3">
                                     {e.shortDescription}
                                 </p>
                             )}
