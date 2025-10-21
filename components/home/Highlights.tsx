@@ -6,7 +6,7 @@ export default function Highlights() {
     ];
 
     return (
-        <section className="band">
+        <section>
             <div className="container py-12 md:py-16">
                 <h2 className="section-title text-2xl md:text-3xl font-bold">Why players love it</h2>
                 <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">

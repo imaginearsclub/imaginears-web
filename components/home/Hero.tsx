@@ -48,15 +48,15 @@ export default function Hero() {
                 {/* Quick Facts */}
                 <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="card card-glass">
-                        <p className="text-sm muted">Server IP</p>
+                        <p className="text-md muted">Server IP</p>
                         <p className="mt-1 text-xl font-semibold">imaginears.club</p>
                     </div>
                     <div className="card card-glass">
-                        <p className="text-sm muted">Version</p>
-                        <p className="mt-1 text-xl font-semibold">Java 1.20.x+</p>
+                        <p className="text-md muted">Version</p>
+                        <p className="mt-1 text-xl font-semibold">Java 1.24.x+</p>
                     </div>
                     <div className="card card-glass">
-                        <p className="text-sm muted">Status</p>
+                        <p className="text-md muted">Status</p>
                         <p className="mt-1 text-xl font-semibold">Online • Community-run</p>
                     </div>
                 </div>
