@@ -25,7 +25,7 @@ export default function Newsletter() {
             <div className="container py-12 md:py-16">
                 <div className="card card-glass">
                     <h2 className="section-title text-2xl md:text-3xl font-bold">Get park updates</h2>
-                    <p className="mt-2 text-slate-700 dark:text-slate-300">
+                    <p className="mt-2 text-body">
                         New shows, special events, and seasonal overlays—straight to your inbox.
                     </p>
                     <form onSubmit={onSubmit} className="mt-6 flex flex-col sm:flex-row gap-3">
