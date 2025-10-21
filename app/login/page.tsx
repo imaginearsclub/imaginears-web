@@ -5,8 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createAuthClient } from "better-auth/client";
 
 const auth = createAuthClient({
-    // If your site isn’t exactly http://localhost:3000 during dev,
-    // set NEXT_PUBLIC_SITE_URL to your origin (incl. port) and we’ll use it.
     baseURL: process.env.NEXT_PUBLIC_SITE_URL || undefined,
 });
 
@@ -16,13 +14,8 @@ function friendlyError(e: unknown): string {
     if (e instanceof Error) return e.message;
     try {
         const any = e as any;
-        if (typeof any.message === "string") return any.message;
-        if (typeof any.error === "string") return any.error;
-        if (typeof any.error?.message === "string") return any.error.message;
-        // If it's a Better-Auth response object:
-        if (any?.ok === false && typeof any?.error === "object") {
-            return any.error.message || "Sign in failed";
-        }
+        if (typeof any?.message === "string") return any.message;
+        if (typeof any?.error?.message === "string") return any.error.message;
         return JSON.stringify(any);
     } catch {
         return "Unknown error";
@@ -44,12 +37,23 @@ export default function LoginPage() {
         setErr(null);
         setLoading(true);
         try {
-            // Better-Auth email+password sign-in
             const res = await auth.signIn.email({ email, password });
-            if (!res?.ok) {
-                setErr(friendlyError(res));
+
+            // Type-safe narrowing: Better-Auth returns { error } on failure, { data } on success
+            if ("error" in res && res.error) {
+                setErr(friendlyError(res.error));
                 return;
             }
+
+            // Success case
+            const data = (res as typeof res & { data: any }).data;
+            // Some providers can request a full redirect
+            if (data?.redirect && typeof data?.url === "string") {
+                window.location.href = data.url;
+                return;
+            }
+
+            // Credentials flow: just go to the callback
             router.push(callbackUrl);
         } catch (e2) {
             setErr(friendlyError(e2));
@@ -63,7 +67,7 @@ export default function LoginPage() {
         setLoading(true);
         try {
             await auth.signIn.social({ provider: "discord", redirectTo: callbackUrl });
-            // redirects out; no need to push()
+            // Will navigate away; no router.push needed
         } catch (e2) {
             setErr(friendlyError(e2));
             setLoading(false);
@@ -73,11 +77,13 @@ export default function LoginPage() {
     return (
         <div className="mx-auto max-w-sm p-6 rounded-2xl border border-slate-200 dark:border-slate-800 mt-10">
             <h1 className="text-xl font-bold">Admin Login</h1>
+
             {err && (
                 <div className="mt-3 rounded-xl bg-rose-50 text-rose-700 p-3 text-sm">
                     {err}
                 </div>
             )}
+
             <form className="mt-4 space-y-3" onSubmit={onSubmit}>
                 <div>
                     <label className="text-sm font-medium">Email</label>
