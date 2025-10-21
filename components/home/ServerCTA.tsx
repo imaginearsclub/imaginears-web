@@ -13,11 +13,11 @@ export default function ServerCTA() {
                         <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white drop-shadow-sm">
                             Ready to visit the parks?
                         </h2>
-                        <p className="mt-2 text-slate-700 dark:text-slate-200">
+                        <p className="mt-2 text-body">
                             Add the server IP in Minecraft Java and hop in—our guides and mods
                             are happy to help you get started!
                         </p>
-                        <ul className="mt-4 text-sm text-slate-700 dark:text-slate-200 list-disc pl-5 space-y-1">
+                        <ul className="mt-4 text-sm text-body list-disc pl-5 space-y-1">
                             <li>
                                 IP: <span className="font-semibold">imaginears.club</span>
                             </li>
