@@ -41,7 +41,7 @@
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.19",
     "@types/luxon": "^3.7.1",
-    "@types/node": "^24.7.2",
+    "@types/node": "^24.9.1",
     "@types/react": "19.2.2",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.47",
