@@ -1,6 +1,33 @@
 {
+  "$schema": "https://json.schemastore.org/eslintrc",
+  "root": true,
   "extends": [
     "next/core-web-vitals",
     "next/typescript"
+  ],
+  "reportUnusedDisableDirectives": true,
+  "ignorePatterns": [
+    "node_modules/",
+    ".next/",
+    "out/",
+    "coverage/",
+    "dist/",
+    "build/",
+    "*.config.js",
+    "*.config.cjs",
+    "*.config.mjs",
+    "*.config.ts"
+  ],
+  "rules": {
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "@next/next/no-img-element": "error",
+    "react/jsx-no-target-blank": ["warn", { "allowReferrer": true }]
+  },
+  "overrides": [
+    {
+      "files": ["*.config.{js,cjs,mjs,ts}", "next.config.ts", "postcss.config.mjs", "tailwind.config.ts", "prisma/*.ts", "scripts/**/*.{ts,js}"],
+      "env": { "node": true },
+      "parserOptions": { "sourceType": "module" }
+    }
   ]
 }
