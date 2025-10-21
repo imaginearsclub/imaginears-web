@@ -22,7 +22,8 @@ export async function middleware(req: NextRequest) {
             }
 
             // Determine role from Better-Auth Organization plugin
-            const roleRaw = (await auth.api.getActiveMemberRole({ headers: req.headers }))?.data?.role;
+            const roleResult = await auth.api.getActiveMemberRole({ headers: req.headers });
+            const roleRaw = roleResult?.role as string | string[] | undefined;
             const roles: string[] = Array.isArray(roleRaw) ? roleRaw : roleRaw ? [roleRaw] : [];
             const isAdmin = roles.some((r) => ADMIN_ROLES.has(r));
 
