@@ -43,6 +43,4 @@ function SocialProof() {
             </div>
         </section>
     );
-}
-
-export default memo(SocialProof);
+}export default memo(SocialProof);
