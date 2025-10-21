@@ -8,14 +8,14 @@ const ADMIN_ROLES = new Set(["owner", "admin"]);
  * Fetch the current Better-Auth session on the server.
  * Works in Server Components and Route Handlers.
  */
+// noinspection JSUnusedGlobalSymbols
 export async function getServerSession() {
     // Read request headers provided by Next.js in the current server context
     const h = nextHeaders();
     // Convert ReadonlyHeaders to a mutable Headers instance for libraries that expect standard Headers
     const hdrs = new Headers(h as unknown as Headers);
 
-    const session = await auth.api.getSession({ headers: hdrs });
-    return session; // { sessionId, user, ... } | null
+    return await auth.api.getSession({ headers: hdrs }); // { sessionId, user, ... } | null
 }
 
 /**
@@ -23,6 +23,7 @@ export async function getServerSession() {
  * Returns the session when authorized, or null when unauthorized.
  * Fails closed on any error.
  */
+// noinspection JSUnusedGlobalSymbols
 export async function requireAdmin() {
     try {
         const h = nextHeaders();
