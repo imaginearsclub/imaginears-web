@@ -11,7 +11,7 @@ import {
     LogOut,
     X,
 } from "lucide-react";
-import { memo, useEffect } from "react";
+import { memo, useEffect, type ComponentType } from "react";
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -23,7 +23,7 @@ const NavItem = memo(function NavItem({
                      onClick,
                  }: {
     href: string;
-    icon: React.ComponentType<{ className?: string }>;
+    icon: ComponentType<{ className?: string }>;
     label: string;
     onClick?: () => void;
 }) {
