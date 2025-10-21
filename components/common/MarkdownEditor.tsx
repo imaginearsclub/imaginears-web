@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { safeRehypePlugins } from "@/lib/markdown";
 
 type Props = {
     value: string;
@@ -88,7 +89,7 @@ export default function MarkdownEditor({ value, onChange, label = "Details (Mark
                 />
             ) : (
                 <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 p-4 prose dark:prose-invert max-w-none">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{value || "_Nothing to preview yet._"}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={safeRehypePlugins as any}>{value || "_Nothing to preview yet._"}</ReactMarkdown>
                 </div>
             )}
         </div>
