@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Production builds
+build/
+dist/
+
+# Logs and diagnostics
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+report.*.json
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# TypeScript
+*.tsbuildinfo
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Caches
+.turbo/
+.eslintcache
+
+# Vercel / deployment
+.vercel/
+
+# Prisma
+# Do not ignore migrations; they should be tracked
+!prisma/migrations/
+# Local dev SQLite databases (if used)
+prisma/*.db
+prisma/*.db-journal
+prisma/*-journal
+
+# Generated artifacts (keep custom path from project)
+/generated/prisma
+
+# Misc
+.direnv/
+.envrc
+.tailwind-cache/
