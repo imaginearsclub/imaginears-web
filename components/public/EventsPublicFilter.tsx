@@ -34,8 +34,8 @@ export default function EventsPublicFilter({ events }: { events: EventItem[] }) 
         return events.filter(e => {
             if (cat !== "All" && e.category !== cat) return false;
             if (world !== "All" && e.world !== world) return false;
-            if (q && !`${e.title} ${e.world} ${CATEGORY_LABEL[e.category]}`.toLowerCase().includes(q.toLowerCase())) return false;
-            return true;
+            return !(q && !`${e.title} ${e.world} ${CATEGORY_LABEL[e.category]}`.toLowerCase().includes(q.toLowerCase()));
+
         });
     }, [events, q, cat, world]);
 
