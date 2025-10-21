@@ -1,7 +1,8 @@
 // components/public/EventTeaser.tsx
 import Link from "next/link";
-import { PrismaClient, EventStatus, type Weekday } from "@prisma/client";
-import ScheduleSummary from "@/components/events/ScheduleSummary";
+import { PrismaClient, EventStatus } from "@prisma/client";
+import ScheduleSummary, { type Weekday as SummaryWeekday, type RecurrenceFreq as SummaryRecurrenceFreq } from "@/components/events/ScheduleSummary";
+import { unstable_cache } from "next/cache";
 
 export const runtime = "nodejs";
 
@@ -19,33 +20,91 @@ type Props = {
     limit?: number;
 };
 
-function asStringArray(v: unknown): string[] {
-    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
-}
-function asWeekdayArray(v: unknown): Weekday[] {
-    const s = asStringArray(v);
-    const allow = new Set<Weekday>(["SU","MO","TU","WE","TH","FR","SA"] as Weekday[]);
-    return s.filter((x): x is Weekday => allow.has(x as Weekday));
+// Safely coerce limit to a sane integer range
+function clampLimit(v: unknown, min = 1, max = 24, fallback = 6): number {
+    const n = typeof v === "number" ? v : Number(v);
+    const safe = Number.isFinite(n) ? Math.floor(n) : fallback;
+    return Math.min(max, Math.max(min, safe));
 }
 
+// Robustly coerce an unknown value into string[]
+function asStringArray(v: unknown): string[] {
+    try {
+        const val = typeof v === "string" ? JSON.parse(v) : v;
+        return Array.isArray(val) ? val.filter((x) => typeof x === "string") : [];
+    } catch {
+        return [];
+    }
+}
+
+function asWeekdayArray(v: unknown): SummaryWeekday[] {
+    const s = asStringArray(v);
+    const allow = new Set<SummaryWeekday>(["SU", "MO", "TU", "WE", "TH", "FR", "SA"] as SummaryWeekday[]);
+    // de-dupe, filter invalid, keep stable order of first occurrence
+    const seen = new Set<string>();
+    const out: SummaryWeekday[] = [];
+    for (const x of s) {
+        if (!seen.has(x) && allow.has(x as SummaryWeekday)) {
+            seen.add(x);
+            out.push(x as SummaryWeekday);
+        }
+    }
+    return out;
+}
+
+function isValidTimeZone(tz: string): boolean {
+    try {
+        new Intl.DateTimeFormat("en-US", { timeZone: tz }).format(new Date());
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+// Cache published events to reduce DB load and improve TTFB
+const getPublishedEvents = unstable_cache(
+    async (take: number) => {
+        try {
+            return await prisma().event.findMany({
+                where: { status: EventStatus.Published },
+                orderBy: [{ recurrenceFreq: "desc" }, { updatedAt: "desc" }],
+                take,
+                select: {
+                    id: true,
+                    title: true,
+                    world: true,
+                    category: true,
+                    shortDescription: true,
+                    timezone: true,
+                    recurrenceFreq: true,
+                    byWeekdayJson: true,
+                    timesJson: true,
+                    recurrenceUntil: true,
+                },
+            });
+        } catch (err) {
+            console.error("EventTeaser: failed to load events", err);
+            return [] as Array<{
+                id: string;
+                title: string;
+                world: string | null;
+                category: string | null;
+                shortDescription: string | null;
+                timezone: string | null;
+                recurrenceFreq: any;
+                byWeekdayJson: unknown;
+                timesJson: unknown;
+                recurrenceUntil: Date | null;
+            }>;
+        }
+    },
+    ["event-teaser"],
+    { revalidate: 300, tags: ["events"] }
+);
+
 export default async function EventTeaser({ title = "Events", limit = 6 }: Props) {
-    const events = await prisma().event.findMany({
-        where: { status: EventStatus.Published },
-        orderBy: [{ recurrenceFreq: "desc" }, { updatedAt: "desc" }],
-        take: Math.max(1, Math.min(limit, 24)),
-        select: {
-            id: true,
-            title: true,
-            world: true,
-            category: true,
-            shortDescription: true,
-            timezone: true,
-            recurrenceFreq: true,
-            byWeekdayJson: true,
-            timesJson: true,
-            recurrenceUntil: true,
-        },
-    });
+    const take = clampLimit(limit);
+    const events = await getPublishedEvents(take);
 
     return (
         <section className="mx-auto max-w-6xl px-4 sm:px-6 mt-10">
@@ -58,9 +117,11 @@ export default async function EventTeaser({ title = "Events", limit = 6 }: Props
 
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {events.map((e) => {
-                    const tz = e.timezone || "America/New_York";
+                    const tzRaw = e.timezone || "America/New_York";
+                    const tz = isValidTimeZone(tzRaw) ? tzRaw : "America/New_York";
                     const byWeekday = asWeekdayArray(e.byWeekdayJson);
                     const times = asStringArray(e.timesJson);
+                    const recurrenceFreq = (e.recurrenceFreq as unknown) as SummaryRecurrenceFreq;
 
                     return (
                         <article
@@ -80,8 +141,8 @@ export default async function EventTeaser({ title = "Events", limit = 6 }: Props
 
                             <div className="mt-2">
                                 <ScheduleSummary
-                                    recurrenceFreq={e.recurrenceFreq as any}
-                                    byWeekday={byWeekday as any}
+                                    recurrenceFreq={recurrenceFreq}
+                                    byWeekday={byWeekday}
                                     times={times}
                                     timezone={tz}
                                     until={e.recurrenceUntil ?? null}
