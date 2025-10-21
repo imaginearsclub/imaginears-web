@@ -11,10 +11,12 @@ import {
     LogOut,
     X,
 } from "lucide-react";
-import { useEffect } from "react";
+import { memo, useEffect } from "react";
+
+const CURRENT_YEAR = new Date().getFullYear();
 
 /* ---------- Nav Item ---------- */
-function NavItem({
+const NavItem = memo(function NavItem({
                      href,
                      icon: Icon,
                      label,
@@ -50,10 +52,10 @@ function NavItem({
             <span className="font-medium">{label}</span>
         </Link>
     );
-}
+});
 
 /* ---------- Sidebar Inner ---------- */
-function SidebarInner({ onClose }: { onClose?: () => void }) {
+function SidebarInner({ onCloseAction }: { onCloseAction?: () => void }) {
     return (
         <aside className="flex h-full w-full flex-col justify-between p-4">
             {/* Top section */}
@@ -63,18 +65,19 @@ function SidebarInner({ onClose }: { onClose?: () => void }) {
                     <Link
                         href="/admin/dashboard"
                         className="flex items-center gap-2"
-                        onClick={onClose}
+                        onClick={onCloseAction}
                     >
                         <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-[var(--brand-start)] to-[var(--brand-end)] shadow-sm" />
                         <div className="text-lg font-bold tracking-tight">
                             Imaginears Admin
                         </div>
                     </Link>
-                    {onClose && (
+                    {onCloseAction && (
                         <button
                             className="btn btn-icon btn-ghost md:hidden"
                             aria-label="Close menu"
-                            onClick={onClose}
+                            type="button"
+                            onClick={onCloseAction}
                         >
                             <X className="h-5 w-5" />
                         </button>
@@ -82,12 +85,12 @@ function SidebarInner({ onClose }: { onClose?: () => void }) {
                 </div>
 
                 {/* Nav items */}
-                <NavItem href="/admin/dashboard" icon={LayoutDashboard} label="Dashboard" onClick={onClose} />
-                <NavItem href="/admin/events" icon={CalendarRange} label="Events" onClick={onClose} />
-                <NavItem href="/admin/applications" icon={FileText} label="Applications" onClick={onClose} />
-                <NavItem href="/admin/players" icon={Users} label="Players" onClick={onClose} />
+                <NavItem href="/admin/dashboard" icon={LayoutDashboard} label="Dashboard" onClick={onCloseAction} />
+                <NavItem href="/admin/events" icon={CalendarRange} label="Events" onClick={onCloseAction} />
+                <NavItem href="/admin/applications" icon={FileText} label="Applications" onClick={onCloseAction} />
+                <NavItem href="/admin/players" icon={Users} label="Players" onClick={onCloseAction} />
                 <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800/60" />
-                <NavItem href="/admin/settings" icon={Settings} label="Settings" onClick={onClose} />
+                <NavItem href="/admin/settings" icon={Settings} label="Settings" onClick={onCloseAction} />
             </div>
 
             {/* Bottom section */}
@@ -103,7 +106,7 @@ function SidebarInner({ onClose }: { onClose?: () => void }) {
                 </form>
 
                 <p className="text-[11px] text-center text-slate-500 dark:text-slate-400 pt-1">
-                    v1 • {new Date().getFullYear()}
+                    v1 • {CURRENT_YEAR}
                 </p>
             </div>
         </aside>
@@ -126,15 +129,16 @@ export function SidebarDesktop() {
 /* ---------- Mobile Drawer Sidebar ---------- */
 export function SidebarDrawer({
                                   open,
-                                  onClose,
+                                  onCloseAction,
                               }: {
     open: boolean;
-    onClose: () => void;
+    onCloseAction: () => void;
 }) {
     useEffect(() => {
-        document.body.style.overflow = open ? "hidden" : "";
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = open ? "hidden" : prev;
         return () => {
-            document.body.style.overflow = "";
+            document.body.style.overflow = prev;
         };
     }, [open]);
 
@@ -144,7 +148,7 @@ export function SidebarDrawer({
                 "fixed inset-0 z-40 md:hidden transition-opacity",
                 open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
             ].join(" ")}
-            onClick={onClose}
+            onClick={onCloseAction}
         >
             <div className="absolute inset-0 bg-black/40" />
             <div
@@ -155,7 +159,7 @@ export function SidebarDrawer({
                 ].join(" ")}
                 onClick={(e) => e.stopPropagation()}
             >
-                <SidebarInner onClose={onClose} />
+                <SidebarInner onCloseAction={onCloseAction} />
             </div>
         </div>
     );

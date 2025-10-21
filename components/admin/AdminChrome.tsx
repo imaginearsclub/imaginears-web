@@ -40,7 +40,7 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
             </main>
 
             {/* Mobile drawer (separate component) */}
-            <SidebarDrawer open={mobileOpen} onClose={() => setMobileOpen(false)} />
+            <SidebarDrawer open={mobileOpen} onCloseAction={() => setMobileOpen(false)} />
         </div>
     );
 }
