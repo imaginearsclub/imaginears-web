@@ -66,7 +66,10 @@ export default function LoginPage() {
         setErr(null);
         setLoading(true);
         try {
-            await auth.signIn.social({ provider: "discord", redirectTo: callbackUrl });
+            await auth.signIn.social({
+                provider: "discord",
+                callbackURL: callbackUrl, // ✅ correct prop
+            });
             // Will navigate away; no router.push needed
         } catch (e2) {
             setErr(friendlyError(e2));
