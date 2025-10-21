@@ -12,7 +12,7 @@ export type Role = (typeof Roles)[number];
 const httpUrl = z
   .string()
   .trim()
-  .url("Please add a valid URL.")
+  .pipe(z.url({ message: "Please add a valid URL." }))
   .refine((val) => {
     try {
       const u = new URL(val);
@@ -46,7 +46,7 @@ function uniqTrimmed(arr: string[]): string[] {
 export const StepSafeSchema = z
   .object({
     name: z.string().trim().min(2, "Please enter your full name.").max(100),
-    email: z.string().trim().email("Enter a valid email.").transform((s) => s.toLowerCase()),
+    email: z.string().trim().pipe(z.email({ message: "Enter a valid email." })).transform((s) => s.toLowerCase()),
     mcUsername: z.string().trim().min(2, "Minecraft username is required.").max(32),
     confirm16: z.literal(true, { message: "You must be at least 16." }),
     canDiscord: z.boolean(),
@@ -88,7 +88,7 @@ export const StepSafeSchema = z
     // If canDiscord, require a discordUser
     if (data.canDiscord && (!data.discordUser || data.discordUser.length < 2)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["discordUser"],
         message: "Please provide your Discord username.",
       });
@@ -96,7 +96,7 @@ export const StepSafeSchema = z
     // If prior staff, ask where
     if (data.priorStaff && !data.priorServers) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["priorServers"],
         message: "Please list your prior server(s).",
       });
@@ -104,7 +104,7 @@ export const StepSafeSchema = z
     // If visited Disney, ask details
     if (data.visitedDisney && !data.visitedDetails) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["visitedDetails"],
         message: "Please share details about your visit(s).",
       });
@@ -112,7 +112,7 @@ export const StepSafeSchema = z
     // Age/consent coherence: if Under18, block proceed
     if (data.ageRange === "Under18") {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["ageRange"],
         message: "Applicants must be at least 16.",
       });
