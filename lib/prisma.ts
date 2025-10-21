@@ -37,16 +37,14 @@ const logLevels: Prisma.LogLevel[] =
 
 const errorFormat: "pretty" | "colorless" | "minimal" = isProd ? "minimal" : "pretty";
 
-declare global {
-    // eslint-disable-next-line no-var
-    var prisma: PrismaClient | undefined;
-    // eslint-disable-next-line no-var
-    var __prisma_shutdown_hooks_registered: boolean | undefined;
-}
+const globalForPrisma = globalThis as unknown as {
+    prisma?: PrismaClient;
+    __prisma_shutdown_hooks_registered?: boolean;
+};
 
 function registerShutdownHooksOnce(client: PrismaClient) {
-    if (globalThis.__prisma_shutdown_hooks_registered) return;
-    globalThis.__prisma_shutdown_hooks_registered = true;
+    if (globalForPrisma.__prisma_shutdown_hooks_registered) return;
+    globalForPrisma.__prisma_shutdown_hooks_registered = true;
 
     const disconnect = async () => {
         try {
@@ -71,7 +69,7 @@ function registerShutdownHooksOnce(client: PrismaClient) {
 }
 
 export const prisma =
-    globalThis.prisma ??
+    globalForPrisma.prisma ??
     new PrismaClient({
         log: logLevels,
         errorFormat,
@@ -80,5 +78,5 @@ export const prisma =
 registerShutdownHooksOnce(prisma);
 
 if (!isProd) {
-    globalThis.prisma = prisma;
+    globalForPrisma.prisma = prisma;
 }
