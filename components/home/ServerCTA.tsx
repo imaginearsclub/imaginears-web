@@ -30,14 +30,18 @@ export default function ServerCTA() {
                         <a
                             href="minecraft://?addExternalServer=Imaginears%20Club|imaginears.club:25565"
                             className="btn-gradient text-center"
+                            aria-label="Add Imaginears Club server to Minecraft Java"
+                            rel="noopener"
                         >
                             Add Server
                         </a>
                         <a
                             href="https://imaginears.club/d"
                             target="_blank"
-                            rel="noreferrer"
+                            rel="noopener noreferrer"
+                            referrerPolicy="no-referrer"
                             className="btn-gradient text-center"
+                            aria-label="Join our Discord server (opens in a new tab)"
                         >
                             Join Discord
                         </a>
