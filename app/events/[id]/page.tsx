@@ -94,7 +94,7 @@ export default async function EventPublicPage({ params }: { params: { id: string
                 </div>
 
                 {ev.shortDescription && (
-                    <p className="mt-3 text-slate-700 dark:text-slate-300">{ev.shortDescription}</p>
+                    <p className="mt-3 text-body">{ev.shortDescription}</p>
                 )}
             </header>
 
