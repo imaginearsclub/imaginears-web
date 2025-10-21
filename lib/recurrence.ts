@@ -1,4 +1,4 @@
-import { toZonedTime } from "date-fns-tz";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { addDays, isAfter, isBefore, set } from "date-fns";
 import type { Event, Weekday } from "@prisma/client";
 
@@ -14,14 +14,18 @@ export type Occurrence = {
 
 const WD_MAP: Record<Weekday, number> = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
 
-function parseHHmm(s: string) {
-    const m = /^(\d{2}):(\d{2})$/.exec(s);
-    if (!m) return { hh: 0, mm: 0 };
-    return { hh: Number(m[1]), mm: Number(m[2]) };
+function parseHHmm(s: string): { hh: number; mm: number } | null {
+    const m = /^(\d{2}):(\d{2})$/.exec(s.trim());
+    if (!m) return null;
+    const hh = Number(m[1]);
+    const mm = Number(m[2]);
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+    if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+    return { hh, mm };
 }
 
 function toHHmmFromDate(d: Date, tz: string) {
-    const local = ToZonedTime(d, tz);
+    const local = toZonedTime(d, tz);
     const hh = local.getHours().toString().padStart(2, "0");
     const mm = local.getMinutes().toString().padStart(2, "0");
     return `${hh}:${mm}`;
@@ -46,7 +50,11 @@ export function expandEventOccurrences(
     limit = 200
 ): Occurrence[] {
     const out: Occurrence[] = [];
+    if (!ev || !(from instanceof Date) || !(until instanceof Date)) return out;
+    if (isAfter(from, until)) return out;
+
     const tz = ev.timezone || "America/New_York";
+    const safeLimit = Math.min(Math.max(1, Math.trunc(limit ?? 200)), 1000);
     const durationMs = Math.max(1, new Date(ev.endAt).getTime() - new Date(ev.startAt).getTime());
 
     const windowEnd =
@@ -78,13 +86,25 @@ export function expandEventOccurrences(
 
     const times = asStringArray(ev.timesJson);
     const weekdays = asWeekdayArray(ev.byWeekdayJson);
-    const timesOrDefault = times.length ? times : [toHHmmFromDate(ev.startAt, tz)];
+    const timesBase = times.length ? times : [toHHmmFromDate(ev.startAt, tz)];
+    const sortedTimes = timesBase
+        .map((s) => s.trim())
+        .filter((s) => !!parseHHmm(s))
+        .sort((a, b) => {
+            const pa = parseHHmm(a)!;
+            const pb = parseHHmm(b)!;
+            return pa.hh * 60 + pa.mm - (pb.hh * 60 + pb.mm);
+        });
+
+    const weeklyAllowed = new Set((weekdays || []).map((w) => WD_MAP[w]));
 
     const pushForDay = (localDay: Date) => {
-        for (const t of timesOrDefault) {
-            const { hh, mm } = parseHHmm(t);
+        for (const t of sortedTimes) {
+            const parsed = parseHHmm(t);
+            if (!parsed) continue;
+            const { hh, mm } = parsed;
             const localStart = set(localDay, { hours: hh, minutes: mm, seconds: 0, milliseconds: 0 });
-            const utcStart = toZonedTime(localStart, tz);
+            const utcStart = fromZonedTime(localStart, tz);
             if (isBefore(utcStart, from) || isAfter(utcStart, windowEnd)) continue;
             const utcEnd = new Date(utcStart.getTime() + durationMs);
             out.push({
@@ -96,19 +116,18 @@ export function expandEventOccurrences(
                 world: ev.world,
                 category: ev.category,
             });
-            if (out.length >= limit) return true;
+            if (out.length >= safeLimit) return true;
         }
         return false;
     };
 
-    while (!isAfter(cursorLocal, endLocal) && out.length < limit) {
+    while (!isAfter(cursorLocal, endLocal) && out.length < safeLimit) {
         const weekday = cursorLocal.getDay(); // 0..6
 
         if (ev.recurrenceFreq === "DAILY") {
             if (pushForDay(cursorLocal)) break;
         } else if (ev.recurrenceFreq === "WEEKLY") {
-            const allowed = new Set((weekdays || []).map((w) => WD_MAP[w]));
-            if (allowed.has(weekday)) {
+            if (weeklyAllowed.has(weekday)) {
                 if (pushForDay(cursorLocal)) break;
             }
         }
@@ -116,5 +135,5 @@ export function expandEventOccurrences(
         cursorLocal = addDays(cursorLocal, 1);
     }
 
-    return out.sort((a, b) => a.start.getTime() - b.start.getTime());
+    return out;
 }
