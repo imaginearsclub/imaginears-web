@@ -14,7 +14,7 @@ const NavLink = ({ href, children }: { href: string; children: React.ReactNode }
 
 export default function Header() {
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-md border-b border-slate-200/60 dark:border-slate-800/60 bg-[linear-gradient(180deg,rgba(142,207,255,0.20)_0%,rgba(255,255,255,0.65)_100%)] dark:bg-[linear-gradient(180deg,rgba(13,23,40,0.85)_0%,rgba(10,15,25,0.60)_100%)] shadow-[0_4px_12px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.45)]">
+    <header className="sticky top-0 z-50 backdrop-blur-sm border-b border-slate-200/60 dark:border-slate-800/60 bg-transparent dark:bg-[linear-gradient(180deg,rgba(13,23,40,0.85)_0%,rgba(10,15,25,0.60)_100%)] shadow-[0_4px_12px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.45)]">
       {/* Accessible skip link for keyboard users */}
       <a href="#main" className="skip-link">Skip to main content</a>
       <div className="container flex h-16 items-center justify-between">

@@ -16,7 +16,7 @@ export default function Highlights() {
                             className="card card-glass duration-200 hover:-translate-y-0.5 hover:shadow-lg"
                         >
                             <h3 className="text-xl font-semibold">{it.title}</h3>
-                            <p className="mt-2 text-slate-700 dark:text-slate-300">{it.body}</p>
+                            <p className="mt-2 text-body">{it.body}</p>
                         </div>
                     ))}
                 </div>
