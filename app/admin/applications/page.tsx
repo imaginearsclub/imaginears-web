@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import ApplicationTable, {
-    ApplicationRow,
+    type ApplicationRow,
     exportApplicationsCSV,
 } from "@/components/admin/applications/ApplicationTable";
 import EditApplicationDrawer, {
-    EditableApplication,
+    type EditableApplication,
 } from "@/components/admin/applications/EditApplicationDrawer";
 
 type Query = {
