@@ -11,7 +11,7 @@ const ADMIN_ROLES = new Set(["owner", "admin"]);
 // noinspection JSUnusedGlobalSymbols
 export async function getServerSession() {
     // Read request headers provided by Next.js in the current server context
-    const h = nextHeaders();
+    const h = await nextHeaders();
     // Convert ReadonlyHeaders to a mutable Headers instance for libraries that expect standard Headers
     const hdrs = new Headers(h as unknown as Headers);
 
@@ -26,7 +26,7 @@ export async function getServerSession() {
 // noinspection JSUnusedGlobalSymbols
 export async function requireAdmin() {
     try {
-        const h = nextHeaders();
+        const h = await nextHeaders();
         const hdrs = new Headers(h as unknown as Headers);
 
         // Do both requests in parallel for better latency
