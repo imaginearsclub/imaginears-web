@@ -1,9 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 
-// Roles that can access the /admin area
-const ADMIN_ROLES = new Set(["owner", "admin"]);
+// Note: Middleware runs on the Edge runtime. Do not import database/auth code here.
 
 export async function middleware(req: NextRequest) {
     const { pathname, searchParams } = req.nextUrl;
@@ -12,33 +10,20 @@ export async function middleware(req: NextRequest) {
     if (req.method === "OPTIONS") return NextResponse.next();
 
     if (pathname.startsWith("/admin")) {
-        try {
-            // Read session cookies from the request
-            const session = await auth.api.getSession({ headers: req.headers });
+        // Lightweight session presence check using cookies only.
+        // This avoids importing Prisma/Better-Auth into the Edge runtime.
+        const cookies = req.cookies.getAll();
+        const hasLikelySession = cookies.some((c) => /session/i.test(c.name) && /auth|better|next/i.test(c.name));
 
-            // If no session, redirect to login immediately
-            if (!session) {
-                return redirectToLogin(req, pathname, searchParams);
-            }
-
-            // Determine role from Better-Auth Organization plugin
-            const roleResult = await auth.api.getActiveMemberRole({ headers: req.headers });
-            const roleRaw = roleResult?.role as string | string[] | undefined;
-            const roles: string[] = Array.isArray(roleRaw) ? roleRaw : roleRaw ? [roleRaw] : [];
-            const isAdmin = roles.some((r) => ADMIN_ROLES.has(r));
-
-            if (!isAdmin) {
-                return redirectToLogin(req, pathname, searchParams);
-            }
-
-            // Add protective headers and no-store for authenticated admin paths
-            const res = NextResponse.next();
-            hardenHeaders(res, req);
-            return res;
-        } catch (_e) {
-            // Fail closed: if Better-Auth throws or is unreachable, send to login
+        if (!hasLikelySession) {
             return redirectToLogin(req, pathname, searchParams);
         }
+
+        // We intentionally skip role checks in middleware (Edge). Perform fine-grained
+        // authorization inside Node.js runtime (server components/route handlers).
+        const res = NextResponse.next();
+        hardenHeaders(res, req);
+        return res;
     }
 
     return NextResponse.next();
