@@ -4,17 +4,13 @@ import { PrismaClient, type Prisma } from "@prisma/client";
 /**
  * Prisma client singleton with hardening and graceful shutdown.
  * - Avoids multiple instances during Next.js HMR in dev.
- * - Throws early if imported on the Edge runtime (Prisma doesn't support Edge).
+ * - Edge-safe: exports a stub on Edge runtime to avoid crashes in middleware/imports.
  * - Configurable log levels via PRISMA_LOG_LEVEL (comma-separated), sensible defaults per env.
  * - Registers process shutdown hooks to disconnect cleanly.
  */
 
-// Guard against accidental Edge runtime usage
+// Detect Edge runtime (e.g., Middleware). Prisma is not supported there.
 const isEdge = typeof (globalThis as any).EdgeRuntime !== "undefined" || process.env.NEXT_RUNTIME === "edge";
-if (isEdge) {
-    // Using Prisma on the Edge runtime is unsupported and will crash at runtime.
-    throw new Error("Prisma Client cannot be used in the Edge runtime. Move this code to the Node.js runtime or a server action/route running on Node.");
-}
 
 const isDev = process.env.NODE_ENV === "development";
 const isProd = process.env.NODE_ENV === "production";
@@ -68,15 +64,37 @@ function registerShutdownHooksOnce(client: PrismaClient) {
     }
 }
 
-export const prisma =
-    globalForPrisma.prisma ??
-    new PrismaClient({
-        log: logLevels,
-        errorFormat,
-    });
+// Export an Edge-safe stub that throws on use, but does not crash on import
+function createEdgePrismaStub(): PrismaClient {
+    const handler: any = new Proxy(
+        {},
+        {
+            get() {
+                throw new Error(
+                    "Prisma Client cannot be used in the Edge runtime. Ensure any code that calls the database runs on the Node.js runtime (e.g., server actions, route handlers, or server components) and avoid importing DB modules in Middleware."
+                );
+            },
+            apply() {
+                throw new Error(
+                    "Prisma Client cannot be used in the Edge runtime."
+                );
+            },
+        }
+    );
+    return handler as PrismaClient;
+}
 
-registerShutdownHooksOnce(prisma);
+export const prisma: PrismaClient = isEdge
+    ? createEdgePrismaStub()
+    : (globalForPrisma.prisma ??
+        new PrismaClient({
+            log: logLevels,
+            errorFormat,
+        }));
 
-if (!isProd) {
-    globalForPrisma.prisma = prisma;
+if (!isEdge) {
+    registerShutdownHooksOnce(prisma);
+    if (!isProd) {
+        globalForPrisma.prisma = prisma;
+    }
 }
