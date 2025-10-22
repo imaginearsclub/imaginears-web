@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 //  - set active organization to that org (if the API is available)
 
 export async function POST() {
-    const h = nextHeaders();
+    const h = await nextHeaders();
     const hdrs = new Headers(h as unknown as Headers);
 
     // Must be authenticated (we just signed up)
