@@ -37,23 +37,24 @@ export default function LoginPage() {
         setErr(null);
         setLoading(true);
         try {
-            const res = await auth.signIn.email({ email, password });
+            const res = await fetch("/api/auth/sign-in/email", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password, callbackURL: callbackUrl }),
+            });
 
-            // Type-safe narrowing: Better-Auth returns { error } on failure, { data } on success
-            if ("error" in res && res.error) {
-                setErr(friendlyError(res.error));
+            if (!res.ok) {
+                const data = await res.json().catch(async () => ({ message: await res.text().catch(() => "") }));
+                setErr(friendlyError((data as any)?.message || data));
                 return;
             }
 
-            // Success case
-            const data = (res as typeof res & { data: any }).data;
-            // Some providers can request a full redirect
-            if (data?.redirect && typeof data?.url === "string") {
+            const data = await res.json().catch(() => null);
+            if (data && data.redirect && typeof data.url === "string") {
                 window.location.href = data.url;
                 return;
             }
 
-            // Credentials flow: just go to the callback
             router.push(callbackUrl);
         } catch (e2) {
             setErr(friendlyError(e2));

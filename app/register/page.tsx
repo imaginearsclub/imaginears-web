@@ -2,13 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createAuthClient } from "better-auth/client";
-
-const auth = createAuthClient({
-    // If your app isn’t running at http://localhost:3000, set NEXT_PUBLIC_SITE_URL
-    // and pass it here so the client knows where /api/auth lives.
-    baseURL: process.env.NEXT_PUBLIC_SITE_URL || undefined,
-});
 
 function friendlyError(e: unknown): string {
     if (!e) return "Unknown error";
@@ -40,16 +33,20 @@ export default function RegisterPage() {
         setLoading(true);
 
         try {
-            // 1) sign up with email/password
-            const res = await auth.signUp.email({
-                email,
-                password,
-                name: name || email.split("@")[0],
-                // If you configured email verification, add: redirectTo: "/login"
+            // 1) Sign up with Better-Auth via REST to ensure credentials account is created
+            const res = await fetch("/api/auth/sign-up/email", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email,
+                    password,
+                    name: name || email.split("@")[0],
+                }),
             });
 
-            if (!res?.ok) {
-                setErr(friendlyError(res));
+            if (!res.ok) {
+                const data = await res.json().catch(async () => ({ message: await res.text().catch(() => "") }));
+                setErr(friendlyError(data?.message || data));
                 setLoading(false);
                 return;
             }
@@ -75,7 +72,7 @@ export default function RegisterPage() {
     return (
         <div className="mx-auto max-w-sm p-6 rounded-2xl border border-slate-200 dark:border-slate-800 mt-10">
             <h1 className="text-xl font-bold">Create First Admin</h1>
-            <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
+            <p className="text-sm text-body dark:text-slate-300 mt-1">
                 Temporary page to create your initial owner/admin. Delete after use.
             </p>
 
@@ -94,12 +91,12 @@ export default function RegisterPage() {
                 <div>
                     <label className="text-sm font-medium">Email</label>
                     <input className="w-full mt-1 rounded-2xl border px-4 py-3"
-                           value={email} onChange={(e)=>setE(e.target.value)} />
+                           value={email} onChange={(e)=>setE(e.target.value)} autoComplete="username" />
                 </div>
                 <div>
                     <label className="text-sm font-medium">Password</label>
                     <input type="password" className="w-full mt-1 rounded-2xl border px-4 py-3"
-                           value={password} onChange={(e)=>setP(e.target.value)} />
+                           value={password} onChange={(e)=>setP(e.target.value)} autoComplete="new-password" />
                 </div>
                 <button className="btn btn-primary w-full" disabled={loading}>
                     {loading ? "Creating…" : "Create admin"}

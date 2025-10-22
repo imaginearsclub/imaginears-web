@@ -38,6 +38,8 @@ const baseURL: string | undefined = (() => {
 // Org creation policy: default to disallowing arbitrary org creation unless explicitly enabled.
 const allowOrgCreation = /^true|1$/i.test(process.env.ALLOW_ORG_CREATION ?? "");
 
+// Note: Better-Auth stores credential passwords on the Account table (field `password`),
+// not on User.passwordHash. Seeing User.passwordHash = null is expected.
 export const auth = betterAuth({
   baseURL,
   database: prismaAdapter(prisma, { provider: "mysql" }),
