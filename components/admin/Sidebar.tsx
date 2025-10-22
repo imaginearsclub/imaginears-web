@@ -89,6 +89,7 @@ function SidebarInner({ onCloseAction }: { onCloseAction?: () => void }) {
                 <NavItem href="/admin/events" icon={CalendarRange} label="Events" onClick={onCloseAction} />
                 <NavItem href="/admin/applications" icon={FileText} label="Applications" onClick={onCloseAction} />
                 <NavItem href="/admin/players" icon={Users} label="Players" onClick={onCloseAction} />
+                <NavItem href="/admin/organizations" icon={Users} label="Organizations" onClick={onCloseAction} />
                 <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800/60" />
                 <NavItem href="/admin/settings" icon={Settings} label="Settings" onClick={onCloseAction} />
             </div>
