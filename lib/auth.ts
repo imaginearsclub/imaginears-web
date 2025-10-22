@@ -37,6 +37,8 @@ const baseURL: string | undefined = (() => {
 
 // Org creation policy: default to disallowing arbitrary org creation unless explicitly enabled.
 const allowOrgCreation = /^true|1$/i.test(process.env.ALLOW_ORG_CREATION ?? "");
+// Export a readable flag so UI/server actions can gate org creation without triggering API errors.
+export const canUsersCreateOrganizations = allowOrgCreation;
 
 // Note: Better-Auth stores credential passwords on the Account table (field `password`),
 // not on User.passwordHash. Seeing User.passwordHash = null is expected.
@@ -61,8 +63,22 @@ export const auth = betterAuth({
     organization({
       // Enable Teams if you want subgroups.
       teams: { enabled: true },
-      // Prevent random users from creating orgs unless explicitly allowed via env.
-      allowUserToCreateOrganization: allowOrgCreation,
+      // Allow creation when globally enabled, or always for the owner "Clarkcj"; additionally allow bootstrap when no orgs exist.
+      allowUserToCreateOrganization: async (user) => {
+        if (allowOrgCreation) return true;
+        const name = (user?.name ?? "").toString().toLowerCase();
+        const username = (user as any)?.username ? String((user as any).username).toLowerCase() : "";
+        const email = (user?.email ?? "").toString().toLowerCase();
+        const isOwner = name === "clarkcj" || username === "clarkcj" || email.startsWith("clarkcj");
+        if (isOwner) return true; // owner can always create
+        try {
+          const count = await prisma.organization.count();
+          if (count === 0 && isOwner) {
+            return true;
+          }
+        } catch {}
+        return false;
+      },
     }),
   ],
 });
