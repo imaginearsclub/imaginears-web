@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { PrismaClient, EventStatus, type Weekday } from "@prisma/client";
+import { EventStatus, type Weekday } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { expandEventOccurrences } from "@/lib/recurrence";
 import { addDays, format as fmt } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
@@ -9,17 +10,6 @@ import { safeRehypePlugins } from "@/lib/markdown";
 import ScheduleSummary from "@/components/events/ScheduleSummary";
 
 export const runtime = "nodejs";
-
-let _prisma: PrismaClient | null = null;
-function prisma() {
-    if (!_prisma) {
-        // @ts-expect-error dev singleton
-        _prisma = globalThis.__PRISMA__ ?? new PrismaClient();
-        // @ts-expect-error dev singleton
-        if (!globalThis.__PRISMA__) globalThis.__PRISMA__ = _prisma;
-    }
-    return _prisma!;
-}
 
 function asStringArray(v: unknown): string[] {
     return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
@@ -35,9 +25,12 @@ function formatLocalTime(utc: Date, tz: string) {
     return fmt(local, "EEE, MMM d • h:mm a");
 }
 
-export default async function EventPublicPage({ params }: { params: { id: string } }) {
-    const ev = await prisma().event.findUnique({
-        where: { id: params.id },
+export default async function EventPublicPage({ params }: { params: Promise<{ id: string }> }) {
+    // Next.js 15+: params is now a Promise
+    const { id } = await params;
+    
+    const ev = await prisma.event.findUnique({
+        where: { id },
         select: {
             id: true,
             title: true,
