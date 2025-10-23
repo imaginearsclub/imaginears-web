@@ -91,11 +91,8 @@ export const prisma: PrismaClient = isEdge
         new PrismaClient({
             log: logLevels,
             errorFormat,
-            datasources: {
-                db: {
-                    url: env.DATABASE_URL + "?connection_limit=5&pool_timeout=20",
-                },
-            },
+            // Prisma handles connection pooling automatically for MySQL
+            // Default pool size: 10 connections (configurable in schema.prisma if needed)
         }));
 
 if (!isEdge) {
