@@ -103,6 +103,8 @@ model Event {
   @@index([startAt])
   @@index([category])
   @@index([recurrenceFreq])
+  @@index([status, startAt])
+  @@index([category, status])
 }
 
 model AppSettings {
@@ -173,6 +175,11 @@ model Application {
 
   // Free-form metadata
   notes String? @db.Text
+
+  // Performance indexes
+  @@index([status, createdAt])
+  @@index([email])
+  @@index([role, status])
 }
 
 enum AppRole {
