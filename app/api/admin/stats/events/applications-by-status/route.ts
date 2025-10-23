@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdminSession } from "@/lib/secure-session";
+import { requireAdmin } from "@/lib/session";
 
 export async function GET() {
     try {
-        await requireAdminSession();
+        await requireAdmin();
 
         // Group by Application.status
         const rows = await prisma.application.groupBy({

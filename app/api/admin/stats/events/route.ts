@@ -1,11 +1,11 @@
 import {NextResponse} from 'next/server';
 import {prisma} from '@/lib/prisma';
-import {requireAdminSession} from '@/lib/secure-session';
+import {requireAdmin} from '@/lib/session';
 
 // Buckets by day fro last N (default 30) days based on Event.createdAt
 export async function GET(req: Request){
     try {
-        await requireAdminSession();
+        await requireAdmin();
 
         const {searchParams} = new URL(req.url);
         const range = parseInt(searchParams.get('range') || '30', 10);

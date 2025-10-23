@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdminSession } from "@/lib/secure-session";
-
+import { requireAdmin } from "@/lib/session";
 type ActivityItem = {
     id: string;
     kind: "event" | "application";
@@ -12,7 +11,7 @@ type ActivityItem = {
 
 export async function GET() {
     try {
-        await requireAdminSession();
+        await requireAdmin();
 
         const [events, apps] = await Promise.all([
             prisma.event.findMany({

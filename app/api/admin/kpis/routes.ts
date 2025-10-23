@@ -1,6 +1,6 @@
 import {NextResponse} from 'next/server';
 import {prisma} from '@/lib/prisma';
-import {requireAdminSession} from '@/lib/secure-session';
+import {requireAdmin} from '@/lib/session';
 
 // Very simple uptime
 const startedAt = Date.now();
@@ -13,7 +13,7 @@ function formatUptime(ms: number) {
 
 export async function GET(){
     try {
-        await requireAdminSession();
+        await requireAdmin();
 
         const [totalPlayers, totalEvents, activeApplications] = await Promise.all([
             prisma.user.count(), // Total players
