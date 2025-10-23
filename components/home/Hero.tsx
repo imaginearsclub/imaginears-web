@@ -123,9 +123,7 @@ function Hero() {
                     
                     {/* Enhanced subtitle with better readability */}
                     <p className="mt-6 max-w-2xl text-xl md:text-2xl text-white/95 drop-shadow-lg leading-relaxed font-medium animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
-                        A Disney-inspired Minecraft world brought to life—rides, shows, and
-                        seasonal events crafted by fans for fans. Family-friendly, welcoming,
-                        and always magical. ✨
+                    Bringing the magic of Disney theme parks to life in Minecraft, with working rides, shows, and seasonal events crafted by fans for fans. Family-friendly, welcoming, and always magical. ✨
                     </p>
 
                     {/* CTA buttons with icons */}
