@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         await requireAdmin();
+        // Next.js 15+: params is now a Promise
+        const { id } = await params;
         const e = await prisma.event.findUnique({
-            where: { id: params.id },
+            where: { id },
             select: {
                 id: true,
                 title: true,
@@ -28,9 +30,11 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     }
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         await requireAdmin();
+        // Next.js 15+: params is now a Promise
+        const { id } = await params;
         const body = await req.json();
 
         const data: Record<string, any> = {};
@@ -44,7 +48,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         if (body.endAt !== undefined) data["endAt"] = body.endAt === null ? null : new Date(body.endAt);
 
         const updated = await prisma.event.update({
-            where: { id: params.id },
+            where: { id },
             data,
         });
 
