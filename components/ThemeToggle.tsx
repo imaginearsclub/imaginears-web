@@ -6,24 +6,24 @@ const STORAGE_KEY = Object.freeze("imaginears.theme" as const);
 
 type Theme = "light" | "dark";
 
-// Batch DOM operations for better performance
+// Apply theme synchronously to prevent flash and race conditions
 function applyTheme(theme: Theme) {
   const root = document.documentElement;
+  const isDark = theme === "dark";
   
-  // Use requestAnimationFrame for smooth visual updates
-  requestAnimationFrame(() => {
-    // Batch DOM writes to prevent multiple reflows
-    const isDark = theme === "dark";
-    
-    // More efficient: directly set/remove class instead of toggle with boolean
-    if (isDark) {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-    
-    root.setAttribute("data-theme", theme);
-  });
+  // Apply immediately (synchronous) to prevent race conditions
+  if (isDark) {
+    root.classList.add("dark");
+  } else {
+    root.classList.remove("dark");
+  }
+  
+  root.setAttribute("data-theme", theme);
+  
+  // Log for debugging
+  if (process.env.NODE_ENV === "development") {
+    console.log("[ThemeToggle] Applied theme:", theme, "| HTML has dark class:", root.classList.contains("dark"));
+  }
 }
 
 function readSessionTheme(): Theme | null {
