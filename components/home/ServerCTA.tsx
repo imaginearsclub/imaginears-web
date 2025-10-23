@@ -93,7 +93,7 @@ function ServerCTA() {
                         </div>
                         
                         <p className="text-body leading-relaxed">
-                            Add the server IP in Minecraft Java and hop in—our guides and mods
+                            Add the server IP in Minecraft Java and enter the parks; our cast members and fellow guests
                             are happy to help you get started!
                         </p>
                         
