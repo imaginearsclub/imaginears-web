@@ -21,7 +21,9 @@ export class HttpError extends Error {
     this.statusText = statusText;
     this.url = url;
     this.method = method;
-    this.bodyText = params.bodyText;
+    if (params.bodyText !== undefined) {
+      this.bodyText = params.bodyText;
+    }
   }
 }
 
@@ -72,7 +74,7 @@ async function requestJSON<T>(method: string, url: string, body?: unknown, extra
   const init: RequestInit & { timeoutMs?: number } = {
     method,
     headers,
-    cache: method === "GET" ? "no-store" : undefined,
+    ...(method === "GET" ? { cache: "no-store" as const } : {}),
   };
   if (body !== undefined) {
     // Only set content-type if caller hasn't provided it
@@ -98,18 +100,18 @@ async function requestJSON<T>(method: string, url: string, body?: unknown, extra
           continue;
         }
         const preview = await readErrorPreview(res);
-        throw new HttpError({ method, url, status: res.status, statusText: res.statusText, bodyText: preview });
+        throw new HttpError({ method, url, status: res.status, statusText: res.statusText, ...(preview !== undefined ? { bodyText: preview } : {}) });
       }
       // Strict JSON parsing: only parse JSON content types
       if (!isJsonContentType(res)) {
         const preview = await readErrorPreview(res);
-        throw new HttpError({ method, url, status: 415, statusText: "Unsupported Media Type (expected JSON)", bodyText: preview });
+        throw new HttpError({ method, url, status: 415, statusText: "Unsupported Media Type (expected JSON)", ...(preview !== undefined ? { bodyText: preview } : {}) });
       }
       // Optional safety: reject very large payloads when content-length indicates it
       const lenHeader = res.headers.get("content-length");
       const contentLength = lenHeader ? Number(lenHeader) : undefined;
       if (contentLength && contentLength > 5_000_000) {
-        throw new HttpError({ method, url, status: 413, statusText: "Payload Too Large", bodyText: undefined });
+        throw new HttpError({ method, url, status: 413, statusText: "Payload Too Large" });
       }
       return (await res.json()) as T;
     } catch (err: any) {
@@ -144,7 +146,7 @@ export async function del(url: string) {
   const res = await fetchWithTimeout(url, { method: "DELETE" });
   if (!res.ok) {
     const preview = await readErrorPreview(res);
-    throw new HttpError({ method: "DELETE", url, status: res.status, statusText: res.statusText, bodyText: preview });
+    throw new HttpError({ method: "DELETE", url, status: res.status, statusText: res.statusText, ...(preview !== undefined ? { bodyText: preview } : {}) });
   }
   return true;
 }
