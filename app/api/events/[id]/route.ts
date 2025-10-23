@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
-const prisma = new PrismaClient();
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        // Next.js 15+: params is now a Promise
+        const { id } = await params;
         const body = await req.json();
 
         const updated = await prisma.event.update({
-            where: { id: params.id },
+            where: { id },
             data: {
                 ...(body.title !== undefined ? { title: body.title } : {}),
                 ...(body.world !== undefined ? { world: body.world } : {}),
