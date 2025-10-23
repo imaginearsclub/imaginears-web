@@ -1,5 +1,6 @@
 import "server-only";
 import { PrismaClient, type Prisma } from "@prisma/client";
+import { env } from "@/lib/env";
 
 /**
  * Prisma client singleton with hardening and graceful shutdown.
@@ -10,13 +11,13 @@ import { PrismaClient, type Prisma } from "@prisma/client";
  */
 
 // Detect Edge runtime (e.g., Middleware). Prisma is not supported there.
-const isEdge = typeof (globalThis as any).EdgeRuntime !== "undefined" || process.env.NEXT_RUNTIME === "edge";
+const isEdge = typeof (globalThis as any).EdgeRuntime !== "undefined" || process.env['NEXT_RUNTIME'] === "edge";
 
-const isDev = process.env.NODE_ENV === "development";
-const isProd = process.env.NODE_ENV === "production";
+const isDev = env.NODE_ENV === "development";
+const isProd = env.NODE_ENV === "production";
 
 function parseLogEnv(): Prisma.LogLevel[] | undefined {
-    const raw = process.env.PRISMA_LOG_LEVEL;
+    const raw = env.PRISMA_LOG_LEVEL;
     if (!raw) return undefined;
     const allowed: Prisma.LogLevel[] = ["query", "info", "warn", "error"];
     const set = new Set(
@@ -90,11 +91,25 @@ export const prisma: PrismaClient = isEdge
         new PrismaClient({
             log: logLevels,
             errorFormat,
+            datasources: {
+                db: {
+                    url: env.DATABASE_URL + "?connection_limit=5&pool_timeout=20",
+                },
+            },
         }));
 
 if (!isEdge) {
     registerShutdownHooksOnce(prisma);
     if (!isProd) {
         globalForPrisma.prisma = prisma;
+    }
+    
+    // Add query performance monitoring (only in development)
+    if (isDev) {
+        (prisma as any).$on('query', (e: any) => {
+            if (e.duration > 2000) {
+                console.warn(`🐌 Slow query detected: ${e.duration}ms - ${e.query.substring(0, 100)}...`);
+            }
+        });
     }
 }
