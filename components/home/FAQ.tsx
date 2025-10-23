@@ -6,21 +6,21 @@ const FAQS = Object.freeze([
     {
         id: "disney-affiliation",
         question: "Is this affiliated with Disney?",
-        answer: "No. Imaginears Club is a fan project and is not affiliated with The Walt Disney Company.",
+        answer: "No, we are not. However, while we are not affiliated with The Walt Disney Company. We are a community of fans who love the Disney theme parks and want to create a fun and engaging experience for everyone.",
         icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253",
         color: "from-blue-500 to-cyan-500"
     },
     {
         id: "mods-required",
         question: "Do I need mods to join?",
-        answer: "No mods are required for Java edition; resource packs are delivered in-game when needed.",
+        answer: "Mods are not required; resource packs are delivered in-game when needed. However, we do recommend using Optifine and Smooth Coasters for the best experience.",
         icon: "M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4",
         color: "from-purple-500 to-pink-500"
     },
     {
         id: "kid-friendly",
         question: "Is it kid-friendly?",
-        answer: "Yes—we keep it family-friendly with active moderation and clear community guidelines.",
+        answer: "We are family-friendly; as we have guests that are of all ages. We want our server to be fun and exciting for all ages. So we request that you be respectful of others and follow our community rules.",
         icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
         color: "from-green-500 to-emerald-500"
     }
