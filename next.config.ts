@@ -7,10 +7,8 @@ const nextConfig: NextConfig = {
     // Performance: Produce a self-contained .next/standalone output that's easier to deploy in Docker/serverless
     output: "standalone",
     
-    // Performance: Enable React Compiler for automatic optimizations
+    // Performance: Enable optimized package imports
     experimental: { 
-        reactCompiler: true,
-        // Performance: Enable optimized package imports
         optimizePackageImports: ['lucide-react', 'framer-motion', 'recharts']
     },
     
@@ -59,7 +57,7 @@ const nextConfig: NextConfig = {
     poweredByHeader: false,
     
     // Performance: Optimize bundle (only when not using Turbopack)
-    ...(process.env.TURBOPACK !== '1' && {
+    ...(process.env['TURBOPACK'] !== '1' && {
         webpack: (config, { dev, isServer }) => {
             // Performance: Optimize for production
             if (!dev && !isServer) {
