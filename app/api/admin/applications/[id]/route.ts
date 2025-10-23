@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
-import { PrismaClient, AppRole, AppStatus } from "@prisma/client";
+import { AppRole, AppStatus } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 
-const prisma = new PrismaClient();
 export const runtime = "nodejs";
 
 export async function PATCH(
     req: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const id = params.id;
+        // Next.js 15+: params is now a Promise
+        const { id } = await params;
         const body = await req.json();
 
         const patch: any = {};
@@ -47,10 +48,11 @@ export async function PATCH(
 
 export async function DELETE(
     _req: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const id = params.id;
+        // Next.js 15+: params is now a Promise
+        const { id } = await params;
         await prisma.application.delete({ where: { id } });
         return NextResponse.json({ ok: true });
     } catch (e) {
