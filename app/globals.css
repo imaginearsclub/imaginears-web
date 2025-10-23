@@ -718,3 +718,82 @@ aside[role="dialog"] select {
     color: var(--text-dark);
   }
 }
+
+/* ----------------------------------------------- */
+/* 🎨 Footer Enhancements                          */
+/* ----------------------------------------------- */
+footer {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+footer code {
+  letter-spacing: 0.025em;
+  transition: all 0.2s ease;
+}
+
+footer code:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(92, 174, 255, 0.2);
+}
+
+footer a:hover svg {
+  transform: scale(1.1);
+  transition: transform 0.2s ease;
+}
+
+/* Subtle gradient overlay for depth */
+footer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    var(--brand-start) 100%
+  );
+}
+
+.dark footer::before {
+  opacity: 0.05;
+}
+
+/* ----------------------------------------------- */
+/* 🎨 Header Enhancements                          */
+/* ----------------------------------------------- */
+header {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Subtle gradient shimmer on header */
+header::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(142, 207, 255, 0.1) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  transition: all 0.6s ease;
+}
+
+header:hover::after {
+  opacity: 1;
+  transform: translateX(100%);
+}
+
+/* Logo animations */
+header img {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.dark header img {
+  filter: drop-shadow(0 2px 6px rgba(92, 174, 255, 0.3));
+}
