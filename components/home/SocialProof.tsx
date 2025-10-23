@@ -90,7 +90,7 @@ function SocialProof() {
                             Join Our Community
                         </h2>
                         <p className="text-sm text-slate-600 dark:text-slate-400">
-                            Connect with thousands of players who've experienced our magical parks
+                            Connect with thousands of fellow guests who've experienced our magical parks
                         </p>
                     </div>
                     <div className="flex items-center gap-2" role="list">
