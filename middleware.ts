@@ -47,17 +47,21 @@ function hardenHeaders(res: NextResponse, req: NextRequest) {
     // Do not cache authenticated admin responses
     res.headers.set("Cache-Control", "no-store, private");
 
-    // Basic hardening headers (safe defaults)
+    // Enhanced hardening headers
     res.headers.set("X-Frame-Options", "DENY");
     res.headers.set("X-Content-Type-Options", "nosniff");
-    res.headers.set("Referrer-Policy", "same-origin");
+    res.headers.set("X-XSS-Protection", "1; mode=block");
+    res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
     res.headers.set("Permissions-Policy", "accelerometer=(), camera=(), geolocation=(), microphone=(), gyroscope=(), interest-cohort=()");
+    
+    // Add CSRF protection header
+    res.headers.set("X-CSRF-Token", "required");
 
     // Only set HSTS when we know the request is HTTPS (avoid localhost issues)
     const proto = req.headers.get("x-forwarded-proto") ?? (req.nextUrl.protocol?.replace(":", "") || "");
     if (proto === "https") {
-        // 6 months, include subdomains, preload signal
-        res.headers.set("Strict-Transport-Security", "max-age=15552000; includeSubDomains; preload");
+        // 1 year, include subdomains, preload signal
+        res.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
     }
 }
 
