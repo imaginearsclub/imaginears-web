@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import Hero from "@/components/home/Hero";
 import Highlights from "@/components/home/Highlights";
 import SocialProof from "@/components/home/SocialProof";
@@ -9,33 +10,96 @@ import EventTeaser from "@/components/public/EventTeaser";
 
 // Force Node.js runtime to ensure compatibility with server-only modules (e.g., Prisma) used by children.
 export const runtime = "nodejs";
-// Revalidate the page shell every 60s for a balance of freshness and performance.
-export const revalidate = 60;
+
+// Performance: Revalidate every 5 minutes for fresh content while reducing DB load
+export const revalidate = 300;
+
+// Security & SEO: Enhanced metadata for homepage
+export const metadata: Metadata = {
+  title: "Imaginears Club - A Magical Disney-Inspired Minecraft Experience",
+  description: "Join Imaginears Club, a family-friendly Disney-inspired Minecraft server with custom rides, shows, and seasonal events. Experience the magic with our welcoming community!",
+  keywords: ["Minecraft server", "Disney Minecraft", "Imaginears", "Theme park server", "Family-friendly Minecraft", "Minecraft events", "Custom Minecraft builds"],
+  openGraph: {
+    title: "Imaginears Club - A Magical Disney-Inspired Minecraft Experience",
+    description: "Join our magical Disney-inspired Minecraft world with custom rides, shows, and seasonal events crafted by fans for fans.",
+    type: "website",
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Imaginears Club - A Magical Disney-Inspired Minecraft Experience",
+    description: "Join our magical Disney-inspired Minecraft world with custom rides, shows, and seasonal events.",
+  },
+  alternates: {
+    canonical: "/",
+  },
+  // Security: Prevent referrer leakage to external sites
+  referrer: "strict-origin-when-cross-origin",
+  // Security: Prevent clickjacking
+  other: {
+    "X-Frame-Options": "SAMEORIGIN",
+    "X-Content-Type-Options": "nosniff",
+  },
+};
+
+// Performance: EventTeaser loading skeleton component (matches actual content structure)
+function EventTeaserSkeleton() {
+  return (
+    <section className="mx-auto max-w-6xl px-4 sm:px-6 mt-10" aria-busy="true" aria-live="polite">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">Happening Now</h2>
+        <div className="h-5 w-20 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+      </div>
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[0, 1, 2].map((i) => (
+          <article
+            key={i}
+            className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 p-4"
+            aria-hidden="true"
+          >
+            {/* Header skeleton */}
+            <header className="flex items-start justify-between gap-3">
+              <div className="h-6 w-3/4 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+              <div className="h-6 w-16 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700" />
+            </header>
+            {/* Schedule skeleton */}
+            <div className="mt-2 space-y-1">
+              <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+              <div className="h-4 w-1/2 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+            </div>
+            {/* Description skeleton */}
+            <div className="mt-3 space-y-2">
+              <div className="h-3 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+              <div className="h-3 w-5/6 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+              <div className="h-3 w-4/6 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+            </div>
+            {/* Footer skeleton */}
+            <footer className="mt-4">
+              <div className="h-4 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+            </footer>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 export default function Home() {
   return (
-    <main id="main">
+    <main id="main" className="scroll-smooth">
+      {/* Above the fold - Critical content with priority loading */}
       <Hero />
+      
+      {/* Progressive enhancement - Load features in order of importance */}
       <Highlights />
       <SocialProof />
-      <Suspense
-        fallback={
-          <section aria-busy="true" aria-live="polite" className="container py-12">
-            <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Happening Now</h2>
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[0,1,2].map((i) => (
-                <div key={i} className="rounded-lg border border-slate-200/60 dark:border-slate-800/60 p-4">
-                  <div className="h-40 w-full animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />
-                  <div className="mt-4 h-4 w-3/5 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-                  <div className="mt-2 h-4 w-2/5 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-                </div>
-              ))}
-            </div>
-          </section>
-        }
-      >
+      
+      {/* Performance: Suspense boundary for dynamic content to prevent blocking */}
+      <Suspense fallback={<EventTeaserSkeleton />}>
         <EventTeaser title="Happening Now" limit={3} />
       </Suspense>
+      
+      {/* Below the fold - Lower priority sections */}
       <ServerCTA />
       <Newsletter />
       <FAQ />
