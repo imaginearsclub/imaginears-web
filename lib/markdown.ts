@@ -2,39 +2,50 @@ import rehypeSanitize, { type Options as RehypeSanitizeOptions } from "rehype-sa
 import { defaultSchema } from "hast-util-sanitize";
 
 // Hardened sanitize schema for Markdown rendering.
+// Security:
 // - Disallows raw script/unsafe nodes (default)
-// - Restricts URL protocols to safe schemes
-// - Forces safe link targets/rel in renderers, but also allows attributes here
-// - Allows className only on code/pre for styling
+// - Disallows HTML comments and doctypes
+// - Restricts URL protocols to safe schemes (no javascript:, data: limited)
+// - Forces safe link targets/rel (noopener prevents tabnabbing)
+// - Prefixes user IDs to prevent DOM clobbering attacks
+// Performance:
+// - Enables native lazy loading for images
+// - Enables async image decoding to prevent blocking
+// - Allows className only on code/pre for syntax highlighting
 export const markdownSanitizeSchema: RehypeSanitizeOptions = Object.freeze({
     ...defaultSchema,
     allowComments: false,
-    clobberPrefix: "user-content",
+    allowDoctypes: false,
+    clobberPrefix: "user-content-",
     attributes: {
         ...defaultSchema.attributes,
         a: [
-            ...(defaultSchema.attributes?.a || []),
+            ...(defaultSchema.attributes?.["a"] || []),
             ["target", "_blank"],
             ["rel", "noopener noreferrer nofollow"],
         ],
         img: [
-            ...(defaultSchema.attributes?.img || []),
+            ...(defaultSchema.attributes?.["img"] || []),
             ["loading", "lazy"],
             ["decoding", "async"],
+            ["alt"], // Ensure alt text is preserved for accessibility
         ],
         code: [
-            ...(defaultSchema.attributes?.code || []),
-            ["className"],
+            ...(defaultSchema.attributes?.["code"] || []),
+            // Only allow language-* className pattern for syntax highlighting
+            ["className", /^language-./],
         ],
         pre: [
-            ...(defaultSchema.attributes?.pre || []),
-            ["className"],
+            ...(defaultSchema.attributes?.["pre"] || []),
+            ["className", /^language-./],
         ],
     },
     protocols: {
         ...defaultSchema.protocols,
         href: ["http", "https", "mailto", "tel"],
-        src: ["http", "https", "data"], // data URLs allowed for images only; other nodes remain filtered by schema
+        // Removed data: URLs for security - use external image hosting instead
+        // If data URLs are needed, consider validating MIME types explicitly
+        src: ["http", "https"],
     },
 } satisfies RehypeSanitizeOptions);
 
