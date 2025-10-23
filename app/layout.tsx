@@ -160,21 +160,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 var key = 'imaginears.theme';
                 var stored = null;
                 try { stored = sessionStorage.getItem(key); } catch (e) {}
-                var prefersDark = false;
-                try { 
-                  prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; 
-                } catch (e) {}
-                var theme = (stored === 'dark' || stored === 'light') ? stored : (prefersDark ? 'dark' : 'light');
-                if (theme) {
-                  if (theme === 'dark') { 
-                    d.classList.add('dark'); 
-                  } else { 
-                    d.classList.remove('dark'); 
-                  }
-                  d.setAttribute('data-theme', theme);
+                
+                // Default to light mode for better readability
+                // Users can switch using the theme toggle in the header
+                var theme = (stored === 'dark' || stored === 'light') ? stored : 'light';
+                
+                if (theme === 'dark') { 
+                  d.classList.add('dark'); 
+                } else { 
+                  d.classList.remove('dark'); 
                 }
+                d.setAttribute('data-theme', theme);
               } catch (e) {
-                // Graceful degradation - browser will use system preference via CSS
+                // Graceful degradation - default to light mode
+                document.documentElement.classList.remove('dark');
+                document.documentElement.setAttribute('data-theme', 'light');
               }
             })();
           `}
