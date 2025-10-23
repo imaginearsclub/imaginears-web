@@ -46,15 +46,15 @@ export const metadata: Metadata = {
 function EventTeaserSkeleton() {
   return (
     <section className="mx-auto max-w-6xl px-4 sm:px-6 mt-10" aria-busy="true" aria-live="polite">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Happening Now</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">Happening Now</h2>
         <div className="h-5 w-20 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
       </div>
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {[0, 1, 2].map((i) => (
           <article
             key={i}
-            className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 p-4"
+            className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5"
             aria-hidden="true"
           >
             {/* Header skeleton */}
