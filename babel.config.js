@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   presets: ['next/babel'],
   plugins: [
     ['babel-plugin-react-compiler', {
@@ -7,3 +7,4 @@ module.exports = {
     }],
   ],
 };
+
