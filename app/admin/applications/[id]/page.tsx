@@ -1,25 +1,17 @@
 import { notFound } from "next/navigation";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import ActionBar from "@/components/admin/applications/ApplicationApproveBar";
 
 export const runtime = "nodejs";
 
-let _prisma: PrismaClient | null = null;
-function prisma() {
-    if (!_prisma) {
-        // @ts-expect-error dev singleton
-        _prisma = globalThis.__PRISMA__ ?? new PrismaClient();
-        // @ts-expect-error dev singleton
-        if (!globalThis.__PRISMA__) globalThis.__PRISMA__ = _prisma;
-    }
-    return _prisma!;
-}
-
 export default async function ApplicationDetailPage({
                                                         params,
-                                                    }: { params: { id: string } }) {
-    const app = await prisma().application.findUnique({
-        where: { id: params.id },
+                                                    }: { params: Promise<{ id: string }> }) {
+    // Next.js 15+: params is now a Promise
+    const { id } = await params;
+    
+    const app = await prisma.application.findUnique({
+        where: { id },
     });
 
     if (!app) return notFound();
