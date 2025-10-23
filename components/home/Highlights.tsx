@@ -5,7 +5,7 @@ const HIGHLIGHTS = Object.freeze([
     { 
         id: "daily-shows",
         title: "Daily Shows", 
-        body: "Catch recurring shows with countdowns and park-wide audio.",
+        body: "Catch stunning Parades and Shows daily as well as meet and greets with your favorite characters.",
         icon: "M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z",
         gradient: "from-blue-500 to-cyan-500",
         bgColor: "bg-blue-50 dark:bg-blue-900/20",
@@ -14,7 +14,7 @@ const HIGHLIGHTS = Object.freeze([
     { 
         id: "ride-classics",
         title: "Ride the Classics", 
-        body: "Tron Lightcycle Run, Mine Train, Star Tours, and more.",
+        body: "Ride the classics like the Its a Small World, Star Tours, and Tower of Terror, with all rides being 100% accurate to the original, with full working ride-audio and full working ride-effects.",
         icon: "M13 10V3L4 14h7v7l9-11h-7z",
         gradient: "from-purple-500 to-pink-500",
         bgColor: "bg-purple-50 dark:bg-purple-900/20",
@@ -23,7 +23,7 @@ const HIGHLIGHTS = Object.freeze([
     { 
         id: "seasonal-magic",
         title: "Seasonal Magic", 
-        body: "Special overlays and limited-time events all year.",
+        body: "Special overlays and limited-time events all year. Like the Halloween event, May the 4th event, and more throught the parks, and as well on our seasonal event server.",
         icon: "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z",
         gradient: "from-amber-500 to-orange-500",
         bgColor: "bg-amber-50 dark:bg-amber-900/20",
