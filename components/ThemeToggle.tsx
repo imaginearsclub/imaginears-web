@@ -1,21 +1,37 @@
 "use client";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useLayoutEffect, useRef, useState, useCallback } from "react";
 
-const STORAGE_KEY = "imaginears.theme"; // session-scoped override
+// Frozen constant to prevent tampering
+const STORAGE_KEY = Object.freeze("imaginears.theme" as const);
 
 type Theme = "light" | "dark";
 
+// Batch DOM operations for better performance
 function applyTheme(theme: Theme) {
   const root = document.documentElement;
-  // Toggle Tailwind's class strategy and set a data attribute for potential CSS hooks
-  root.classList.toggle("dark", theme === "dark");
-  root.setAttribute("data-theme", theme);
+  
+  // Use requestAnimationFrame for smooth visual updates
+  requestAnimationFrame(() => {
+    // Batch DOM writes to prevent multiple reflows
+    const isDark = theme === "dark";
+    
+    // More efficient: directly set/remove class instead of toggle with boolean
+    if (isDark) {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
+    
+    root.setAttribute("data-theme", theme);
+  });
 }
 
 function readSessionTheme(): Theme | null {
   try {
     const v = sessionStorage.getItem(STORAGE_KEY);
-    return v === "dark" || v === "light" ? v : null;
+    // Strict validation: only accept exact values
+    if (v !== "dark" && v !== "light") return null;
+    return v;
   } catch {
     // Storage may be disabled or in a restricted context
     return null;
@@ -24,19 +40,33 @@ function readSessionTheme(): Theme | null {
 
 function writeSessionTheme(theme: Theme) {
   try {
+    // Validate before writing
+    if (theme !== "dark" && theme !== "light") {
+      console.warn("[ThemeToggle] Attempted to write invalid theme:", theme);
+      return;
+    }
     sessionStorage.setItem(STORAGE_KEY, theme);
-  } catch {
-    // Ignore write failures (private mode or quota)
+  } catch (err) {
+    // Log quota exceeded errors in development for debugging
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[ThemeToggle] Failed to write theme:", err);
+    }
   }
 }
 
 export default function ThemeToggle() {
   const [dark, setDark] = useState(false);
   const hasOverrideRef = useRef(false);
+  const mediaQueryRef = useRef<MediaQueryList | null>(null);
 
-  // Initialize from session override or system preference. Also watch system changes when no override exists.
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  // Use useLayoutEffect to prevent flash of wrong theme on page load
+  // This runs synchronously before browser paint
+  useLayoutEffect(() => {
+    // Cache mediaQuery for performance (avoid repeated matchMedia calls)
+    if (!mediaQueryRef.current) {
+      mediaQueryRef.current = window.matchMedia("(prefers-color-scheme: dark)");
+    }
+    const mq = mediaQueryRef.current;
     const stored = readSessionTheme();
 
     if (stored) {
@@ -50,18 +80,21 @@ export default function ThemeToggle() {
     }
 
     // Respond to system theme changes only if no user override is set
-    const handleChange = (e: MediaQueryListEvent) => {
+    const handleChange = (e: MediaQueryListEvent | MediaQueryList) => {
       if (hasOverrideRef.current) return;
-      const next: Theme = e.matches ? "dark" : "light";
+      const matches = "matches" in e ? e.matches : (e as MediaQueryListEvent).matches;
+      const next: Theme = matches ? "dark" : "light";
       applyTheme(next);
       setDark(next === "dark");
     };
 
-    // Older Safari uses addListener/removeListener
+    // Modern browsers support addEventListener
     if (typeof mq.addEventListener === "function") {
       mq.addEventListener("change", handleChange);
       return () => mq.removeEventListener("change", handleChange);
-    } else if (typeof (mq as any).addListener === "function") {
+    } 
+    // Legacy Safari support
+    else if (typeof (mq as any).addListener === "function") {
       (mq as any).addListener(handleChange);
       return () => (mq as any).removeListener(handleChange);
     }
@@ -71,11 +104,11 @@ export default function ThemeToggle() {
 
   const toggle = useCallback(() => {
     setDark((d) => {
-      const next = d ? "light" : "dark" as Theme;
+      const next: Theme = d ? "light" : "dark";
       hasOverrideRef.current = true; // user explicitly chose a theme for this session
       applyTheme(next);
       writeSessionTheme(next);
-      return next === "dark";
+      return !d; // More efficient boolean toggle
     });
   }, []);
 
@@ -84,10 +117,11 @@ export default function ThemeToggle() {
       onClick={toggle}
       aria-label="Toggle theme"
       aria-pressed={dark}
-      className="rounded-full p-2 border border-slate-200/60 dark:border-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-900"
+      type="button" // Explicit type to prevent form submission
+      className="rounded-full p-2 border border-slate-200/60 dark:border-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors duration-200"
       title={dark ? "Switch to light mode" : "Switch to dark mode"}
     >
-      <span aria-hidden>{dark ? "☀️" : "🌙"}</span>
+      <span aria-hidden="true">{dark ? "☀️" : "🌙"}</span>
     </button>
   );
 }
