@@ -4,8 +4,9 @@ import { requireAdmin } from "@/lib/session";
 
 export const runtime = "nodejs";
 
-// Cache for 5 minutes to reduce database load
-export const revalidate = 300;
+// Force dynamic rendering for authenticated endpoints
+// This ensures fresh session validation on every request
+export const dynamic = "force-dynamic";
 
 export async function GET() {
     try {
