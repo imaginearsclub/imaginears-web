@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const LOGIN_PATH = "/login";
 const TIMEOUT_MS = 8000;
@@ -37,56 +39,63 @@ export default function SignOutButton() {
         // Safety timeout to prevent hanging
         const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-        try {
-            // Call Better-Auth sign-out endpoint
-            await fetch("/api/logout", {
-                method: "POST",
-                headers: { 
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                },
-                credentials: "include",
-                signal: controller.signal,
-            });
+        const signOutPromise = (async () => {
+            try {
+                // Call Better-Auth sign-out endpoint
+                await fetch("/api/logout", {
+                    method: "POST",
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                    },
+                    credentials: "include",
+                    signal: controller.signal,
+                });
 
-            // Clear any client-side state
-            if (typeof window !== "undefined") {
-                try {
-                    // Clear localStorage/sessionStorage if used
-                    sessionStorage.clear();
-                    // Keep localStorage items that aren't auth-related if needed
-                } catch (e) {
-                    console.warn("Failed to clear storage:", e);
+                // Clear any client-side state
+                if (typeof window !== "undefined") {
+                    try {
+                        sessionStorage.clear();
+                    } catch (e) {
+                        console.warn("Failed to clear storage:", e);
+                    }
                 }
-            }
 
-            // Navigate to login (use replace to prevent back button issues)
-            startTransition(() => {
-                router.replace(LOGIN_PATH);
-                router.refresh(); // Refresh to clear server-side session state
-            });
-        } catch (error) {
-            // Even on error, navigate to login for security
-            // Better to log user out client-side than leave them in uncertain state
-            if (!controller.signal.aborted) {
-                console.error("Sign out error:", error);
-            }
-            
-            // Force navigation to login
-            if (isMountedRef.current) {
-                try {
+                // Navigate to login (use replace to prevent back button issues)
+                startTransition(() => {
                     router.replace(LOGIN_PATH);
-                } catch {
-                    // Last resort: hard redirect
-                    window.location.href = LOGIN_PATH;
+                    router.refresh();
+                });
+            } catch (error) {
+                // Even on error, navigate to login for security
+                if (!controller.signal.aborted) {
+                    console.error("Sign out error:", error);
+                }
+                
+                // Force navigation to login
+                if (isMountedRef.current) {
+                    try {
+                        router.replace(LOGIN_PATH);
+                    } catch {
+                        window.location.href = LOGIN_PATH;
+                    }
+                }
+                throw error; // Rethrow for toast.promise to catch
+            } finally {
+                clearTimeout(timeoutId);
+                if (isMountedRef.current) {
+                    setIsSigningOut(false);
                 }
             }
-        } finally {
-            clearTimeout(timeoutId);
-            if (isMountedRef.current) {
-                setIsSigningOut(false);
-            }
-        }
+        })();
+
+        toast.promise(signOutPromise, {
+            loading: 'Signing out...',
+            success: 'Signed out successfully',
+            error: 'Sign out failed, redirecting...',
+        });
+
+        await signOutPromise;
     }, [isSigningOut, isPending, router]);
 
     const isLoading = isSigningOut || isPending;
@@ -96,7 +105,18 @@ export default function SignOutButton() {
             type="button"
             onClick={handleSignOut}
             disabled={isLoading}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 hover:border-slate-400 dark:hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98]"
+            className={cn(
+                "w-full inline-flex items-center justify-center gap-2",
+                "px-4 py-2.5 text-sm font-medium rounded-xl",
+                "border border-slate-300 dark:border-slate-700",
+                "bg-white dark:bg-slate-800",
+                "text-slate-700 dark:text-slate-200",
+                "hover:bg-slate-100 dark:hover:bg-slate-700",
+                "hover:border-slate-400 dark:hover:border-slate-600",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
+                "transition-all duration-200",
+                "shadow-sm hover:shadow-md active:scale-[0.98]"
+            )}
             aria-label="Sign out of your account"
             aria-busy={isLoading}
         >
