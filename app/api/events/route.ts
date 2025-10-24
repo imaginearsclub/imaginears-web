@@ -18,7 +18,7 @@ const MAX_SHORT_DESC_LENGTH = 500;
 const MAX_DETAILS_LENGTH = 50000; // 50KB for markdown details
 
 // Valid categories and statuses from Prisma schema
-const VALID_CATEGORIES: EventCategory[] = ["Attraction", "Show", "MeetGreet", "Dining", "Shopping", "Other"];
+const VALID_CATEGORIES: EventCategory[] = ["Fireworks", "SeasonalOverlay", "MeetAndGreet", "Parade", "Other"];
 const VALID_STATUSES: EventStatus[] = ["Draft", "Published", "Archived"];
 const VALID_RECURRENCE_FREQ: RecurrenceFreq[] = ["NONE", "DAILY", "WEEKLY"];
 
