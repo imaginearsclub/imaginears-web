@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { Command } from "cmdk";
-import { Dialog, DialogContent, DialogPortal, DialogOverlay } from "./Dialog";
+import { Dialog, DialogContent, DialogPortal, DialogOverlay, DialogTitle } from "./Dialog";
 import { cn } from "@/lib/utils";
 import { Search, ArrowRight } from "lucide-react";
 
@@ -90,9 +90,10 @@ export function CommandPalette({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogPortal>
           <DialogOverlay />
-          <DialogContent className="overflow-hidden p-0 max-w-2xl bg-white dark:bg-slate-900">
+          <DialogContent className="overflow-hidden p-0 max-w-2xl bg-white dark:bg-slate-900 [&>button]:absolute [&>button]:right-3 [&>button]:top-3 [&>button]:z-10 [&>button]:bg-white [&>button]:dark:bg-slate-900 [&>button]:hover:bg-slate-100 [&>button]:dark:hover:bg-slate-800 [&>button]:p-1.5 [&>button]:rounded-md">
+            <DialogTitle className="sr-only">Command Palette</DialogTitle>
             <Command className="bg-white dark:bg-slate-900 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-slate-500 dark:[&_[cmdk-group-heading]]:text-slate-400 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
-              <div className="flex items-center border-b border-slate-200 dark:border-slate-800 px-3 bg-white dark:bg-slate-900">
+              <div className="flex items-center border-b border-slate-200 dark:border-slate-800 px-3 pr-12 bg-white dark:bg-slate-900">
                 <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                 <Command.Input
                   placeholder={placeholder}
