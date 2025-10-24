@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { safeRehypePlugins } from "@/lib/markdown";
+import { Tooltip, Separator, Badge } from "@/components/common";
+import { Bold, Italic, Code, Link, Eye, Edit, Quote, List, ListOrdered, Heading2, Heading3 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type Props = {
     value: string;
@@ -108,78 +111,84 @@ export default function MarkdownEditor({
     return (
         <div className="space-y-3">
             <div className="flex items-center justify-between gap-4">
-                <label className="text-sm font-semibold text-body dark:text-white">
+                <label className="text-sm font-semibold text-slate-900 dark:text-white">
                     {label}
                 </label>
                 <div className="flex items-center gap-1.5">
                     <ToolbarButton 
                         title="Bold (Ctrl+B)" 
                         onClick={() => wrap("**", "**", "bold text")}
-                        icon={<BoldIcon />}
+                        icon={<Bold className="w-3.5 h-3.5" />}
                     />
                     <ToolbarButton 
                         title="Italic (Ctrl+I)" 
                         onClick={() => wrap("*", "*", "italic text")}
-                        icon={<ItalicIcon />}
+                        icon={<Italic className="w-3.5 h-3.5" />}
                     />
                     <ToolbarButton 
                         title="Code" 
                         onClick={() => wrap("`", "`", "code")}
-                        icon={<CodeIcon />}
+                        icon={<Code className="w-3.5 h-3.5" />}
                     />
                     <ToolbarButton 
                         title="Link (Ctrl+K)" 
                         onClick={() => wrap("[", "](https://)", "text")}
-                        icon={<LinkIcon />}
+                        icon={<Link className="w-3.5 h-3.5" />}
                     />
-                    <div className="w-px h-5 bg-white/50 text-body dark:bg-slate-700 mx-0.5" />
+                    
+                    <Separator orientation="vertical" className="h-5 mx-0.5" />
+                    
                     <ToolbarButton 
                         title="Heading 2" 
                         onClick={() => prefixLines("## ")}
-                        text="H2"
+                        icon={<Heading2 className="w-3.5 h-3.5" />}
                     />
                     <ToolbarButton 
                         title="Heading 3" 
                         onClick={() => prefixLines("### ")}
-                        text="H3"
+                        icon={<Heading3 className="w-3.5 h-3.5" />}
                     />
                     <ToolbarButton 
                         title="Quote" 
                         onClick={() => prefixLines("> ", "Quote")}
-                        icon={<QuoteIcon />}
+                        icon={<Quote className="w-3.5 h-3.5" />}
                     />
                     <ToolbarButton 
                         title="Bullet List" 
                         onClick={() => prefixLines("- ", "List item")}
-                        icon={<ListIcon />}
+                        icon={<List className="w-3.5 h-3.5" />}
                     />
                     <ToolbarButton 
                         title="Numbered List" 
                         onClick={() => prefixLines("1. ", "Step")}
-                        icon={<NumberListIcon />}
+                        icon={<ListOrdered className="w-3.5 h-3.5" />}
                     />
-                    <div className="w-px h-5 bg-white/50 text-body dark:bg-slate-700 mx-0.5" />
+                    
+                    <Separator orientation="vertical" className="h-5 mx-0.5" />
+                    
                     <button
                         type="button"
-                        className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
+                        className={cn(
+                            "inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border-2 font-medium transition-all",
+                            "focus:outline-none focus:ring-2 focus:ring-blue-500/50",
                             preview 
-                                ? "bg-slate-800 text-white border-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:border-slate-300 shadow-sm" 
+                                ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:border-blue-500 dark:hover:bg-blue-600 shadow-sm" 
                                 : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
-                        }`}
+                        )}
                         onClick={() => setPreview((p) => !p)}
                         aria-pressed={preview}
                         aria-label={preview ? "Switch to edit mode" : "Switch to preview mode"}
                     >
                         {preview ? (
-                            <span className="flex items-center gap-1.5">
-                                <EditIcon />
+                            <>
+                                <Edit className="w-3.5 h-3.5" />
                                 Edit
-                            </span>
+                            </>
                         ) : (
-                            <span className="flex items-center gap-1.5">
-                                <EyeIcon />
+                            <>
+                                <Eye className="w-3.5 h-3.5" />
                                 Preview
-                            </span>
+                            </>
                         )}
                     </button>
                 </div>
@@ -199,17 +208,31 @@ export default function MarkdownEditor({
                         rows={rows}
                         placeholder={placeholder || "Write Markdown…"}
                         maxLength={maxLength}
-                        className="w-full rounded-xl border border-slate-300 dark:border-slate-700 px-4 py-3 font-mono text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow resize-y"
+                        className={cn(
+                            "w-full rounded-xl border-2 px-4 py-3 font-mono text-sm resize-y",
+                            "bg-white dark:bg-slate-900",
+                            "border-slate-300 dark:border-slate-700",
+                            "text-slate-900 dark:text-slate-100",
+                            "placeholder:text-slate-400 dark:placeholder:text-slate-500",
+                            "focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent",
+                            "transition-all"
+                        )}
                         aria-label={label}
                     />
-                    <div className={`absolute bottom-3 right-3 text-xs ${
-                        isNearLimit ? 'text-amber-600 dark:text-amber-400 font-semibold' : 'text-slate-400 dark:text-slate-500'
-                    }`}>
+                    <Badge 
+                        variant={isNearLimit ? "warning" : "default"} 
+                        size="sm" 
+                        className="absolute bottom-3 right-3"
+                    >
                         {charCount} / {maxLength}
-                    </div>
+                    </Badge>
                 </div>
             ) : (
-                <div className="rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/50 p-6 prose dark:prose-invert max-w-none min-h-[200px]">
+                <div className={cn(
+                    "rounded-xl border-2 p-6 prose dark:prose-invert max-w-none min-h-[200px]",
+                    "border-slate-300 dark:border-slate-700",
+                    "bg-slate-50 dark:bg-slate-900/50"
+                )}>
                     <ReactMarkdown 
                         remarkPlugins={[remarkGfm]} 
                         rehypePlugins={safeRehypePlugins as any}
@@ -226,96 +249,30 @@ function ToolbarButton({
     title,
     onClick,
     icon,
-    text,
 }: {
     title: string;
     onClick: () => void;
-    icon?: React.ReactNode;
-    text?: string;
+    icon: React.ReactNode;
 }) {
     return (
-        <button
-            type="button"
-            title={title}
-            onClick={onClick}
-            className="text-xs rounded-md border text-body dark:text-white border-slate-300 dark:border-slate-700 px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-slate-400 dark:hover:border-slate-600 transition-colors bg-white dark:bg-slate-900 active:scale-95 transform"
-            aria-label={title}
-        >
-            {icon || <span className="font-semibold">{text}</span>}
-        </button>
-    );
-}
-
-// Icon components
-function BoldIcon() {
-    return (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z" />
-        </svg>
-    );
-}
-
-function ItalicIcon() {
-    return (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m0 0l4 0m-4 0l-4 0" />
-        </svg>
-    );
-}
-
-function CodeIcon() {
-    return (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-        </svg>
-    );
-}
-
-function LinkIcon() {
-    return (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-        </svg>
-    );
-}
-
-function QuoteIcon() {
-    return (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-        </svg>
-    );
-}
-
-function ListIcon() {
-    return (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-    );
-}
-
-function NumberListIcon() {
-    return (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5h10M9 12h10M9 19h10M3 5v4m0 0v4m0-4h.01M3 19v-4m0 4h.01" />
-        </svg>
-    );
-}
-
-function EyeIcon() {
-    return (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-        </svg>
-    );
-}
-
-function EditIcon() {
-    return (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-        </svg>
+        <Tooltip content={title} side="bottom">
+            <button
+                type="button"
+                onClick={onClick}
+                className={cn(
+                    "inline-flex items-center justify-center w-7 h-7 rounded-lg border-2 transition-all",
+                    "bg-white dark:bg-slate-900",
+                    "border-slate-300 dark:border-slate-700",
+                    "text-slate-700 dark:text-slate-300",
+                    "hover:bg-slate-100 dark:hover:bg-slate-800",
+                    "hover:border-slate-400 dark:hover:border-slate-600",
+                    "focus:outline-none focus:ring-2 focus:ring-blue-500/50",
+                    "active:scale-95"
+                )}
+                aria-label={title}
+            >
+                {icon}
+            </button>
+        </Tooltip>
     );
 }
