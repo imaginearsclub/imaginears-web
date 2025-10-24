@@ -1,9 +1,38 @@
 "use client";
 
-import { useState } from "react";
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Checkbox, Badge, EmptyState, ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuLabel, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent, ConfirmDialog, HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/common";
+import { useState, useMemo } from "react";
+import { 
+    Checkbox, 
+    Badge, 
+    EmptyState, 
+    ContextMenu, 
+    ContextMenuTrigger, 
+    ContextMenuContent, 
+    ContextMenuItem, 
+    ContextMenuSeparator, 
+    ContextMenuLabel, 
+    ContextMenuSub, 
+    ContextMenuSubTrigger, 
+    ContextMenuSubContent, 
+    ConfirmDialog, 
+    HoverCard, 
+    HoverCardTrigger, 
+    HoverCardContent,
+    Input,
+    TableSkeleton,
+    DropdownMenu,
+    DropdownMenuTrigger,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuPortal,
+    DropdownMenuSub,
+    DropdownMenuSubTrigger,
+    DropdownMenuSubContent,
+    DropdownMenuLabel,
+} from "@/components/common";
 import { FileText, Edit, FileCheck, Trash2, UserCog, CheckCircle, XCircle, Clock, Eye, Mail, Calendar } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 /** Keep these in sync with your Prisma enums */
@@ -29,6 +58,7 @@ export default function ApplicationTable({
                                              onDelete,
                                              onExportCSV,
                                              onBulkChangeStatus,
+                                             isLoading,
                                          }: {
     rows?: ApplicationRow[];
     onEdit?: (id: string) => void;
@@ -38,8 +68,10 @@ export default function ApplicationTable({
     onDelete?: (id: string) => void;
     onExportCSV?: () => void;
     onBulkChangeStatus?: (ids: string[], status: AppStatus) => Promise<void> | void;
+    isLoading?: boolean;
 }) {
     const list = Array.isArray(rows) ? rows : [];
+    const [searchQuery, setSearchQuery] = useState("");
 
     const [selected, setSelected] = useState<string[]>([]);
     const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: string; name: string }>({
@@ -47,8 +79,21 @@ export default function ApplicationTable({
         id: "",
         name: "",
     });
-    const allSelected = selected.length > 0 && selected.length === list.length;
-    const someSelected = selected.length > 0 && selected.length < list.length;
+
+    // Filter applications based on search query
+    const filteredList = useMemo(() => {
+        if (!searchQuery) return list;
+        const q = searchQuery.toLowerCase();
+        return list.filter(app =>
+            app.name.toLowerCase().includes(q) ||
+            app.email.toLowerCase().includes(q) ||
+            app.role.toLowerCase().includes(q) ||
+            app.status.toLowerCase().includes(q)
+        );
+    }, [list, searchQuery]);
+
+    const allSelected = selected.length > 0 && selected.length === filteredList.length;
+    const someSelected = selected.length > 0 && selected.length < filteredList.length;
 
     function toggleAll() {
         setSelected((s) => (s.length ? [] : list.map((r) => r.id)));
@@ -108,8 +153,41 @@ export default function ApplicationTable({
         }
     };
 
+    // Loading state
+    if (isLoading) {
+        return <TableSkeleton columns={7} rows={5} />;
+    }
+
+    // Empty state
+    if (!list.length) {
+        return (
+            <EmptyState
+                icon={<FileText className="w-12 h-12" />}
+                title="No applications yet"
+                description="Applications will appear here when users submit them through the application form."
+            />
+        );
+    }
+
+    const thClass = cn(
+        "py-3.5 pr-4 text-left cursor-pointer select-none group",
+        "text-xs font-semibold uppercase tracking-wider",
+        "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
+        "transition-colors"
+    );
+
     return (
         <div className="space-y-3">
+            {/* Search Filter */}
+            <div className="mb-4">
+                <Input
+                    type="text"
+                    placeholder="Search applications by name, email, role, or status..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    size="md"
+                />
+            </div>
             {/* Bulk bar */}
             {hasBulk && (
                 <div className="flex items-center justify-between rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 p-3">
@@ -136,11 +214,15 @@ export default function ApplicationTable({
                 </div>
             )}
 
-            <div className="overflow-auto rounded-2xl border border-slate-200 dark:border-slate-800">
-                <table className="min-w-[900px] w-full">
-                    <thead className="text-left text-sm text-slate-600 dark:text-slate-300">
+            <div className={cn(
+                "overflow-x-auto rounded-xl shadow-sm",
+                "border border-slate-300 dark:border-slate-800",
+                "bg-white dark:bg-slate-900"
+            )}>
+                <table className="min-w-[900px] w-full bg-white dark:bg-slate-900" role="table" aria-label="Applications table">
+                    <thead className="bg-white dark:bg-slate-900/50">
                     <tr className="border-b border-slate-200 dark:border-slate-800">
-                        <th className="px-3 py-2 w-10">
+                        <th scope="col" className={cn(thClass, "pl-6 pr-3 w-10 cursor-default hover:text-slate-600 dark:hover:text-slate-400")}>
                             <label className="inline-flex items-center gap-2">
                                 <Checkbox
                                     checked={someSelected ? "indeterminate" : allSelected}
@@ -149,27 +231,45 @@ export default function ApplicationTable({
                                 />
                             </label>
                         </th>
-                        <th className="px-3 py-2">Name</th>
-                        <th className="px-3 py-2">Email</th>
-                        <th className="px-3 py-2">Role</th>
-                        <th className="px-3 py-2">Status</th>
-                        <th className="px-3 py-2">Submitted</th>
-                        <th className="px-3 py-2 w-12"></th>
+                        <th scope="col" className={thClass}>Name</th>
+                        <th scope="col" className={thClass}>Email</th>
+                        <th scope="col" className={thClass}>Role</th>
+                        <th scope="col" className={thClass}>Status</th>
+                        <th scope="col" className={thClass}>Submitted</th>
+                        <th scope="col" className={cn(thClass, "pl-4 pr-6 text-right cursor-default hover:text-slate-600 dark:hover:text-slate-400")}>Actions</th>
                     </tr>
                     </thead>
-                    <tbody className="text-sm">
-                    {list.map((r) => (
+                    <tbody className="bg-white dark:bg-slate-900">
+                    {filteredList.length === 0 ? (
+                        <tr>
+                            <td colSpan={7} className="py-12 text-center">
+                                <div className="flex flex-col items-center gap-2">
+                                    <FileText className="w-8 h-8 text-slate-400 dark:text-slate-600" />
+                                    <p className="text-slate-500 dark:text-slate-400">
+                                        No applications match your search
+                                    </p>
+                                </div>
+                            </td>
+                        </tr>
+                    ) : (
+                        filteredList.map((r) => (
                         <ContextMenu key={r.id}>
                             <ContextMenuTrigger asChild>
-                                <tr className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors cursor-pointer">
-                                    <td className="px-3 py-2">
+                                <tr className={cn(
+                                    "group transition-colors cursor-pointer",
+                                    "bg-white dark:bg-slate-900",
+                                    "hover:bg-slate-50 dark:hover:bg-slate-800/50",
+                                    "border-b border-slate-200 dark:border-slate-800",
+                                    "last:border-0"
+                                )}>
+                                    <td className="py-3.5 pl-6 pr-3">
                                         <Checkbox
                                             checked={selected.includes(r.id)}
                                             onCheckedChange={() => toggleOne(r.id)}
                                             aria-label={`Select ${r.name}`}
                                         />
                                     </td>
-                                    <td className="px-3 py-2 font-medium">
+                                    <td className="py-3.5 pr-4 font-medium">
                                         <HoverCard>
                                             <HoverCardTrigger asChild>
                                                 {onEdit ? (
@@ -221,19 +321,19 @@ export default function ApplicationTable({
                                             </HoverCardContent>
                                         </HoverCard>
                                     </td>
-                                    <td className="px-3 py-2">
+                                    <td className="py-3.5 pr-4">
                                         <a className="underline" href={`mailto:${r.email}`}>
                                             {r.email}
                                         </a>
                                     </td>
-                                    <td className="px-3 py-2">
+                                    <td className="py-3.5 pr-4">
                                         <RoleBadge role={r.role} />
                                     </td>
-                                    <td className="px-3 py-2">
+                                    <td className="py-3.5 pr-4">
                                         <StatusBadge status={r.status} />
                                     </td>
-                                    <td className="px-3 py-2">{fmt(r.submittedAt)}</td>
-                                    <td className="px-3 py-2 text-right">
+                                    <td className="py-3.5 pr-4">{fmt(r.submittedAt)}</td>
+                                    <td className="py-3.5 pl-4 pr-6 text-right">
                                         <RowActions
                                             row={r}
                                             {...(onEdit && { onEdit: () => onEdit(r.id) })}
@@ -327,18 +427,7 @@ export default function ApplicationTable({
                                 )}
                             </ContextMenuContent>
                         </ContextMenu>
-                    ))}
-
-                    {!list.length && (
-                        <tr>
-                            <td colSpan={7} className="p-0">
-                                <EmptyState
-                                    icon={<FileText className="w-12 h-12 font-black dark:text-slate-600" />}
-                                    title="No applications yet"
-                                    description="Applications will appear here when users submit them through the application form."
-                                />
-                            </td>
-                        </tr>
+                    ))
                     )}
                     </tbody>
                 </table>
@@ -378,20 +467,20 @@ function RowActions({
     const [open, setOpen] = useState(false);
 
     return (
-        <DropdownMenu.Root open={open} onOpenChange={setOpen}>
-            <DropdownMenu.Trigger asChild>
+        <DropdownMenu open={open} onOpenChange={setOpen}>
+            <DropdownMenuTrigger asChild>
                 <button type="button" className="btn btn-ghost btn-xs" aria-label="Open row actions">
                     ⋯
                 </button>
-            </DropdownMenu.Trigger>
+            </DropdownMenuTrigger>
 
-            <DropdownMenu.Portal>
-                <DropdownMenu.Content
+            <DropdownMenuPortal>
+                <DropdownMenuContent
                     align="end"
                     sideOffset={6}
                     className="z-[9999] min-w-[210px] rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg overflow-hidden"
                 >
-                    <DropdownMenu.Item
+                    <DropdownMenuItem
                         className="px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                         onSelect={(e) => {
                             e.preventDefault();
@@ -400,9 +489,9 @@ function RowActions({
                         }}
                     >
                         Edit
-                    </DropdownMenu.Item>
+                    </DropdownMenuItem>
 
-                    <DropdownMenu.Item
+                    <DropdownMenuItem
                         className="px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                         onSelect={(e) => {
                             e.preventDefault();
@@ -411,20 +500,20 @@ function RowActions({
                         }}
                     >
                         Notes
-                    </DropdownMenu.Item>
+                    </DropdownMenuItem>
 
-                    <DropdownMenu.Sub>
-                        <DropdownMenu.SubTrigger className="px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                    <DropdownMenuSub>
+                        <DropdownMenuSubTrigger className="px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
                             Change status →
-                        </DropdownMenu.SubTrigger>
-                        <DropdownMenu.Portal>
-                            <DropdownMenu.SubContent
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuPortal>
+                            <DropdownMenuSubContent
                                 className="z-[10000] rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg overflow-hidden"
                                 sideOffset={6}
                                 alignOffset={-4}
                             >
                                 {(["New", "InReview", "Approved", "Rejected"] as AppStatus[]).map((s) => (
-                                    <DropdownMenu.Item
+                                    <DropdownMenuItem
                                         key={s}
                                         className="px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                                         onSelect={(e) => {
@@ -434,24 +523,24 @@ function RowActions({
                                         }}
                                     >
                                         {s}
-                                    </DropdownMenu.Item>
+                                    </DropdownMenuItem>
                                 ))}
-                            </DropdownMenu.SubContent>
-                        </DropdownMenu.Portal>
-                    </DropdownMenu.Sub>
+                            </DropdownMenuSubContent>
+                        </DropdownMenuPortal>
+                    </DropdownMenuSub>
 
-                    <DropdownMenu.Sub>
-                        <DropdownMenu.SubTrigger className="px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                    <DropdownMenuSub>
+                        <DropdownMenuSubTrigger className="px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
                             Change role →
-                        </DropdownMenu.SubTrigger>
-                        <DropdownMenu.Portal>
-                            <DropdownMenu.SubContent
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuPortal>
+                            <DropdownMenuSubContent
                                 className="z-[10000] rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg overflow-hidden"
                                 sideOffset={6}
                                 alignOffset={-4}
                             >
                                 {(["Developer", "Imaginear", "GuestServices"] as AppRole[]).map((r) => (
-                                    <DropdownMenu.Item
+                                    <DropdownMenuItem
                                         key={r}
                                         className="px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                                         onSelect={(e) => {
@@ -461,15 +550,15 @@ function RowActions({
                                         }}
                                     >
                                         {r === "GuestServices" ? "Guest Services" : r}
-                                    </DropdownMenu.Item>
+                                    </DropdownMenuItem>
                                 ))}
-                            </DropdownMenu.SubContent>
-                        </DropdownMenu.Portal>
-                    </DropdownMenu.Sub>
+                            </DropdownMenuSubContent>
+                        </DropdownMenuPortal>
+                    </DropdownMenuSub>
 
-                    <DropdownMenu.Separator className="h-px bg-slate-200 dark:bg-slate-800" />
+                    <DropdownMenuSeparator className="h-px bg-slate-200 dark:bg-slate-800" />
 
-                    <DropdownMenu.Item
+                    <DropdownMenuItem
                         className="px-3 py-2 text-sm hover:bg-rose-50 dark:hover:bg-rose-900/30 text-rose-600 cursor-pointer"
                         onSelect={(e) => {
                             e.preventDefault();
@@ -478,12 +567,10 @@ function RowActions({
                         }}
                     >
                         Delete
-                    </DropdownMenu.Item>
-
-                    <DropdownMenu.Arrow className="fill-white dark:fill-slate-900" />
-                </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-        </DropdownMenu.Root>
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenuPortal>
+        </DropdownMenu>
     );
 }
 
@@ -511,8 +598,8 @@ function BulkMenu({
     const [open, setOpen] = useState(false);
 
     return (
-        <DropdownMenu.Root open={open} onOpenChange={setOpen}>
-            <DropdownMenu.Trigger asChild>
+        <DropdownMenu open={open} onOpenChange={setOpen}>
+            <DropdownMenuTrigger asChild>
                 <button
                     type="button"
                     className="btn btn-primary btn-sm"
@@ -520,21 +607,21 @@ function BulkMenu({
                 >
                     Bulk Actions ▾
                 </button>
-            </DropdownMenu.Trigger>
+            </DropdownMenuTrigger>
 
-            <DropdownMenu.Portal>
-                <DropdownMenu.Content
+            <DropdownMenuPortal>
+                <DropdownMenuContent
                     align="start"
                     sideOffset={6}
                     className="z-[9999] min-w-[180px] rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg overflow-hidden"
                 >
-                    <DropdownMenu.Label className="px-3 py-1.5 text-xs text-slate-500 dark:text-slate-400">
+                    <DropdownMenuLabel className="px-3 py-1.5 text-xs text-slate-500 dark:text-slate-400">
                         Change status to…
-                    </DropdownMenu.Label>
+                    </DropdownMenuLabel>
 
                     {(["New", "InReview", "Approved", "Rejected"] as AppStatus[]).map(
                         (s) => (
-                            <DropdownMenu.Item
+                            <DropdownMenuItem
                                 key={s}
                                 className="px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                                 onSelect={(e) => {
@@ -544,14 +631,12 @@ function BulkMenu({
                                 }}
                             >
                                 {s}
-                            </DropdownMenu.Item>
+                            </DropdownMenuItem>
                         )
                     )}
-
-                    <DropdownMenu.Arrow className="fill-white dark:fill-slate-900" />
-                </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-        </DropdownMenu.Root>
+                </DropdownMenuContent>
+            </DropdownMenuPortal>
+        </DropdownMenu>
     );
 }
 

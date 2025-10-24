@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { toast } from "sonner";
 import {
     Badge,
@@ -16,15 +15,24 @@ import {
     HoverCard,
     HoverCardTrigger,
     HoverCardContent,
+    Input,
+    TableSkeleton,
+    DropdownMenu,
+    DropdownMenuTrigger,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuPortal,
 } from "@/components/common";
 import { CalendarRange, Edit, Eye, EyeOff, MapPin, Tag, Clock, ArrowUpDown } from "lucide-react";
 import { useTableSort } from "@/hooks/useTableSort";
 import { useTableFilter } from "@/hooks/useTableFilter";
+import { cn } from "@/lib/utils";
 
 export type AdminEventRow = {
     id: string;
     title: string;
-    world: string;
+    server: string;
     category: string;
     status: "Draft" | "Published" | "Cancelled";
     startAt: string;         // ISO
@@ -58,7 +66,7 @@ export default function EventsTable({
         const q = query.toLowerCase();
         return (
             event.title.toLowerCase().includes(q) ||
-            event.world.toLowerCase().includes(q) ||
+            event.server.toLowerCase().includes(q) ||
             event.category.toLowerCase().includes(q) ||
             event.status.toLowerCase().includes(q)
         );
@@ -122,39 +130,7 @@ export default function EventsTable({
 
     // Loading state
     if (isLoading) {
-        return (
-            <div className="space-y-4">
-                <div className="h-11 bg-slate-100 dark:bg-slate-800 rounded-lg animate-pulse" />
-                <div className="overflow-auto rounded-2xl border border-slate-200 dark:border-slate-800">
-                    <table className="min-w-[820px] w-full">
-                        <thead className="text-left text-sm text-slate-600 dark:text-slate-300">
-                        <tr className="border-b border-slate-200 dark:border-slate-800">
-                            <th className="px-3 py-2">Title</th>
-                            <th className="px-3 py-2">World</th>
-                            <th className="px-3 py-2">Category</th>
-                            <th className="px-3 py-2">Status</th>
-                            <th className="px-3 py-2">Starts</th>
-                            <th className="px-3 py-2">Ends</th>
-                            <th className="px-3 py-2 w-12"></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {[...Array(5)].map((_, i) => (
-                            <tr key={i} className="border-b border-slate-100 dark:border-slate-800">
-                                <td className="px-3 py-4"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-32" /></td>
-                                <td className="px-3 py-4"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-24" /></td>
-                                <td className="px-3 py-4"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-20" /></td>
-                                <td className="px-3 py-4"><div className="h-5 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-16" /></td>
-                                <td className="px-3 py-4"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-24" /></td>
-                                <td className="px-3 py-4"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-24" /></td>
-                                <td className="px-3 py-4"><div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse w-6" /></td>
-                            </tr>
-                        ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        );
+        return <TableSkeleton columns={7} rows={5} />;
     }
 
     // Empty state
@@ -168,46 +144,59 @@ export default function EventsTable({
         );
     }
 
+    const thClass = cn(
+        "py-3.5 pr-4 text-left cursor-pointer select-none group",
+        "text-xs font-semibold uppercase tracking-wider",
+        "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
+        "transition-colors"
+    );
+
     return (
         <>
             {/* Search Filter */}
             <div className="mb-4">
-                <input
+                <Input
                     type="text"
-                    placeholder="Search events by title, world, category, or status..."
+                    placeholder="Search events by title, server, category, or status..."
                     value={filterQuery}
                     onChange={(e) => setFilterQuery(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-shadow"
+                    size="md"
                 />
             </div>
 
             {/* Table */}
-            <div className="overflow-auto rounded-2xl border border-slate-200 dark:border-slate-800">
-                <table className="min-w-[820px] w-full">
-                    <thead className="text-left text-sm text-slate-600 dark:text-slate-300">
+            <div className={cn(
+                "overflow-x-auto rounded-xl shadow-sm",
+                "border border-slate-300 dark:border-slate-800",
+                "bg-white dark:bg-slate-900"
+            )}>
+                <table className="min-w-[820px] w-full bg-white dark:bg-slate-900" role="table" aria-label="Events table">
+                    <thead className="bg-white dark:bg-slate-900/50">
                     <tr className="border-b border-slate-200 dark:border-slate-800">
-                        <th className="px-3 py-2 cursor-pointer select-none group hover:text-slate-900 dark:hover:text-slate-200 transition-colors" onClick={() => requestSort("title")}>
+                        <th scope="col" className={cn(thClass, "pl-6")} onClick={() => requestSort("title")}>
                             Title{getSortIndicator("title")}
                         </th>
-                        <th className="px-3 py-2 cursor-pointer select-none group hover:text-slate-900 dark:hover:text-slate-200 transition-colors" onClick={() => requestSort("world")}>
-                            World{getSortIndicator("world")}
+                        <th scope="col" className={thClass} onClick={() => requestSort("server")}>
+                            Server{getSortIndicator("server")}
                         </th>
-                        <th className="px-3 py-2 cursor-pointer select-none group hover:text-slate-900 dark:hover:text-slate-200 transition-colors" onClick={() => requestSort("category")}>
+                        <th scope="col" className={thClass} onClick={() => requestSort("category")}>
                             Category{getSortIndicator("category")}
                         </th>
-                        <th className="px-3 py-2 cursor-pointer select-none group hover:text-slate-900 dark:hover:text-slate-200 transition-colors" onClick={() => requestSort("status")}>
+                        <th scope="col" className={thClass} onClick={() => requestSort("status")}>
                             Status{getSortIndicator("status")}
                         </th>
-                        <th className="px-3 py-2 cursor-pointer select-none group hover:text-slate-900 dark:hover:text-slate-200 transition-colors" onClick={() => requestSort("startAt")}>
+                        <th scope="col" className={thClass} onClick={() => requestSort("startAt")}>
                             Starts{getSortIndicator("startAt")}
                         </th>
-                        <th className="px-3 py-2 cursor-pointer select-none group hover:text-slate-900 dark:hover:text-slate-200 transition-colors" onClick={() => requestSort("endAt")}>
+                        <th scope="col" className={thClass} onClick={() => requestSort("endAt")}>
                             Ends{getSortIndicator("endAt")}
                         </th>
-                        <th className="px-3 py-2 w-12"></th>
+                        <th scope="col" className={cn(thClass, "pl-4 pr-6 text-right cursor-default hover:text-slate-600 dark:hover:text-slate-400")}>
+                            Actions
+                        </th>
                     </tr>
                     </thead>
-                    <tbody className="text-sm">
+                    <tbody className="bg-white dark:bg-slate-900">
                     {filteredData.length === 0 ? (
                         <tr>
                             <td colSpan={7} className="py-12 text-center">
@@ -223,8 +212,14 @@ export default function EventsTable({
                         filteredData.map((r) => (
                             <ContextMenu key={r.id}>
                                 <ContextMenuTrigger asChild>
-                                    <tr className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors cursor-pointer">
-                                        <td className="px-3 py-2 font-medium">
+                                    <tr className={cn(
+                                        "group transition-colors cursor-pointer",
+                                        "bg-white dark:bg-slate-900",
+                                        "hover:bg-slate-50 dark:hover:bg-slate-800/50",
+                                        "border-b border-slate-200 dark:border-slate-800",
+                                        "last:border-0"
+                                    )}>
+                                        <td className="py-3.5 pl-6 pr-4 font-medium">
                                             <HoverCard>
                                                 <HoverCardTrigger asChild>
                                                     <span className="cursor-pointer hover:underline">
@@ -252,7 +247,7 @@ export default function EventsTable({
                                                         <div className="space-y-2 text-sm">
                                                             <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
                                                                 <MapPin className="w-4 h-4" />
-                                                                <span><strong>World:</strong> {r.world}</span>
+                                                                <span><strong>Server:</strong> {r.server}</span>
                                                             </div>
                                                             <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
                                                                 <Tag className="w-4 h-4" />
@@ -274,9 +269,9 @@ export default function EventsTable({
                                                 </HoverCardContent>
                                             </HoverCard>
                                         </td>
-                                        <td className="px-3 py-2">{r.world}</td>
-                                        <td className="px-3 py-2">{r.category}</td>
-                                        <td className="px-3 py-2">
+                                        <td className="py-3.5 pr-4">{r.server}</td>
+                                        <td className="py-3.5 pr-4">{r.category}</td>
+                                        <td className="py-3.5 pr-4">
                                             <Badge
                                                 variant={
                                                     r.status === "Published" ? "success" :
@@ -287,9 +282,10 @@ export default function EventsTable({
                                                 {r.status}
                                             </Badge>
                                         </td>
-                                        <td className="px-3 py-2">{fmt(r.startAt)}</td>
-                                        <td className="px-3 py-2">{fmt(r.endAt)}</td>
-                                        <td className="px-3 py-2 text-right">
+                                        <td className="py-3.5 pr-4">{fmt(r.startAt)}</td>
+                                        <td className="py-3.5 pr-4">{fmt(r.endAt)}</td>
+                                        <td className="py-3.5 pl-4 pr-6">
+                                            <div className="flex justify-end">
                                             <RowActions
                                                 status={r.status}
                                                 onEdit={() => onEdit(r.id)}
@@ -297,6 +293,7 @@ export default function EventsTable({
                                                     onTogglePublish: () => handlePublishClick(r.id, r.title, r.status)
                                                 })}
                                             />
+                                            </div>
                                         </td>
                                     </tr>
                                 </ContextMenuTrigger>
@@ -367,8 +364,8 @@ function RowActions({
     const [open, setOpen] = useState(false);
 
     return (
-        <DropdownMenu.Root open={open} onOpenChange={setOpen}>
-            <DropdownMenu.Trigger asChild>
+        <DropdownMenu open={open} onOpenChange={setOpen}>
+            <DropdownMenuTrigger asChild>
                 <button
                     type="button"
                     className="btn btn-ghost btn-xs"
@@ -376,16 +373,16 @@ function RowActions({
                 >
                     ⋯
                 </button>
-            </DropdownMenu.Trigger>
+            </DropdownMenuTrigger>
 
             {/* Portal ensures it renders outside any overflow/stacking contexts */}
-            <DropdownMenu.Portal>
-                <DropdownMenu.Content
+            <DropdownMenuPortal>
+                <DropdownMenuContent
                     align="end"
                     sideOffset={6}
                     className="z-[9999] rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg overflow-hidden min-w-[160px]"
                 >
-                    <DropdownMenu.Item
+                    <DropdownMenuItem
                         className="px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                         onSelect={(e) => {
                             e.preventDefault();
@@ -394,10 +391,10 @@ function RowActions({
                         }}
                     >
                         Edit
-                    </DropdownMenu.Item>
+                    </DropdownMenuItem>
 
                     {onTogglePublish && (
-                        <DropdownMenu.Item
+                        <DropdownMenuItem
                             className="px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                             onSelect={(e) => {
                                 e.preventDefault();
@@ -406,12 +403,12 @@ function RowActions({
                             }}
                         >
                             {status === "Published" ? "Unpublish" : "Publish"}
-                        </DropdownMenu.Item>
+                        </DropdownMenuItem>
                     )}
 
-                    <DropdownMenu.Separator className="h-px bg-slate-200 dark:bg-slate-800" />
+                    <DropdownMenuSeparator className="h-px bg-slate-200 dark:bg-slate-800" />
 
-                    <DropdownMenu.Item
+                    <DropdownMenuItem
                         className="px-3 py-2 text-sm hover:bg-rose-50 dark:hover:bg-rose-900/30 text-rose-600 cursor-pointer"
                         onSelect={(e) => {
                             e.preventDefault();
@@ -420,11 +417,9 @@ function RowActions({
                         }}
                     >
                         Delete
-                    </DropdownMenu.Item>
-
-                    <DropdownMenu.Arrow className="fill-white dark:fill-slate-900" />
-                </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-        </DropdownMenu.Root>
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenuPortal>
+        </DropdownMenu>
     );
 }
