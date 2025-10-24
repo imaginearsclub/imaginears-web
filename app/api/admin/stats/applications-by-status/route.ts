@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 
+export const runtime = "nodejs";
+
+// Cache for 5 minutes to reduce database load
+export const revalidate = 300;
+
 export async function GET() {
     try {
         const session = await requireAdmin();
