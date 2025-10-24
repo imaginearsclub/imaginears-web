@@ -1,8 +1,9 @@
 // components/public/EventTeaser.tsx
 import Link from "next/link";
-import ScheduleSummary, { type Weekday as SummaryWeekday, type RecurrenceFreq as SummaryRecurrenceFreq } from "@/components/events/ScheduleSummary";
+import { type Weekday as SummaryWeekday, type RecurrenceFreq as SummaryRecurrenceFreq } from "@/components/events/ScheduleSummary";
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import EventCard from "@/components/public/EventCard";
 
 export const runtime = "nodejs";
 
@@ -16,20 +17,6 @@ function clampLimit(v: unknown, min = 1, max = 24, fallback = 6): number {
     const n = typeof v === "number" ? v : Number(v);
     const safe = Number.isFinite(n) ? Math.floor(n) : fallback;
     return Math.min(max, Math.max(min, safe));
-}
-
-// Visual: Category color coding for better UX
-function getCategoryStyles(category: string | null): string {
-    const defaultStyle = "bg-slate-100 dark:bg-slate-800/30 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700";
-    const categoryMap: Record<string, string> = {
-        Fireworks: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800",
-        SeasonalOverlay: "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800",
-        MeetAndGreet: "bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800",
-        Parade: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
-        Other: defaultStyle,
-    };
-    const key = category || "Other";
-    return categoryMap[key] ?? defaultStyle;
 }
 
 // Visual: Format category name for display
@@ -157,67 +144,21 @@ export default async function EventTeaser({ title = "Events", limit = 6 }: Props
                     const byWeekday = asWeekdayArray(e.byWeekdayJson);
                     const times = asStringArray(e.timesJson);
                     const recurrenceFreq = (e.recurrenceFreq as unknown) as SummaryRecurrenceFreq;
-                    const categoryStyles = getCategoryStyles(e.category);
                     const categoryName = formatCategoryName(e.category);
 
                     return (
-                        <article
+                        <EventCard
                             key={e.id}
-                            className="group relative rounded-2xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-md hover:shadow-2xl hover:border-blue-400 dark:hover:border-blue-600 transition-all duration-300 hover:-translate-y-1.5"
-                        >
-                            {/* Category badge with color coding */}
-                            <header className="flex items-start justify-between gap-3 mb-4">
-                                <h3 className="text-lg font-bold leading-snug flex-1 min-w-0 text-gray-900 dark:text-white">
-                                    <Link 
-                                        href={`/events/${e.id}`} 
-                                        className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors line-clamp-2"
-                                        aria-label={`View details for ${e.title}`}
-                                    >
-                                        {e.title}
-                                    </Link>
-                                </h3>
-                                <span 
-                                    className={`text-xs font-semibold rounded-full border px-3 py-1.5 shrink-0 ${categoryStyles}`}
-                                    aria-label={`Event category: ${categoryName}`}
-                                >
-                                    {categoryName}
-                                </span>
-                            </header>
-
-                            {/* Schedule information with improved spacing */}
-                            <div className="mb-4">
-                                <ScheduleSummary
-                                    recurrenceFreq={recurrenceFreq}
-                                    byWeekday={byWeekday}
-                                    times={times}
-                                    timezone={tz}
-                                    until={e.recurrenceUntil ?? null}
-                                    className="text-sm text-gray-700 dark:text-gray-300"
-                                />
-                            </div>
-
-                            {/* Description with improved typography */}
-                            {e.shortDescription && (
-                                <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-3 leading-relaxed mb-4">
-                                    {e.shortDescription}
-                                </p>
-                            )}
-
-                            {/* Call-to-action with improved hover state */}
-                            <footer className="mt-auto pt-4 border-t border-gray-200 dark:border-slate-700">
-                                <Link
-                                    href={`/events/${e.id}`}
-                                    className="group/link inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-                                    aria-label={`View full details for ${e.title}`}
-                                >
-                                    View details
-                                    <span className="group-hover/link:translate-x-0.5 transition-transform" aria-hidden="true">→</span>
-                                </Link>
-                            </footer>
-
-                            {/* Hover effect overlay */}
-                            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/0 to-indigo-500/0 group-hover:from-blue-500/[0.03] group-hover:to-indigo-500/[0.03] transition-all duration-300 pointer-events-none" aria-hidden="true" />
-                        </article>
+                            id={e.id}
+                            title={e.title}
+                            categoryName={categoryName}
+                            recurrenceFreq={recurrenceFreq}
+                            byWeekday={byWeekday}
+                            times={times}
+                            timezone={tz}
+                            until={e.recurrenceUntil ?? null}
+                            shortDescription={e.shortDescription}
+                        />
                     );
                 })}
 

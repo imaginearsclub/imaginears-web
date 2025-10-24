@@ -83,7 +83,7 @@ export default function ScheduleSummary(props: {
     if (recurrenceFreq === "DAILY") {
         return (
             <span
-                className={`inline-flex flex-wrap items-center gap-1.5 text-xs sm:text-sm rounded-xl border px-3 py-1.5 bg-white border-sky-300 text-sky-700 dark:bg-sky-900/30 dark:border-sky-800 dark:text-sky-200 shadow-sm transition-colors ${className}`}
+                className={`inline-flex flex-wrap items-center gap-1.5 text-xs sm:text-sm rounded-xl border px-3 py-1.5 bg-white border-sky-300 text-sky-700 dark:bg-sky-950/50 dark:border-sky-700 dark:text-sky-100 shadow-sm transition-colors ${className}`}
                 role="status"
                 aria-label={`Daily event${timesText ? ` at ${timesText}` : ""} ${timezone}${untilText}`}
             >
@@ -113,7 +113,7 @@ export default function ScheduleSummary(props: {
         const days = (byWeekday || []).map((d) => WEEKDAY_LABEL[d]).join(", ");
         return (
             <span
-                className={`inline-flex flex-wrap items-center gap-1.5 text-xs sm:text-sm rounded-xl border px-3 py-1.5 bg-white border-violet-300 text-violet-700 dark:bg-violet-900/30 dark:border-violet-800 dark:text-violet-200 shadow-sm transition-colors ${className}`}
+                className={`inline-flex flex-wrap items-center gap-1.5 text-xs sm:text-sm rounded-xl border px-3 py-1.5 bg-white border-violet-300 text-violet-700 dark:bg-violet-950/50 dark:border-violet-700 dark:text-violet-100 shadow-sm transition-colors ${className}`}
                 role="status"
                 aria-label={`Weekly event${days ? ` on ${days}` : ""}${timesText ? ` at ${timesText}` : ""} ${timezone}${untilText}`}
             >
