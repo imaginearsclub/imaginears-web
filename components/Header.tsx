@@ -2,6 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { memo, useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import ThemeToggle from "./ThemeToggle";
 
 // Allowed navigation paths - prevents injection attacks
@@ -125,7 +126,12 @@ export default function Header() {
         {/* Logo and Brand */}
         <Link 
           href="/" 
-          className="flex items-center gap-3 group focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 rounded-lg px-2 py-1 -ml-2 transition-all duration-200 hover:scale-105"
+          className={cn(
+            "flex items-center gap-3 group",
+            "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500",
+            "rounded-lg px-2 py-1 -ml-2",
+            "transition-all duration-200 hover:scale-105"
+          )}
           aria-label="Imaginears Club - Go to homepage"
         >
           <div className="relative">
@@ -163,8 +169,10 @@ export default function Header() {
             <NavLink href="/apply">Apply</NavLink>
           </div>
           <div 
-            className="h-6 w-px hidden sm:block"
-            style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(203, 213, 225, 0.5)' }}
+            className={cn(
+              "h-6 w-px hidden sm:block",
+              "bg-slate-300/50 dark:bg-slate-600/30"
+            )}
           />
           <ThemeToggle />
         </nav>
