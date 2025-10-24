@@ -4,36 +4,33 @@
 @tailwind utilities;
 @reference "tailwindcss";
 
-/* Ensure Tailwind background utilities override global styles */
+/* Ensure Tailwind background utilities override drawer input styles */
 @layer utilities {
-  /* Force bg-white to always be white, even in dark mode */
-  .bg-white,
-  .dark .bg-white {
+  /* Only force bg-white on dialogs/drawers where we need it */
+  [role="dialog"] .bg-white,
+  aside[role="dialog"] .bg-white {
+    background-color: rgb(255 255 255) !important;
+  }
+  .dark [role="dialog"] .bg-white,
+  .dark aside[role="dialog"] .bg-white {
     background-color: rgb(255 255 255) !important;
   }
   
-  /* Ensure other common backgrounds work too */
-  .bg-transparent {
-    background-color: transparent !important;
-  }
-  
-  /* Force text colors to override global body color */
-  .text-slate-900 {
+  /* Force text colors only in dialogs/drawers to override global styles */
+  [role="dialog"] .text-slate-900,
+  aside[role="dialog"] .text-slate-900 {
     color: rgb(15 23 42) !important;
   }
-  .text-slate-800 {
+  [role="dialog"] .text-slate-800,
+  aside[role="dialog"] .text-slate-800 {
     color: rgb(30 41 59) !important;
   }
-  .text-slate-700 {
+  [role="dialog"] .text-slate-700,
+  aside[role="dialog"] .text-slate-700 {
     color: rgb(51 65 85) !important;
   }
-  .text-slate-600 {
-    color: rgb(71 85 105) !important;
-  }
-  .text-white {
-    color: rgb(255 255 255) !important;
-  }
-  .dark .text-white {
+  [role="dialog"] .text-white,
+  aside[role="dialog"] .text-white {
     color: rgb(255 255 255) !important;
   }
 }
@@ -47,8 +44,8 @@
     --brand-end: #5caeff;
     --brand-accent: #4c97ff;
 
-    --text-light: black;      /* slate-900-ish */
-    --text-dark:  #e5e7eb;      /* slate-200-ish */
+    --text-light: #0f172a;      /* slate-900 */
+    --text-dark:  #e5e7eb;      /* slate-200 */
 
     --bg-light: #f8fafc;        /* slate-50 */
     --bg-dark:  #0b1221;        /* deeper than slate-900 for richness */
@@ -738,9 +735,37 @@ h3:hover::after,
 /* ----------------------------------------------- */
 .muted { @apply text-slate-600 dark:text-slate-400; }
 
-/* text-body utility - use Tailwind classes instead for better control */
+/* text-body utility - ensure it overrides body color */
 .text-body { 
     @apply text-slate-900 dark:text-slate-100;
+}
+
+/* Force proper text colors in light mode for homepage content */
+:not(.dark) .text-body {
+    color: #0f172a !important; /* slate-900 */
+}
+
+.dark .text-body {
+    color: #f1f5f9 !important; /* slate-100 */
+}
+
+/* Ensure headings are visible in light mode */
+:not(.dark) h1,
+:not(.dark) h2,
+:not(.dark) h3,
+:not(.dark) h4,
+:not(.dark) h5,
+:not(.dark) h6 {
+    color: #0f172a; /* slate-900 */
+}
+
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark h5,
+.dark h6 {
+    color: #f1f5f9; /* slate-100 */
 }
 
 @layer base {
