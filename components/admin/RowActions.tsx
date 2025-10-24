@@ -1,11 +1,20 @@
 "use client";
 
 import { memo, useCallback, useState } from "react";
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { MoreVertical, VolumeX, UserX, MapPin, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { Tooltip } from "@/components/common/Tooltip";
+import {
+    Tooltip,
+    Spinner,
+    Badge,
+    DropdownMenu,
+    DropdownMenuTrigger,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuPortal,
+} from "@/components/common";
 
 interface RowActionsProps {
     name: string;
@@ -56,9 +65,9 @@ const RowActions = memo(function RowActions({
     const handleTeleport = useCallback(() => handleAction(onTeleport, "teleport"), [handleAction, onTeleport]);
 
     return (
-        <DropdownMenu.Root open={open} onOpenChange={setOpen}>
+        <DropdownMenu open={open} onOpenChange={setOpen}>
             <Tooltip content="Player actions" side="left">
-                <DropdownMenu.Trigger asChild>
+                <DropdownMenuTrigger asChild>
                     <button
                         type="button"
                         aria-label={`Actions for ${name}`}
@@ -77,11 +86,11 @@ const RowActions = memo(function RowActions({
                     >
                         <MoreVertical className="w-4 h-4" aria-hidden="true" />
                     </button>
-                </DropdownMenu.Trigger>
+                </DropdownMenuTrigger>
             </Tooltip>
 
-            <DropdownMenu.Portal>
-                <DropdownMenu.Content
+            <DropdownMenuPortal>
+                <DropdownMenuContent
                     align="end"
                     sideOffset={8}
                     className={cn(
@@ -98,15 +107,22 @@ const RowActions = memo(function RowActions({
                     )}
                 >
                     {/* Header */}
-                    <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                    <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/50">
                         <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate">
                             {name}
                         </p>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
-                            <span className={`w-1.5 h-1.5 rounded-full ${online ? 'bg-green-500' : 'bg-slate-400'}`} />
-                            {online ? 'Online' : 'Offline'}
-                        </p>
+                        <div className="flex items-center gap-1.5 mt-1">
+                            <Badge 
+                                variant={online ? "success" : "default"} 
+                                size="sm"
+                                className="text-[10px] px-1.5 py-0"
+                            >
+                                {online ? 'Online' : 'Offline'}
+                            </Badge>
+                        </div>
                     </div>
+
+                    <DropdownMenuSeparator />
 
                     {/* Actions */}
                     <div className="py-1">
@@ -141,16 +157,19 @@ const RowActions = memo(function RowActions({
 
                     {/* Warning for offline actions */}
                     {!online && (
-                        <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-700 bg-amber-50 dark:bg-amber-900/20">
-                            <p className="text-[10px] text-amber-700 dark:text-amber-400 flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" />
-                                Some actions require player to be online
-                            </p>
-                        </div>
+                        <>
+                            <DropdownMenuSeparator />
+                            <div className="px-3 py-2 bg-amber-50 dark:bg-amber-900/20">
+                                <p className="text-[10px] text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3" />
+                                    Some actions require player to be online
+                                </p>
+                            </div>
+                        </>
                     )}
-                </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-        </DropdownMenu.Root>
+                </DropdownMenuContent>
+            </DropdownMenuPortal>
+        </DropdownMenu>
     );
 });
 
@@ -182,7 +201,7 @@ const MenuItem = memo(function MenuItem({
     }, [disabled, loading, onClick]);
 
     return (
-        <DropdownMenu.Item
+        <DropdownMenuItem
             onSelect={handleSelect}
             disabled={disabled || loading}
             className={cn(
@@ -196,17 +215,14 @@ const MenuItem = memo(function MenuItem({
         >
             <span className="flex-shrink-0 mt-0.5" aria-hidden="true">
                 {loading ? (
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
+                    <Spinner size="sm" variant="current" label="Loading action" />
                 ) : icon}
             </span>
             <div className="flex-1 text-left">
                 <div className="font-medium">{label}</div>
                 <div className="text-[11px] opacity-70 mt-0.5">{description}</div>
             </div>
-        </DropdownMenu.Item>
+        </DropdownMenuItem>
     );
 });
 
