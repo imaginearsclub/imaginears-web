@@ -30,8 +30,9 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuSubContent,
     DropdownMenuLabel,
+    Tooltip,
 } from "@/components/common";
-import { FileText, Edit, FileCheck, Trash2, UserCog, CheckCircle, XCircle, Clock, Eye, Mail, Calendar } from "lucide-react";
+import { FileText, Edit, FileCheck, Trash2, UserCog, CheckCircle, XCircle, Clock, Eye, Mail, Calendar, MoreVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -468,11 +469,28 @@ function RowActions({
 
     return (
         <DropdownMenu open={open} onOpenChange={setOpen}>
-            <DropdownMenuTrigger asChild>
-                <button type="button" className="btn btn-ghost btn-xs" aria-label="Open row actions">
-                    ⋯
-                </button>
-            </DropdownMenuTrigger>
+            <Tooltip content="Application actions" side="left">
+                <DropdownMenuTrigger asChild>
+                    <button 
+                        type="button" 
+                        aria-label="Open row actions"
+                        className={cn(
+                            "inline-flex items-center justify-center w-8 h-8 rounded-lg",
+                            "border border-slate-300 dark:border-slate-700",
+                            "bg-white dark:bg-slate-800",
+                            "text-slate-700 dark:text-slate-300",
+                            "hover:bg-slate-100 dark:hover:bg-slate-700",
+                            "hover:border-slate-400 dark:hover:border-slate-600",
+                            "transition-all duration-200",
+                            "focus:outline-none focus:ring-2 focus:ring-blue-500/50",
+                            "active:scale-95",
+                            "data-[state=open]:bg-slate-100 data-[state=open]:dark:bg-slate-700"
+                        )}
+                    >
+                        <MoreVertical className="w-4 h-4" aria-hidden="true" />
+                    </button>
+                </DropdownMenuTrigger>
+            </Tooltip>
 
             <DropdownMenuPortal>
                 <DropdownMenuContent
