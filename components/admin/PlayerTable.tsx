@@ -1,6 +1,7 @@
 import { memo, useCallback, useMemo } from "react";
 import RowActions from "@/components/admin/RowActions";
 import { Shield, Crown, User, Calendar, Globe } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export type Player = {
     name: string;
@@ -70,7 +71,10 @@ const RankBadge = memo(function RankBadge({ rank }: { rank: Player['rank'] }) {
 
     return (
         <span 
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${config.classes} transition-colors`}
+            className={cn(
+                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors",
+                config.classes
+            )}
             aria-label={config.label}
         >
             <Icon className="w-3.5 h-3.5" aria-hidden="true" />
@@ -84,15 +88,20 @@ const StatusBadge = memo(function StatusBadge({ online }: { online: boolean }) {
     return (
         <span className="inline-flex items-center gap-2 text-sm">
             <span 
-                className={`relative flex h-2.5 w-2.5`}
+                className="relative flex h-2.5 w-2.5"
                 aria-label={online ? 'Online' : 'Offline'}
             >
                 {online && (
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
                 )}
-                <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${online ? 'bg-green-500' : 'bg-slate-400 dark:bg-slate-600'}`} />
+                <span className={cn(
+                    "relative inline-flex rounded-full h-2.5 w-2.5",
+                    online ? 'bg-green-500' : 'bg-slate-400 dark:bg-slate-600'
+                )} />
             </span>
-            <span className={online ? 'text-slate-700 dark:text-slate-200 font-medium' : 'text-slate-500 dark:text-slate-400'}>
+            <span className={cn(
+                online ? 'text-slate-700 dark:text-slate-200 font-medium' : 'text-slate-500 dark:text-slate-400'
+            )}>
                 {online ? 'Online' : 'Offline'}
             </span>
         </span>
@@ -122,10 +131,20 @@ const PlayerRow = memo(function PlayerRow({
     const handleTeleport = useCallback(() => onTeleport(safeName), [onTeleport, safeName]);
 
     return (
-        <tr className="group bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-200 dark:border-slate-800 last:border-0">
+        <tr className={cn(
+            "group transition-colors",
+            "bg-white dark:bg-slate-900",
+            "hover:bg-slate-50 dark:hover:bg-slate-800/50",
+            "border-b border-slate-200 dark:border-slate-800",
+            "last:border-0"
+        )}>
             <td className="py-3.5 pl-6 pr-4">
                 <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold text-sm shadow-sm flex-shrink-0">
+                    <div className={cn(
+                        "w-8 h-8 rounded-full flex items-center justify-center",
+                        "bg-gradient-to-br from-blue-400 to-purple-500",
+                        "text-white font-bold text-sm shadow-sm flex-shrink-0"
+                    )}>
                         {safeName.charAt(0).toUpperCase()}
                     </div>
                     <span className="font-semibold text-slate-900 dark:text-white">
@@ -176,8 +195,16 @@ const PlayerTable = memo(function PlayerTable({
     // Empty state
     if (!rows || rows.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-white dark:bg-slate-900/50 rounded-xl border border-slate-300 dark:border-slate-800">
-                <div className="w-16 h-16 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center mb-4">
+            <div className={cn(
+                "flex flex-col items-center justify-center py-16 px-4 text-center",
+                "bg-white dark:bg-slate-900/50 rounded-xl",
+                "border border-slate-300 dark:border-slate-800"
+            )}>
+                <div className={cn(
+                    "w-16 h-16 rounded-full mb-4",
+                    "bg-slate-200 dark:bg-slate-800",
+                    "flex items-center justify-center"
+                )}>
                     <User className="w-8 h-8 text-slate-400 dark:text-slate-600" />
                 </div>
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
@@ -190,27 +217,37 @@ const PlayerTable = memo(function PlayerTable({
         );
     }
 
+    const thClass = cn(
+        "py-3.5 pr-4 text-left",
+        "text-xs font-semibold uppercase tracking-wider",
+        "text-slate-600 dark:text-slate-400"
+    );
+
     return (
-        <div className="overflow-x-auto rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+        <div className={cn(
+            "overflow-x-auto rounded-xl shadow-sm",
+            "border border-slate-300 dark:border-slate-800",
+            "bg-white dark:bg-slate-900"
+        )}>
             <table className="min-w-full bg-white dark:bg-slate-900" role="table" aria-label="Players table">
                 <thead className="bg-white dark:bg-slate-900/50">
                     <tr className="border-b border-slate-200 dark:border-slate-800">
-                        <th scope="col" className="py-3.5 pr-4 pl-6 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                        <th scope="col" className={cn(thClass, "pl-6")}>
                             Player
                         </th>
-                        <th scope="col" className="py-3.5 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                        <th scope="col" className={thClass}>
                             Rank
                         </th>
-                        <th scope="col" className="py-3.5 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                        <th scope="col" className={thClass}>
                             World
                         </th>
-                        <th scope="col" className="py-3.5 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                        <th scope="col" className={thClass}>
                             Status
                         </th>
-                        <th scope="col" className="py-3.5 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                        <th scope="col" className={thClass}>
                             Joined
                         </th>
-                        <th scope="col" className="py-3.5 pl-4 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                        <th scope="col" className={cn(thClass, "pl-4 pr-6 text-right")}>
                             Actions
                         </th>
                     </tr>
