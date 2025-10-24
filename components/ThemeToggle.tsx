@@ -1,5 +1,9 @@
 "use client";
 import { useLayoutEffect, useRef, useState, useCallback } from "react";
+import * as Switch from "@radix-ui/react-switch";
+import { Sun, Moon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Tooltip } from "@/components/common/Tooltip";
 
 // Frozen constant to prevent tampering
 const STORAGE_KEY = Object.freeze("imaginears.theme" as const);
@@ -102,26 +106,46 @@ export default function ThemeToggle() {
     return () => {};
   }, []);
 
-  const toggle = useCallback(() => {
-    setDark((d) => {
-      const next: Theme = d ? "light" : "dark";
-      hasOverrideRef.current = true; // user explicitly chose a theme for this session
-      applyTheme(next);
-      writeSessionTheme(next);
-      return !d; // More efficient boolean toggle
-    });
+  const toggle = useCallback((checked: boolean) => {
+    const next: Theme = checked ? "dark" : "light";
+    hasOverrideRef.current = true; // user explicitly chose a theme for this session
+    applyTheme(next);
+    writeSessionTheme(next);
+    setDark(checked);
   }, []);
 
   return (
-    <button
-      onClick={toggle}
-      aria-label="Toggle theme"
-      aria-pressed={dark}
-      type="button" // Explicit type to prevent form submission
-      className="rounded-full p-2 border border-slate-200/60 dark:border-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors duration-200"
-      title={dark ? "Switch to light mode" : "Switch to dark mode"}
-    >
-      <span aria-hidden="true">{dark ? "☀️" : "🌙"}</span>
-    </button>
+    <Tooltip content={dark ? "Switch to light mode" : "Switch to dark mode"} side="bottom">
+      <Switch.Root
+        checked={dark}
+        onCheckedChange={toggle}
+        aria-label="Toggle theme"
+        className={cn(
+          "group relative inline-flex h-8 w-14 shrink-0 cursor-pointer items-center",
+          "rounded-full border-2 border-transparent transition-colors duration-200",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2",
+          "focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900",
+          "data-[state=unchecked]:bg-slate-200 dark:data-[state=unchecked]:bg-slate-700",
+          "data-[state=checked]:bg-blue-600 dark:data-[state=checked]:bg-blue-500",
+          "hover:data-[state=unchecked]:bg-slate-300 dark:hover:data-[state=unchecked]:bg-slate-600",
+          "hover:data-[state=checked]:bg-blue-700 dark:hover:data-[state=checked]:bg-blue-600"
+        )}
+      >
+        <Switch.Thumb
+          className={cn(
+            "pointer-events-none flex h-7 w-7 items-center justify-center",
+            "rounded-full bg-white shadow-lg ring-0 transition-transform duration-200",
+            "data-[state=unchecked]:translate-x-0",
+            "data-[state=checked]:translate-x-6"
+          )}
+        >
+          {dark ? (
+            <Moon className="h-4 w-4 text-blue-600" aria-hidden="true" />
+          ) : (
+            <Sun className="h-4 w-4 text-amber-500" aria-hidden="true" />
+          )}
+        </Switch.Thumb>
+      </Switch.Root>
+    </Tooltip>
   );
 }
