@@ -5,7 +5,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import MarkdownEditor from "@/components/common/MarkdownEditor";
+import { MarkdownEditor, Input, Separator } from "@/components/common";
 import RecurrenceEditor, { type RecurrenceValue } from "./RecurrenceEditor";
 
 type Props = {
@@ -100,12 +100,13 @@ export default function CreateEventDrawer({ open, onOpenChange, onCreated }: Pro
         }
     }
 
-    const inputClass = cn(
-        "mt-1 w-full rounded-2xl px-4 py-3",
-        "border border-slate-300 dark:border-slate-700",
-        "bg-white dark:bg-slate-800",
+    const selectClass = cn(
+        "mt-2 w-full rounded-xl border-2 px-4 py-3",
+        "border-slate-300 dark:border-slate-700",
+        "bg-white dark:bg-slate-900",
         "text-slate-900 dark:text-white",
-        "focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+        "focus:outline-none focus:ring-2 focus:ring-blue-500/50",
+        "transition-all"
     );
 
     return (
@@ -124,66 +125,75 @@ export default function CreateEventDrawer({ open, onOpenChange, onCreated }: Pro
                     )}
                 >
                     {/* Header */}
-                    <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
+                    <div className="flex items-center justify-between p-4">
                         <Dialog.Title className="text-lg font-semibold text-slate-900 dark:text-white">
                             Create Event
                         </Dialog.Title>
                         <Dialog.Close asChild>
-                            <button className="btn btn-icon btn-ghost" aria-label="Close">
-                                <X className="h-5 w-5" />
+                            <button 
+                                type="button"
+                                className={cn(
+                                    "inline-flex items-center justify-center w-8 h-8 rounded-lg",
+                                    "text-slate-500 dark:text-slate-400",
+                                    "hover:bg-slate-100 dark:hover:bg-slate-800",
+                                    "transition-colors"
+                                )}
+                                aria-label="Close"
+                            >
+                                <X className="w-5 h-5" />
                             </button>
                         </Dialog.Close>
                     </div>
+                    
+                    <Separator />
 
                     {/* Form */}
                     <form onSubmit={handleCreate} className="flex-1 overflow-auto p-4 space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                <label className="text-sm font-medium text-slate-900 dark:text-white mb-2 block">
                                     Title *
                                 </label>
-                                <input
+                                <Input
                                     type="text"
-                                    className={inputClass}
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                     disabled={submitting}
+                                    placeholder="Event title"
                                 />
                             </div>
                             <div>
-                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                <label className="text-sm font-medium text-slate-900 dark:text-white mb-2 block">
                                     World *
                                 </label>
-                                <input
+                                <Input
                                     type="text"
-                                    className={inputClass}
                                     value={world}
                                     onChange={(e) => setWorld(e.target.value)}
                                     disabled={submitting}
+                                    placeholder="World name"
                                 />
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                <label className="text-sm font-medium text-slate-900 dark:text-white mb-2 block">
                                     Start *
                                 </label>
-                                <input
+                                <Input
                                     type="datetime-local"
-                                    className={inputClass}
                                     value={startAt}
                                     onChange={(e) => setStartAt(e.target.value)}
                                     disabled={submitting}
                                 />
                             </div>
                             <div>
-                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                <label className="text-sm font-medium text-slate-900 dark:text-white mb-2 block">
                                     End *
                                 </label>
-                                <input
+                                <Input
                                     type="datetime-local"
-                                    className={inputClass}
                                     value={endAt}
                                     onChange={(e) => setEndAt(e.target.value)}
                                     disabled={submitting}
@@ -192,11 +202,11 @@ export default function CreateEventDrawer({ open, onOpenChange, onCreated }: Pro
                         </div>
 
                         <div>
-                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                            <label className="text-sm font-medium text-slate-900 dark:text-white mb-2 block">
                                 Category
                             </label>
                             <select
-                                className={inputClass}
+                                className={selectClass}
                                 value={category}
                                 onChange={(e) => setCategory(e.target.value as any)}
                                 disabled={submitting}
@@ -210,15 +220,15 @@ export default function CreateEventDrawer({ open, onOpenChange, onCreated }: Pro
                         </div>
 
                         <div>
-                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                            <label className="text-sm font-medium text-slate-900 dark:text-white mb-2 block">
                                 Short Description
                             </label>
-                            <input
+                            <Input
                                 type="text"
-                                className={inputClass}
                                 value={shortDesc}
                                 onChange={(e) => setShortDesc(e.target.value)}
                                 disabled={submitting}
+                                placeholder="Brief description"
                             />
                         </div>
 
@@ -237,24 +247,41 @@ export default function CreateEventDrawer({ open, onOpenChange, onCreated }: Pro
                     </form>
 
                     {/* Footer */}
-                    <div className="p-4 flex justify-end gap-2 border-t border-slate-200 dark:border-slate-800">
-                        <Dialog.Close asChild>
+                    <div className="p-4 border-t border-slate-200 dark:border-slate-800">
+                        <div className="flex justify-end gap-3">
+                            <Dialog.Close asChild>
+                                <button
+                                    type="button"
+                                    className={cn(
+                                        "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                                        "bg-slate-100 dark:bg-slate-800",
+                                        "text-slate-700 dark:text-slate-300",
+                                        "hover:bg-slate-200 dark:hover:bg-slate-700",
+                                        "border-2 border-transparent",
+                                        "disabled:opacity-50 disabled:cursor-not-allowed"
+                                    )}
+                                    disabled={submitting}
+                                >
+                                    Cancel
+                                </button>
+                            </Dialog.Close>
                             <button
-                                type="button"
-                                className="btn btn-muted"
+                                type="submit"
+                                onClick={handleCreate}
+                                className={cn(
+                                    "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                                    "bg-blue-600 dark:bg-blue-500",
+                                    "text-white",
+                                    "hover:bg-blue-700 dark:hover:bg-blue-600",
+                                    "border-2 border-transparent",
+                                    "focus:outline-none focus:ring-2 focus:ring-blue-500/50",
+                                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                                )}
                                 disabled={submitting}
                             >
-                                Cancel
+                                {submitting ? "Creating..." : "Create Event"}
                             </button>
-                        </Dialog.Close>
-                        <button
-                            type="submit"
-                            onClick={handleCreate}
-                            className={cn("btn btn-primary", submitting && "is-loading")}
-                            disabled={submitting}
-                        >
-                            {submitting ? "Creating..." : "Create"}
-                        </button>
+                        </div>
                     </div>
                 </Dialog.Content>
             </Dialog.Portal>
