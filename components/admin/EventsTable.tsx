@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { toast } from "sonner";
 
 export type AdminEventRow = {
     id: string;
@@ -162,7 +163,7 @@ function RowActions({
                         onSelect={(e) => {
                             e.preventDefault();
                             setOpen(false);
-                            alert("Delete coming soon");
+                            toast.info("Delete functionality coming soon");
                         }}
                     >
                         Delete
