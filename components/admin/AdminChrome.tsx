@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Menu, Home, CalendarRange, FileText, Users, Settings } from "lucide-react";
+import { Menu, Home, CalendarRange, FileText, Users, Settings, Plus, Search, Moon, Sun, Palette, LogOut, Code } from "lucide-react";
 import { SidebarDesktop, SidebarDrawer } from "@/components/admin/Sidebar";
 import { CommandPalette } from "@/components/common";
 import type { CommandItem } from "@/components/common";
@@ -73,10 +73,88 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
             id: "components",
             label: "Components Demo",
             description: "View all UI components",
-            icon: <Settings className="w-4 h-4" />,
+            icon: <Palette className="w-4 h-4" />,
             group: "Tools",
             onSelect: () => router.push("/admin/components-demo"),
             keywords: ["ui", "design", "showcase"],
+        },
+        // Quick Actions
+        {
+            id: "new-event",
+            label: "Create New Event",
+            description: "Add a new event to the schedule",
+            icon: <Plus className="w-4 h-4" />,
+            group: "Quick Actions",
+            onSelect: () => router.push("/admin/events?action=create"),
+            keywords: ["add", "event", "calendar", "new"],
+        },
+        {
+            id: "search-apps",
+            label: "Search Applications",
+            description: "Find and filter applications",
+            icon: <Search className="w-4 h-4" />,
+            group: "Quick Actions",
+            onSelect: () => router.push("/admin/applications"),
+            keywords: ["find", "lookup", "filter", "apps"],
+        },
+        {
+            id: "search-players",
+            label: "Search Players",
+            description: "Find player accounts",
+            icon: <Search className="w-4 h-4" />,
+            group: "Quick Actions",
+            onSelect: () => router.push("/admin/players"),
+            keywords: ["find", "users", "members", "lookup"],
+        },
+        // Theme Controls
+        {
+            id: "toggle-theme-light",
+            label: "Switch to Light Mode",
+            description: "Change theme to light mode",
+            icon: <Sun className="w-4 h-4" />,
+            group: "Theme",
+            onSelect: () => {
+                document.documentElement.classList.remove("dark");
+                sessionStorage.setItem("imaginears.theme", "light");
+                window.dispatchEvent(new Event("storage"));
+            },
+            keywords: ["theme", "appearance", "bright", "light"],
+        },
+        {
+            id: "toggle-theme-dark",
+            label: "Switch to Dark Mode",
+            description: "Change theme to dark mode",
+            icon: <Moon className="w-4 h-4" />,
+            group: "Theme",
+            onSelect: () => {
+                document.documentElement.classList.add("dark");
+                sessionStorage.setItem("imaginears.theme", "dark");
+                window.dispatchEvent(new Event("storage"));
+            },
+            keywords: ["theme", "appearance", "night", "dark"],
+        },
+        // System Actions
+        {
+            id: "view-source",
+            label: "View Page Source",
+            description: "Inspect page source code",
+            icon: <Code className="w-4 h-4" />,
+            group: "System",
+            onSelect: () => {
+                if (typeof window !== "undefined") {
+                    window.open("view-source:" + window.location.href, "_blank");
+                }
+            },
+            keywords: ["dev", "inspect", "debug", "developer"],
+        },
+        {
+            id: "logout",
+            label: "Sign Out",
+            description: "Log out of your account",
+            icon: <LogOut className="w-4 h-4" />,
+            group: "System",
+            onSelect: () => router.push("/logout"),
+            keywords: ["exit", "leave", "signout", "logout"],
         },
     ];
 
