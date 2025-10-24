@@ -53,12 +53,16 @@ export default function SignOutButton() {
                     signal: controller.signal,
                 });
 
-                // Clear any client-side state
+                // Clear client-side session data (but preserve theme preference in localStorage)
                 if (typeof window !== "undefined") {
                     try {
+                        // Clear sessionStorage (temporary session data)
                         sessionStorage.clear();
+                        
+                        // Note: We intentionally don't clear localStorage here
+                        // to preserve user preferences like theme that should persist
                     } catch (e) {
-                        console.warn("Failed to clear storage:", e);
+                        console.warn("Failed to clear session storage:", e);
                     }
                 }
 
