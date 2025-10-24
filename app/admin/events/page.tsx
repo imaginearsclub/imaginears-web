@@ -29,7 +29,7 @@ export default function AdminEventsPage() {
                 items.map((it: any) => ({
                     id: it.id,
                     title: it.title,
-                    world: it.world,
+                    server: it.world,
                     category: it.category,
                     status: it.status,
                     startAt: it.startAt,
@@ -69,7 +69,7 @@ export default function AdminEventsPage() {
         const ev: EditableEvent = {
             id: r.id,
             title: r.title,
-            world: r.world,
+            world: r.server,
             category: r.category as any,
             details: r.details ?? "",
             shortDescription: r.shortDescription ?? "",
