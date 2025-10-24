@@ -2,7 +2,12 @@ import {NextResponse} from 'next/server';
 import {prisma} from '@/lib/prisma';
 import {requireAdmin} from '@/lib/session';
 
-// Buckets by day fro last N (default 30) days based on Event.createdAt
+export const runtime = "nodejs";
+
+// Cache for 5 minutes to reduce database load
+export const revalidate = 300;
+
+// Buckets by day for last N (default 30) days based on Event.createdAt
 export async function GET(req: Request){
     try {
         const session = await requireAdmin();
@@ -13,41 +18,54 @@ export async function GET(req: Request){
         }
 
         const {searchParams} = new URL(req.url);
-        const range = parseInt(searchParams.get('range') || '30', 10);
+        const rangeParam = searchParams.get('range') || '30';
+        
+        // Validate input is a number
+        if (!/^\d+$/.test(rangeParam)) {
+            return NextResponse.json({error: "Invalid range parameter"}, {status: 400});
+        }
+        
+        const range = parseInt(rangeParam, 10);
         const days = Math.min(Math.max(range, 1), 90);
 
+        // Use start of day for consistent date boundaries (UTC)
         const end = new Date();
-        const start = new Date();
-        start.setDate(end.getDate() - (days - 1));
+        end.setUTCHours(23, 59, 59, 999);
+        
+        const start = new Date(end);
+        start.setUTCDate(end.getUTCDate() - (days - 1));
+        start.setUTCHours(0, 0, 0, 0);
 
-        // Pull all created in window
-        const rows = await prisma.event.findMany({
-            where: {
-                createdAt: {
-                    gte: start,
-                    lte: end,
-                }
-            },
-            select: {
-                createdAt: true},
-        });
+        // Use database aggregation instead of fetching all records
+        // This is much more efficient for large datasets
+        const rows = await prisma.$queryRaw<Array<{date: string; count: bigint}>>`
+            SELECT 
+                DATE(createdAt) as date,
+                COUNT(*)::bigint as count
+            FROM "Event"
+            WHERE createdAt >= ${start}
+                AND createdAt <= ${end}
+            GROUP BY DATE(createdAt)
+            ORDER BY date ASC
+        `;
 
-        // Bucket counts per yyyy-mm-dd
+        // Create map with all dates initialized to 0
         const map = new Map<string, number>();
+        const tempDate = new Date(start);
         for (let i = 0; i < days; i++) {
-            const d = new Date(start);
-            d.setDate(start.getDate() + i);
-            const key = d.toISOString().slice(0, 10);
+            const key = tempDate.toISOString().slice(0, 10);
             map.set(key, 0);
+            tempDate.setUTCDate(tempDate.getUTCDate() + 1);
         }
 
-        for (const r of rows) {
-            const key = r.createdAt.toISOString().slice(0, 10);
-            if (map.has(key)) map.set(key, (map.get(key) || 0) + 1);
+        // Fill in actual counts from database
+        for (const row of rows) {
+            const dateStr = String(row.date).slice(0, 10);
+            map.set(dateStr, Number(row.count));
         }
 
         const data = Array.from(map.entries()).map(([key, count]) => ({
-            date: key.slice(5),
+            date: key.slice(5), // MM-DD format
             count,
         }));
 
