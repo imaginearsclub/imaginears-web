@@ -1,72 +1,135 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
+
+const LOGIN_PATH = "/login";
+const TIMEOUT_MS = 8000;
 
 export default function SignOutButton() {
     const router = useRouter();
-    const [pending, setPending] = useState(false);
+    const [isSigningOut, setIsSigningOut] = useState(false);
+    const [isPending, startTransition] = useTransition();
     const abortRef = useRef<AbortController | null>(null);
+    const isMountedRef = useRef(true);
 
-    const loginPath = useMemo(() => "/login", []);
+    // Cleanup on unmount
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+            abortRef.current?.abort();
+        };
+    }, []);
 
-    const handleClick = useCallback(async () => {
-        if (pending) return; // Prevent double-clicks
-        setPending(true);
+    const handleSignOut = useCallback(async () => {
+        // Prevent double-clicks
+        if (isSigningOut || isPending) return;
+        
+        setIsSigningOut(true);
 
-        // Abort any in-flight request before starting a new one
-        if (abortRef.current) {
-            try { abortRef.current.abort(); } catch {}
-        }
-
+        // Cancel any pending requests
+        abortRef.current?.abort();
         const controller = new AbortController();
         abortRef.current = controller;
 
-        // Safety timeout to avoid hanging forever
-        const timeoutId = setTimeout(() => {
-            try { controller.abort(); } catch {}
-        }, 8000);
+        // Safety timeout to prevent hanging
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
         try {
-            const res = await fetch("/api/auth/sign-out", {
+            // Call Better-Auth sign-out endpoint
+            await fetch("/api/logout", {
                 method: "POST",
-                headers: { "content-type": "application/json" },
-                body: "{}",
-                signal: controller.signal,
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
                 credentials: "include",
+                signal: controller.signal,
             });
 
-            // Whether or not the response is ok, force local redirect to ensure UI resets
-            // Better-Auth will clear cookies on success.
-            if (!res.ok) {
-                // Try to parse error for logging (non-blocking)
-                try { await res.text(); } catch {}
+            // Clear any client-side state
+            if (typeof window !== "undefined") {
+                try {
+                    // Clear localStorage/sessionStorage if used
+                    sessionStorage.clear();
+                    // Keep localStorage items that aren't auth-related if needed
+                } catch (e) {
+                    console.warn("Failed to clear storage:", e);
+                }
             }
 
-            // Use replace so back button won't return to an authed page
-            router.replace(loginPath);
-        } catch (_err) {
-            // Network/abort. Still route to login to ensure user lands on a safe page.
-            try { router.replace(loginPath); } catch {}
-            // As last resort (router unavailable), hard redirect
-            if (typeof window !== "undefined") {
-                try { window.location.replace(loginPath); } catch {}
+            // Navigate to login (use replace to prevent back button issues)
+            startTransition(() => {
+                router.replace(LOGIN_PATH);
+                router.refresh(); // Refresh to clear server-side session state
+            });
+        } catch (error) {
+            // Even on error, navigate to login for security
+            // Better to log user out client-side than leave them in uncertain state
+            if (!controller.signal.aborted) {
+                console.error("Sign out error:", error);
+            }
+            
+            // Force navigation to login
+            if (isMountedRef.current) {
+                try {
+                    router.replace(LOGIN_PATH);
+                } catch {
+                    // Last resort: hard redirect
+                    window.location.href = LOGIN_PATH;
+                }
             }
         } finally {
             clearTimeout(timeoutId);
-            setPending(false);
+            if (isMountedRef.current) {
+                setIsSigningOut(false);
+            }
         }
-    }, [pending, router, loginPath]);
+    }, [isSigningOut, isPending, router]);
+
+    const isLoading = isSigningOut || isPending;
 
     return (
         <button
             type="button"
-            className="btn btn-muted btn-sm"
-            onClick={handleClick}
-            disabled={pending}
-            aria-busy={pending}
+            onClick={handleSignOut}
+            disabled={isLoading}
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 hover:border-slate-400 dark:hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98]"
+            aria-label="Sign out of your account"
+            aria-busy={isLoading}
         >
-            {pending ? "Signing out…" : "Sign out"}
+            {isLoading ? (
+                <>
+                    <svg 
+                        className="w-4 h-4 animate-spin" 
+                        fill="none" 
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                    >
+                        <circle 
+                            className="opacity-25" 
+                            cx="12" 
+                            cy="12" 
+                            r="10" 
+                            stroke="currentColor" 
+                            strokeWidth="4"
+                        />
+                        <path 
+                            className="opacity-75" 
+                            fill="currentColor" 
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                    </svg>
+                    <span>Signing out...</span>
+                </>
+            ) : (
+                <>
+                    <LogOut className="w-4 h-4" aria-hidden="true" />
+                    <span>Sign out</span>
+                </>
+            )}
         </button>
     );
 }

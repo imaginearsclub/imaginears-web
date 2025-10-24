@@ -83,42 +83,42 @@ export default function CreateEventDrawer({ open, onOpenChange, onCreated }: Pro
     return (
         <div className="fixed inset-0 z-50 flex">
             <button className="absolute inset-0 bg-black/40" onClick={() => onOpenChange(false)} aria-label="Close backdrop" />
-            <aside className="relative ml-auto h-full w-full max-w-2xl bg-[var(--bg-light)] dark:bg-[var(--bg-dark)] shadow-2xl flex flex-col">
+            <aside className="relative ml-auto h-full w-full max-w-2xl bg-white dark:bg-slate-900 shadow-2xl flex flex-col">
                 <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
-                    <h2 className="text-lg font-semibold">Create Event</h2>
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Create Event</h2>
                     <button className="btn btn-icon btn-ghost" onClick={() => onOpenChange(false)} aria-label="Close">
                         <X className="h-5 w-5" />
                     </button>
                 </div>
 
                 <form onSubmit={handleCreate} className="flex-1 overflow-auto p-4 space-y-4">
-                    {err && <div className="rounded-xl bg-rose-50 text-rose-700 p-3 text-sm">{err}</div>}
+                    {err && <div className="rounded-xl bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 p-3 text-sm">{err}</div>}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label className="text-sm font-medium">Title *</label>
-                            <input className="mt-1 w-full rounded-2xl border px-4 py-3" value={title} onChange={(e) => setTitle(e.target.value)} />
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Title *</label>
+                            <input className="mt-1 w-full rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3" value={title} onChange={(e) => setTitle(e.target.value)} />
                         </div>
                         <div>
-                            <label className="text-sm font-medium">World *</label>
-                            <input className="mt-1 w-full rounded-2xl border px-4 py-3" value={world} onChange={(e) => setWorld(e.target.value)} />
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">World *</label>
+                            <input className="mt-1 w-full rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3" value={world} onChange={(e) => setWorld(e.target.value)} />
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label className="text-sm font-medium">Start *</label>
-                            <input type="datetime-local" className="mt-1 w-full rounded-2xl border px-4 py-3" value={startAt} onChange={(e) => setStartAt(e.target.value)} />
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Start *</label>
+                            <input type="datetime-local" className="mt-1 w-full rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3" value={startAt} onChange={(e) => setStartAt(e.target.value)} />
                         </div>
                         <div>
-                            <label className="text-sm font-medium">End *</label>
-                            <input type="datetime-local" className="mt-1 w-full rounded-2xl border px-4 py-3" value={endAt} onChange={(e) => setEndAt(e.target.value)} />
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">End *</label>
+                            <input type="datetime-local" className="mt-1 w-full rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3" value={endAt} onChange={(e) => setEndAt(e.target.value)} />
                         </div>
                     </div>
 
                     <div>
-                        <label className="text-sm font-medium">Category</label>
-                        <select className="mt-1 w-full rounded-2xl border px-4 py-3" value={category} onChange={(e) => setCategory(e.target.value as any)}>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Category</label>
+                        <select className="mt-1 w-full rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3" value={category} onChange={(e) => setCategory(e.target.value as any)}>
                             <option value="Fireworks">Fireworks</option>
                             <option value="Seasonal">Seasonal</option>
                             <option value="MeetAndGreet">Meet & Greet</option>
@@ -128,8 +128,8 @@ export default function CreateEventDrawer({ open, onOpenChange, onCreated }: Pro
                     </div>
 
                     <div>
-                        <label className="text-sm font-medium">Short Description</label>
-                        <input className="mt-1 w-full rounded-2xl border px-4 py-3" value={shortDesc} onChange={(e) => setShortDesc(e.target.value)} />
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Short Description</label>
+                        <input className="mt-1 w-full rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3" value={shortDesc} onChange={(e) => setShortDesc(e.target.value)} />
                     </div>
 
                     <div>

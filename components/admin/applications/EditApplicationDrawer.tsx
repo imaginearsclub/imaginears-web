@@ -97,23 +97,23 @@ export default function EditApplicationDrawer({ open, app, onOpenChange, onSave 
             />
             {/* Panel */}
             <aside
-                className="relative ml-auto h-full w-full max-w-lg bg-[var(--bg-light)] dark:bg-[var(--bg-dark)] shadow-2xl flex flex-col"
+                className="relative ml-auto h-full w-full max-w-lg bg-white dark:bg-slate-900 shadow-2xl flex flex-col"
                 role="dialog"
                 aria-modal="true"
                 aria-label="Edit Application"
             >
                 <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
-                    <h2 className="text-lg font-semibold">Edit Application</h2>
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Edit Application</h2>
                     <button type="button" className="btn btn-icon btn-ghost" onClick={() => onOpenChange(false)} aria-label="Close">
                         <X className="h-5 w-5" />
                     </button>
                 </div>
 
                 <form className="flex-1 overflow-auto p-4 space-y-4" onSubmit={handleSave}>
-                    {err && <div className="rounded-xl bg-rose-50 text-rose-700 p-3 text-sm">{err}</div>}
+                    {err && <div className="rounded-xl bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 p-3 text-sm">{err}</div>}
 
                     <div>
-                        <label className="text-sm font-medium">Full Name *</label>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Full Name *</label>
                         <input
                             value={form?.name ?? ""}
                             onChange={(e) => setForm((f) => (f ? { ...f, name: e.target.value } : f))}
@@ -124,7 +124,7 @@ export default function EditApplicationDrawer({ open, app, onOpenChange, onSave 
                     </div>
 
                     <div>
-                        <label className="text-sm font-medium">Email *</label>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Email *</label>
                         <input
                             type="email"
                             value={form?.email ?? ""}
@@ -136,7 +136,7 @@ export default function EditApplicationDrawer({ open, app, onOpenChange, onSave 
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label className="text-sm font-medium">Role</label>
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Role</label>
                             <select
                                 value={form?.role ?? "Developer"}
                                 onChange={(e) =>
@@ -151,7 +151,7 @@ export default function EditApplicationDrawer({ open, app, onOpenChange, onSave 
                         </div>
 
                         <div>
-                            <label className="text-sm font-medium">Status</label>
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Status</label>
                             <select
                                 value={form?.status ?? "New"}
                                 onChange={(e) =>
@@ -167,7 +167,7 @@ export default function EditApplicationDrawer({ open, app, onOpenChange, onSave 
                     </div>
 
                     <div>
-                        <label className="text-sm font-medium">Notes</label>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</label>
                         <MarkdownToolbar targetId="app-notes-md" />
                         <textarea
                             id="app-notes-md"

@@ -4,6 +4,40 @@
 @tailwind utilities;
 @reference "tailwindcss";
 
+/* Ensure Tailwind background utilities override global styles */
+@layer utilities {
+  /* Force bg-white to always be white, even in dark mode */
+  .bg-white,
+  .dark .bg-white {
+    background-color: rgb(255 255 255) !important;
+  }
+  
+  /* Ensure other common backgrounds work too */
+  .bg-transparent {
+    background-color: transparent !important;
+  }
+  
+  /* Force text colors to override global body color */
+  .text-slate-900 {
+    color: rgb(15 23 42) !important;
+  }
+  .text-slate-800 {
+    color: rgb(30 41 59) !important;
+  }
+  .text-slate-700 {
+    color: rgb(51 65 85) !important;
+  }
+  .text-slate-600 {
+    color: rgb(71 85 105) !important;
+  }
+  .text-white {
+    color: rgb(255 255 255) !important;
+  }
+  .dark .text-white {
+    color: rgb(255 255 255) !important;
+  }
+}
+
 /* ------------------------------ */
 /* 🌟 Base Light & Dark Theme     */
 /* ------------------------------ */
@@ -37,9 +71,17 @@
     --shadow-lg: 0 10px 26px rgba(15, 23, 42, 0.12);
 }
 
-html { scroll-behavior: smooth; background: var(--bg-light); color: var(--text-light); transition: color .3s ease, background-color .3s ease; }
+html { 
+    scroll-behavior: smooth; 
+    background: var(--bg-light); 
+    color: var(--text-light); 
+    transition: color .3s ease, background-color .3s ease; 
+}
 
-html.dark { color: var(--text-dark); background: var(--bg-dark); }
+html.dark { 
+    color: var(--text-dark); 
+    background: var(--bg-dark); 
+}
 
 body {
     @apply font-sans antialiased;
@@ -52,6 +94,7 @@ body {
     color: var(--text-dark);
     background: var(--bg-dark);
 }
+
 }
 
 /* ------------------------------ */
@@ -517,7 +560,16 @@ a:hover .card {
 /* ------------------------------ */
 /* 🌗 Dark mode transitions       */
 /* ------------------------------ */
-* { transition: color .25s ease, background-color .25s ease, border-color .25s ease; }
+/* More specific transition - avoid overriding Tailwind utilities */
+body,
+.card,
+.btn,
+a,
+header,
+footer,
+nav {
+    transition: color .25s ease, background-color .25s ease, border-color .25s ease;
+}
 
 /* Respect users that prefer reduced motion: minimize animations and smooth scroll */
 @media (prefers-reduced-motion: reduce) {
@@ -635,27 +687,8 @@ h3:hover::after,
 /* ----------------------------------------------- */
 /* 🔘 Drawer System                               */
 /* ----------------------------------------------- */
-/* Drawer panel base text colors for dark mode */
-aside[role="dialog"] {
-    color: rgb(15 23 42); /* slate-900 */
-}
-.dark aside[role="dialog"]{
-    color: rgb(241 245 249) /* slate-100 */
-}
-
-/* Ensure inputs in drawers keep contrast in darkm mode */
-aside[role="dialog"] input,
-aside[role="dialog"] textarea,
-aside[role="dialog"] select {
-    background-color: rgb(255 255 255);
-    color: rgb(15 23 42);
-}
-.dark aside[role="dialog"] input,
-.dark aside[role="dialog"] textarea,
-.dark aside[role="dialog"] select {
-    background-color: rgb(15 23 42);
-    color: rgb(241 245 249);
-}
+/* Drawer panel base text colors - removed as they conflict with Tailwind utilities */
+/* Let Tailwind classes handle all styling */
 
 /* Compact toolbar buttons */
 .btn.btn-xs {
@@ -704,17 +737,21 @@ aside[role="dialog"] select {
 /* 📝 Text utilities                                */
 /* ----------------------------------------------- */
 .muted { @apply text-slate-600 dark:text-slate-400; }
-.text-body { color: var(--text-light); }
-.dark .text-body { color: var(--text-dark); }
 
+/* text-body utility - use Tailwind classes instead for better control */
+.text-body { 
+    @apply text-slate-900 dark:text-slate-100;
+}
 
 @layer base {
-  /* Base paragraph readability in both themes */
-  p { 
+  /* Base paragraph readability in both themes - only apply to prose content */
+  .prose p,
+  article p { 
     color: var(--text-light);
     line-height: 1.7;
   }
-  .dark p {
+  .dark .prose p,
+  .dark article p {
     color: var(--text-dark);
   }
 }

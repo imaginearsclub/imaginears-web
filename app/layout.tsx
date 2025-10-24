@@ -3,6 +3,7 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Script from "next/script";
+import { Toaster } from "sonner";
 
 // Force Node.js runtime at the root to avoid accidental Edge usage by children that depend on Node-only modules.
 export const runtime = "nodejs";
@@ -185,6 +186,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Header />
         {children}
         <Footer />
+        
+        {/* Toast notifications */}
+        <Toaster 
+          richColors 
+          position="top-right" 
+          expand={false}
+          closeButton
+          toastOptions={{
+            classNames: {
+              toast: 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800',
+              title: 'text-slate-900 dark:text-white',
+              description: 'text-slate-600 dark:text-slate-400',
+              actionButton: 'bg-blue-500 text-white',
+              cancelButton: 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white',
+              closeButton: 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white',
+            },
+          }}
+        />
       </body>
     </html>
   );
