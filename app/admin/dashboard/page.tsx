@@ -39,7 +39,7 @@ type Kpi = {
         error?: string;
     };
 };
-type ActivityItem = { id: string; kind: "event" | "application"; title: string; sub: string; when: string };
+type ActivityItem = { id: string; kind: "event" | "application"; title: string; sub: string; when: string; updatedBy?: string };
 
 export default function DashboardPage() {
     const [kpis, setKpis] = useState<Kpi | null>(null);
@@ -56,10 +56,10 @@ export default function DashboardPage() {
                 setErr(null);
                 
                 const [kRes, eRes, aRes, actRes] = await Promise.all([
-                    fetch("/api/admin/kpis"),
-                    fetch("/api/admin/stats/events?range=30"),
-                    fetch("/api/admin/stats/applications-by-status"),
-                    fetch("/api/admin/activity"),
+                    fetch("/api/admin/kpis", { credentials: "include" }),
+                    fetch("/api/admin/stats/events?range=30", { credentials: "include" }),
+                    fetch("/api/admin/stats/applications-by-status", { credentials: "include" }),
+                    fetch("/api/admin/activity", { credentials: "include" }),
                 ]);
 
                 // Parse JSON responses
@@ -467,9 +467,19 @@ export default function DashboardPage() {
                                                         <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">
                                                             {item.sub}
                                                         </p>
-                                                        <p className="text-xs text-slate-500 dark:text-slate-500">
-                                                            {new Date(item.when).toLocaleString()}
-                                                        </p>
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <p className="text-xs text-slate-500 dark:text-slate-500">
+                                                                {new Date(item.when).toLocaleString()}
+                                                            </p>
+                                                            {item.updatedBy && (
+                                                                <>
+                                                                    <span className="text-xs text-slate-400">•</span>
+                                                                    <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                                                                        by {item.updatedBy}
+                                                                    </p>
+                                                                </>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     {idx < 3 && <Badge variant="success" className="text-xs">New</Badge>}
                                                 </li>
