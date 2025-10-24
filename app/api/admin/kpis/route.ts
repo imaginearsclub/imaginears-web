@@ -5,8 +5,9 @@ import {getMinecraftServerStatus, getUptimePercentage, getPlayerCountHistory} fr
 
 export const runtime = "nodejs";
 
-// Cache for 1 minute - KPIs don't need to be real-time and external server calls are expensive
-export const revalidate = 60;
+// Force dynamic rendering for authenticated endpoints
+// This ensures fresh session validation on every request
+export const dynamic = "force-dynamic";
 
 // Configuration
 const MINECRAFT_SERVER = process.env['MINECRAFT_SERVER_ADDRESS'] || 'iears.us';
