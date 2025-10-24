@@ -3,10 +3,15 @@ import {prisma} from '@/lib/prisma';
 import {requireAdmin} from '@/lib/session';
 import {getMinecraftServerStatus, getUptimePercentage, getPlayerCountHistory} from '@/lib/minecraft-status';
 
+export const runtime = "nodejs";
+
+// Cache for 1 minute - KPIs don't need to be real-time and external server calls are expensive
+export const revalidate = 60;
+
 // Configuration
 const MINECRAFT_SERVER = process.env['MINECRAFT_SERVER_ADDRESS'] || 'iears.us';
 
-// API uptime tracking (fallback)
+// API uptime tracking (fallback) - Note: resets on serverless cold starts
 const startedAt = Date.now();
 function formatApiUptime(ms: number) {
     const s = Math.floor(ms / 1000);
@@ -25,6 +30,24 @@ export async function GET(){
         }
 
         // Fetch database stats and server status in parallel
+        // Wrap Minecraft server call with timeout to prevent hanging
+        const serverStatusPromise = Promise.race([
+            getMinecraftServerStatus(MINECRAFT_SERVER),
+            new Promise<never>((_, reject) => 
+                setTimeout(() => reject(new Error('Server status timeout')), 5000)
+            )
+        ]).catch((err: any) => {
+            console.warn('[KPIs] Minecraft server status failed:', err?.message || 'Unknown error');
+            return { 
+                online: false, 
+                error: err?.message || 'Unknown error',
+                version: null,
+                playersOnline: 0,
+                playersMax: 0,
+                latency: null
+            };
+        });
+
         const [totalPlayers, totalEvents, activeApplications, serverStatus] = await Promise.all([
             prisma.user.count(), // Total players
             prisma.event.count(), // Total events
@@ -33,7 +56,7 @@ export async function GET(){
                     status: {in: ['New', 'InReview', 'Approved']},
                 }
             }),
-            getMinecraftServerStatus(MINECRAFT_SERVER),
+            serverStatusPromise,
         ]);
 
         // Use API uptime as fallback
