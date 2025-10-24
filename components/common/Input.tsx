@@ -2,7 +2,7 @@
 import { cn } from "@/lib/utils";
 import { type ComponentPropsWithoutRef, type ElementRef, forwardRef } from "react";
 
-export interface InputProps extends ComponentPropsWithoutRef<"input"> {
+export interface InputProps extends Omit<ComponentPropsWithoutRef<"input">, "size"> {
   /**
    * Visual state of the input
    * - default: Normal state
