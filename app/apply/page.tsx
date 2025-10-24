@@ -5,6 +5,7 @@ import { useForm, FormProvider, Controller, useFormContext } from "react-hook-fo
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
 import Turnstile from "react-turnstile";
+import { toast } from "sonner";
 import {
     StepSafeSchema,
     type StepSafeInput,
@@ -82,7 +83,7 @@ export default function ApplyPage() {
 
     // Cloudflare Turnstile
     const [tsToken, setTsToken] = useState<string>("");
-    const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+    const siteKey = process.env['NEXT_PUBLIC_TURNSTILE_SITE_KEY'] || "";
 
     useEffect(() => {
         if (!canDiscord) setValue("discordUser", "");
@@ -101,8 +102,8 @@ export default function ApplyPage() {
     async function onSubmit(data: StepSafeInput) {
         // Honeypot check
         if (honeypotRef.current && honeypotRef.current.value.trim().length > 0) {
-            // quietly drop (or show generic error)
-            alert("Unable to submit at this time.");
+            // Quietly drop (security: don't reveal honeypot to bots)
+            toast.error("Unable to submit at this time");
             return;
         }
 
@@ -114,25 +115,40 @@ export default function ApplyPage() {
 
         // Require Turnstile token
         if (!tsToken) {
-            alert("Please verify the Turnstile challenge.");
+            toast.error("Please verify the security challenge below");
             return;
         }
 
-        const res = await fetch("/api/public/applications", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            // include turnstile token + honeypot echo for server checks
-            body: JSON.stringify({ ...finalData, __turnstileToken: tsToken, __hp: "" }),
+        const submitPromise = (async () => {
+            const res = await fetch("/api/public/applications", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...finalData, __turnstileToken: tsToken, __hp: "" }),
+            });
+
+            if (!res.ok) {
+                const j = await res.json().catch(() => ({}));
+                throw new Error(j.error || "Something went wrong submitting your application");
+            }
+
+            return res.json();
+        })();
+
+        toast.promise(submitPromise, {
+            loading: "Submitting your application...",
+            success: "Application submitted! Redirecting...",
+            error: (err) => err.message || "Failed to submit application",
         });
 
-        if (!res.ok) {
-            const j = await res.json().catch(() => ({}));
-            alert(j.error || "Something went wrong submitting your application.");
-            return;
+        try {
+            await submitPromise;
+            // Redirect on success
+            setTimeout(() => {
+                window.location.href = "/apply/success";
+            }, 1000); // Brief delay to show success toast
+        } catch (e) {
+            console.error(e);
         }
-
-        // Optional: reset Turnstile (if you stay on page). We redirect instead:
-        window.location.href = "/apply/success";
     }
 
     const errorList = useMemo(
