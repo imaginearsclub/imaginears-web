@@ -31,8 +31,9 @@ import {
     DropdownMenuSubContent,
     DropdownMenuLabel,
     Tooltip,
+    Separator,
 } from "@/components/common";
-import { FileText, Edit, FileCheck, Trash2, UserCog, CheckCircle, XCircle, Clock, Eye, Mail, Calendar, MoreVertical } from "lucide-react";
+import { FileText, Edit, FileCheck, Trash2, UserCog, CheckCircle, XCircle, Clock, Eye, Mail, Calendar, MoreVertical, Search, Filter, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -73,6 +74,8 @@ export default function ApplicationTable({
 }) {
     const list = Array.isArray(rows) ? rows : [];
     const [searchQuery, setSearchQuery] = useState("");
+    const [roleFilter, setRoleFilter] = useState<AppRole | "all">("all");
+    const [statusFilter, setStatusFilter] = useState<AppStatus | "all">("all");
 
     const [selected, setSelected] = useState<string[]>([]);
     const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: string; name: string }>({
@@ -81,17 +84,33 @@ export default function ApplicationTable({
         name: "",
     });
 
-    // Filter applications based on search query
+    // Filter applications based on search query and filters
     const filteredList = useMemo(() => {
-        if (!searchQuery) return list;
-        const q = searchQuery.toLowerCase();
-        return list.filter(app =>
-            app.name.toLowerCase().includes(q) ||
-            app.email.toLowerCase().includes(q) ||
-            app.role.toLowerCase().includes(q) ||
-            app.status.toLowerCase().includes(q)
-        );
-    }, [list, searchQuery]);
+        let filtered = list;
+        
+        // Apply role filter
+        if (roleFilter !== "all") {
+            filtered = filtered.filter(app => app.role === roleFilter);
+        }
+        
+        // Apply status filter
+        if (statusFilter !== "all") {
+            filtered = filtered.filter(app => app.status === statusFilter);
+        }
+        
+        // Apply search query
+        if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            filtered = filtered.filter(app =>
+                app.name.toLowerCase().includes(q) ||
+                app.email.toLowerCase().includes(q) ||
+                app.role.toLowerCase().includes(q) ||
+                app.status.toLowerCase().includes(q)
+            );
+        }
+        
+        return filtered;
+    }, [list, searchQuery, roleFilter, statusFilter]);
 
     const allSelected = selected.length > 0 && selected.length === filteredList.length;
     const someSelected = selected.length > 0 && selected.length < filteredList.length;
@@ -177,23 +196,130 @@ export default function ApplicationTable({
         "transition-colors"
     );
 
+    const hasActiveFilters = roleFilter !== "all" || statusFilter !== "all" || searchQuery !== "";
+    const clearAllFilters = () => {
+        setSearchQuery("");
+        setRoleFilter("all");
+        setStatusFilter("all");
+    };
+
     return (
         <div className="space-y-3">
-            {/* Search Filter */}
-            <div className="mb-4">
-                <Input
-                    type="text"
-                    placeholder="Search applications by name, email, role, or status..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    size="md"
-                />
+            {/* Filter Bar */}
+            <div className={cn(
+                "rounded-xl border-2 p-4",
+                "border-slate-300 dark:border-slate-700",
+                "bg-white dark:bg-slate-900"
+            )}>
+                <div className="flex items-center gap-2 mb-3">
+                    <Filter className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                        Filters
+                    </h3>
+                    {hasActiveFilters && (
+                        <>
+                            <Separator orientation="vertical" className="h-4" />
+                            <button
+                                onClick={clearAllFilters}
+                                className={cn(
+                                    "inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium",
+                                    "text-slate-600 dark:text-slate-400",
+                                    "hover:bg-slate-100 dark:hover:bg-slate-800",
+                                    "transition-colors"
+                                )}
+                            >
+                                <X className="w-3 h-3" />
+                                Clear all
+                            </button>
+                        </>
+                    )}
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {/* Search */}
+                    <div className="md:col-span-1">
+                        <label className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5 block">
+                            Search
+                        </label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+                            <Input
+                                type="text"
+                                placeholder="Name, email..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9"
+                                size="md"
+                            />
+                        </div>
+                    </div>
+                    
+                    {/* Role Filter */}
+                    <div>
+                        <label className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5 block">
+                            Role
+                        </label>
+                        <select
+                            value={roleFilter}
+                            onChange={(e) => setRoleFilter(e.target.value as AppRole | "all")}
+                            className={cn(
+                                "w-full rounded-xl border-2 px-3 py-2 text-sm",
+                                "bg-white dark:bg-slate-900",
+                                "border-slate-300 dark:border-slate-700",
+                                "text-slate-900 dark:text-white",
+                                "focus:outline-none focus:ring-2 focus:ring-blue-500/50",
+                                "transition-all"
+                            )}
+                        >
+                            <option value="all">All roles</option>
+                            <option value="Developer">Developer</option>
+                            <option value="Imaginear">Imaginear</option>
+                            <option value="GuestServices">Guest Services</option>
+                        </select>
+                    </div>
+                    
+                    {/* Status Filter */}
+                    <div>
+                        <label className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5 block">
+                            Status
+                        </label>
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value as AppStatus | "all")}
+                            className={cn(
+                                "w-full rounded-xl border-2 px-3 py-2 text-sm",
+                                "bg-white dark:bg-slate-900",
+                                "border-slate-300 dark:border-slate-700",
+                                "text-slate-900 dark:text-white",
+                                "focus:outline-none focus:ring-2 focus:ring-blue-500/50",
+                                "transition-all"
+                            )}
+                        >
+                            <option value="all">All statuses</option>
+                            <option value="New">New</option>
+                            <option value="InReview">In Review</option>
+                            <option value="Approved">Approved</option>
+                            <option value="Rejected">Rejected</option>
+                        </select>
+                    </div>
+                </div>
+                
+                {/* Results count */}
+                <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                        Showing <strong className="text-slate-900 dark:text-white">{filteredList.length}</strong> of <strong className="text-slate-900 dark:text-white">{list.length}</strong> applications
+                    </p>
+                </div>
             </div>
             {/* Bulk bar */}
             {hasBulk && (
-                <div className="flex items-center justify-between rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 p-3">
-                    <div className="text-sm">
-                        <strong>{selected.length}</strong> selected
+                <div className={cn(
+                    "flex items-center justify-between rounded-xl border-2 p-3",
+                    "border-blue-200 dark:border-blue-800",
+                    "bg-blue-50 dark:bg-blue-900/20"
+                )}>
+                    <div className="text-sm font-medium text-slate-900 dark:text-white">
+                        <strong className="text-blue-600 dark:text-blue-400">{selected.length}</strong> selected
                     </div>
                     <div className="flex gap-2">
                         <BulkMenu
@@ -204,11 +330,29 @@ export default function ApplicationTable({
                             }}
                         />
                         {onExportCSV && (
-                            <button className="btn btn-muted btn-sm" onClick={onExportCSV}>
+                            <button 
+                                className={cn(
+                                    "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                                    "bg-slate-100 dark:bg-slate-800",
+                                    "text-slate-700 dark:text-slate-300",
+                                    "hover:bg-slate-200 dark:hover:bg-slate-700",
+                                    "border-2 border-transparent"
+                                )}
+                                onClick={onExportCSV}
+                            >
                                 Export CSV
                             </button>
                         )}
-                        <button className="btn btn-ghost btn-sm" onClick={() => setSelected([])}>
+                        <button 
+                            className={cn(
+                                "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                                "bg-white dark:bg-slate-900",
+                                "text-slate-700 dark:text-slate-300",
+                                "hover:bg-slate-50 dark:hover:bg-slate-800",
+                                "border-2 border-slate-300 dark:border-slate-700"
+                            )}
+                            onClick={() => setSelected([])}
+                        >
                             Clear
                         </button>
                     </div>
@@ -620,7 +764,14 @@ function BulkMenu({
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"
-                    className="btn btn-primary btn-sm"
+                    className={cn(
+                        "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                        "bg-blue-600 dark:bg-blue-500",
+                        "text-white",
+                        "hover:bg-blue-700 dark:hover:bg-blue-600",
+                        "border-2 border-transparent",
+                        "focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    )}
                     aria-label="Bulk change status"
                 >
                     Bulk Actions ▾
