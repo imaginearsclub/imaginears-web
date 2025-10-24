@@ -14,7 +14,8 @@ import {
     ConfirmDialog,
     HoverCard,
     HoverCardTrigger,
-    HoverCardContent 
+    HoverCardContent,
+    TableSkeleton 
 } from "@/components/common";
 import { toast } from "sonner";
 import { useTableSort } from "@/hooks/useTableSort";
@@ -169,8 +170,11 @@ const PlayerRow = memo(function PlayerRow({
                             <HoverCardTrigger asChild>
                                 <div className="flex items-center gap-2.5 cursor-pointer">
                                     <Avatar
+                                        src={`https://minotar.net/avatar/${encodeURIComponent(safeName)}/100`}
+                                        alt={`${safeName}'s Minecraft avatar`}
                                         fallback={safeName.charAt(0).toUpperCase()}
                                         size="sm"
+                                        shape="square"
                                     />
                                     <span className="font-semibold text-slate-900 dark:text-white hover:underline">
                                         {safeName}
@@ -179,13 +183,22 @@ const PlayerRow = memo(function PlayerRow({
                             </HoverCardTrigger>
                             <HoverCardContent className="w-80">
                                 <div className="space-y-3">
-                                    <div>
-                                        <h4 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                                            {safeName}
-                                        </h4>
-                                        <div className="flex items-center gap-2 mt-1.5">
-                                            <RankBadge rank={player.rank} />
-                                            <StatusBadge online={player.online} />
+                                    <div className="flex items-center gap-3">
+                                        <Avatar
+                                            src={`https://minotar.net/avatar/${encodeURIComponent(safeName)}/100`}
+                                            alt={`${safeName}'s Minecraft avatar`}
+                                            fallback={safeName.charAt(0).toUpperCase()}
+                                            size="lg"
+                                            shape="square"
+                                        />
+                                        <div className="flex-1">
+                                            <h4 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                                                {safeName}
+                                            </h4>
+                                            <div className="flex items-center gap-2 mt-1.5">
+                                                <RankBadge rank={player.rank} />
+                                                <StatusBadge online={player.online} />
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="space-y-2 text-sm">
@@ -348,6 +361,11 @@ const PlayerTable = memo(function PlayerTable({
             <ArrowUpDown className="inline-block ml-1 w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" />
         );
     };
+
+    // Loading state
+    if (isLoading) {
+        return <TableSkeleton columns={6} rows={5} />;
+    }
 
     // Empty state
     if (!list || list.length === 0) {
