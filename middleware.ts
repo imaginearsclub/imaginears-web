@@ -9,6 +9,38 @@ export async function middleware(req: NextRequest) {
     // Always allow preflight requests
     if (req.method === "OPTIONS") return NextResponse.next();
 
+    // Check maintenance mode (skip for admin, API routes, and maintenance page itself)
+    const isPublicRoute = !pathname.startsWith("/admin") && !pathname.startsWith("/api");
+    const isMaintenancePage = pathname === "/maintenance";
+    
+    if (isPublicRoute && !isMaintenancePage) {
+        try {
+            const origin = req.nextUrl.origin;
+            const maintenanceCheckUrl = `${origin}/api/maintenance-check`;
+            
+            const maintenanceCheck = await fetch(maintenanceCheckUrl, {
+                headers: {
+                    "x-forwarded-for": req.headers.get("x-forwarded-for") ?? "",
+                    "x-real-ip": req.headers.get("x-real-ip") ?? "",
+                },
+                cache: "no-store",
+            });
+
+            if (maintenanceCheck.ok) {
+                const data = await maintenanceCheck.json();
+                if (data.maintenance) {
+                    // Redirect to maintenance page
+                    const url = req.nextUrl.clone();
+                    url.pathname = "/maintenance";
+                    return NextResponse.redirect(url);
+                }
+            }
+        } catch (error) {
+            // On error, allow access (fail open for maintenance checks)
+            console.error("[Middleware] Maintenance check error:", error);
+        }
+    }
+
     if (pathname.startsWith("/admin")) {
         // Session validation using Better-Auth session check
         // We validate the session server-side to ensure it's not expired/invalid
@@ -91,4 +123,15 @@ function hardenHeaders(res: NextResponse, req: NextRequest) {
     }
 }
 
-export const config = { matcher: ["/admin/:path*"] };
+export const config = { 
+    matcher: [
+        /*
+         * Match all request paths except:
+         * - _next/static (static files)
+         * - _next/image (image optimization)
+         * - favicon.ico
+         * - public assets
+         */
+        "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    ]
+};
