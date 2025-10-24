@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export default function ActionBar({
                                       id,
@@ -12,18 +14,33 @@ export default function ActionBar({
     const [pending, setPending] = useState<null | "InReview" | "Approved" | "Rejected">(null);
 
     async function setStatus(status: "InReview" | "Approved" | "Rejected") {
-        try {
-            setPending(status);
+        setPending(status);
+
+        const statusLabels = {
+            InReview: "In Review",
+            Approved: "Approved",
+            Rejected: "Rejected",
+        };
+
+        const updatePromise = (async () => {
             const res = await fetch(`/api/admin/applications/${id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ status }),
             });
-            if (!res.ok) throw new Error("Failed");
-            // Simple UX: refresh to reflect new status
+            if (!res.ok) throw new Error("Failed to update status");
+            // Reload to reflect new status
             window.location.reload();
-        } catch {
-            alert("Failed to update status.");
+        })();
+
+        toast.promise(updatePromise, {
+            loading: `Updating to ${statusLabels[status]}...`,
+            success: `Status updated to ${statusLabels[status]}!`,
+            error: "Failed to update status",
+        });
+
+        try {
+            await updatePromise;
         } finally {
             setPending(null);
         }
@@ -32,9 +49,15 @@ export default function ActionBar({
     return (
         <div className="fixed inset-x-0 bottom-0 z-40">
             <div className="mx-auto max-w-4xl">
-                <div className="m-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur p-3 flex items-center justify-between">
-                    <div className="text-sm">
-                        Current status: <strong>{currentStatus}</strong>
+                <div className={cn(
+                    "m-4 rounded-2xl p-3",
+                    "border border-slate-200 dark:border-slate-800",
+                    "bg-white/90 dark:bg-slate-900/90 backdrop-blur",
+                    "flex items-center justify-between",
+                    "shadow-lg"
+                )}>
+                    <div className="text-sm text-slate-700 dark:text-slate-300">
+                        Current status: <strong className="text-slate-900 dark:text-white">{currentStatus}</strong>
                     </div>
                     <div className="flex gap-2">
                         <button
