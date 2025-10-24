@@ -749,22 +749,22 @@ h3:hover::after,
     color: #f1f5f9 !important; /* slate-100 */
 }
 
-/* Ensure headings are visible in light mode */
-:not(.dark) h1,
-:not(.dark) h2,
-:not(.dark) h3,
-:not(.dark) h4,
-:not(.dark) h5,
-:not(.dark) h6 {
+/* Ensure headings are visible in light mode - but only when no explicit text color class is used */
+:not(.dark) h1:not([class*="text-"]),
+:not(.dark) h2:not([class*="text-"]),
+:not(.dark) h3:not([class*="text-"]),
+:not(.dark) h4:not([class*="text-"]),
+:not(.dark) h5:not([class*="text-"]),
+:not(.dark) h6:not([class*="text-"]) {
     color: #0f172a; /* slate-900 */
 }
 
-.dark h1,
-.dark h2,
-.dark h3,
-.dark h4,
-.dark h5,
-.dark h6 {
+.dark h1:not([class*="text-"]),
+.dark h2:not([class*="text-"]),
+.dark h3:not([class*="text-"]),
+.dark h4:not([class*="text-"]),
+.dark h5:not([class*="text-"]),
+.dark h6:not([class*="text-"]) {
     color: #f1f5f9; /* slate-100 */
 }
 
