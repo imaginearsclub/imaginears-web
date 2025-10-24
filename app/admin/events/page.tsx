@@ -20,7 +20,10 @@ export default function AdminEventsPage() {
         setLoading(true);
         setErrorMsg(null);
         try {
-            const res = await fetch("/api/admin/events?take=200", { cache: "no-store" });
+            const res = await fetch("/api/admin/events?take=200", { 
+                cache: "no-store",
+                credentials: "include"
+            });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json().catch(() => ({}));
             const items = Array.isArray(data.items) ? data.items : [];
