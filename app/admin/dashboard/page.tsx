@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, CartesianGrid
 } from "recharts";
-import { CalendarRange, Users, FileText, Clock, CalendarCheck2, UserSquare2, TrendingUp } from "lucide-react";
+import { CalendarRange, Users, FileText, Clock, CalendarCheck2, UserSquare2, TrendingUp, Server, Wifi, Activity as ActivityIcon } from "lucide-react";
 import {
     Card,
     CardHeader,
@@ -20,7 +20,25 @@ import {
     TabsContent,
 } from "@/components/common";
 
-type Kpi = { totalPlayers: number; totalEvents: number; activeApplications: number; uptime: string };
+type Kpi = { 
+    totalPlayers: number; 
+    totalEvents: number; 
+    activeApplications: number; 
+    apiUptime: string;
+    server: {
+        address: string;
+        online: boolean;
+        version?: string;
+        players: {
+            online: number;
+            max: number;
+        };
+        latency?: number;
+        uptimePercentage: number | null;
+        playerHistory: { timestamp: number; count: number }[];
+        error?: string;
+    };
+};
 type ActivityItem = { id: string; kind: "event" | "application"; title: string; sub: string; when: string };
 
 export default function DashboardPage() {
@@ -32,26 +50,48 @@ export default function DashboardPage() {
     const [err, setErr] = useState<string | null>(null);
 
     useEffect(() => {
-        (async () => {
+        const loadDashboard = async () => {
             try {
                 setLoading(true);
                 setErr(null);
-                const [k, e, a, act] = await Promise.all([
-                    fetch("/api/admin/kpis").then(r => r.json()),
-                    fetch("/api/admin/stats/events?range=30").then(r => r.json()),
-                    fetch("/api/admin/stats/applications-by-status").then(r => r.json()),
-                    fetch("/api/admin/activity").then(r => r.json()),
+                
+                const [kRes, eRes, aRes, actRes] = await Promise.all([
+                    fetch("/api/admin/kpis"),
+                    fetch("/api/admin/stats/events?range=30"),
+                    fetch("/api/admin/stats/applications-by-status"),
+                    fetch("/api/admin/activity"),
                 ]);
+
+                // Parse JSON responses
+                const k = kRes.ok ? await kRes.json() : null;
+                const e = eRes.ok ? await eRes.json() : [];
+                const a = aRes.ok ? await aRes.json() : [];
+                const act = actRes.ok ? await actRes.json() : [];
+
+                // Log any API failures
+                if (!actRes.ok) {
+                    console.error("[Dashboard] Activity API failed:", actRes.status, actRes.statusText);
+                }
+                
                 setKpis(k);
                 setEvents30d(Array.isArray(e) ? e : []);
                 setAppsByStatus(Array.isArray(a) ? a : []);
                 setActivity(Array.isArray(act) ? act : []);
-            } catch {
+            } catch (error) {
+                console.error("[Dashboard] Load error:", error);
                 setErr("Failed to load stats.");
             } finally {
                 setLoading(false);
             }
-        })();
+        };
+
+        // Initial load
+        loadDashboard();
+
+        // Auto-refresh every 30 seconds (matches API cache)
+        const interval = setInterval(loadDashboard, 30000);
+
+        return () => clearInterval(interval);
     }, []);
 
     const cards = useMemo(
@@ -77,13 +117,6 @@ export default function DashboardPage() {
                 trend: "+23%",
                 bgColor: "bg-emerald-50 dark:bg-emerald-950/30"
             },
-            { 
-                title: "Server Uptime", 
-                value: kpis?.uptime ?? "—", 
-                icon: <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />,
-                trend: "99.9%",
-                bgColor: "bg-amber-50 dark:bg-amber-950/30"
-            },
         ],
         [kpis]
     );
@@ -96,10 +129,10 @@ export default function DashboardPage() {
                     <div>
                         <h1 className="section-title text-2xl md:text-3xl mb-2">Dashboard Overview</h1>
                         <p className="text-slate-600 dark:text-slate-400">
-                            Real-time insights into your community
+                            Real-time insights into your community • Auto-refreshes every 30s
                         </p>
                     </div>
-                    <Badge variant="success" className="hidden sm:inline-flex">
+                    <Badge variant="success" className="hidden sm:inline-flex animate-pulse">
                         <TrendingUp className="w-3 h-3 mr-1" />
                         Live
                     </Badge>
@@ -124,31 +157,191 @@ export default function DashboardPage() {
 
                 {/* KPI Cards */}
                 {kpis && (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        {cards.map((card) => (
-                            <Card key={card.title} className="hover:shadow-lg transition-shadow">
-                                <CardContent className="flex flex-col gap-3 p-6">
-                                    <div className="flex items-center justify-between">
-                                        <div className={`p-2 rounded-lg ${card.bgColor}`}>
-                                            {card.icon}
+                    <>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            {cards.map((card) => (
+                                <Card key={card.title} className="hover:shadow-lg transition-shadow">
+                                    <CardContent className="flex flex-col gap-3 p-6">
+                                        <div className="flex items-center justify-between">
+                                            <div className={`p-2 rounded-lg ${card.bgColor}`}>
+                                                {card.icon}
+                                            </div>
+                                            <Badge variant="default" className="text-xs">
+                                                {card.trend}
+                                            </Badge>
                                         </div>
-                                        <Badge variant="default" className="text-xs">
-                                            {card.trend}
-                                        </Badge>
+                                        <div>
+                                            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{card.title}</p>
+                                            <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1">{card.value}</p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+
+                        {/* Server Status Card */}
+                        <Card className={`hover:shadow-lg transition-all ${
+                            kpis.server?.online 
+                                ? "border-green-500/50 bg-gradient-to-br from-green-50/50 to-transparent dark:from-green-950/20 dark:to-transparent" 
+                                : "border-red-500/50 bg-gradient-to-br from-red-50/50 to-transparent dark:from-red-950/20 dark:to-transparent"
+                        }`}>
+                            <CardContent className="p-6">
+                                <div className="flex flex-col lg:flex-row gap-6">
+                                    {/* Left: Server Info */}
+                                    <div className="flex-1 space-y-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-3 rounded-xl ${
+                                                kpis.server?.online 
+                                                    ? "bg-green-100 dark:bg-green-950/30" 
+                                                    : "bg-red-100 dark:bg-red-950/30"
+                                            }`}>
+                                                <Server className={`h-6 w-6 ${
+                                                    kpis.server?.online 
+                                                        ? "text-green-600 dark:text-green-400" 
+                                                        : "text-red-600 dark:text-red-400"
+                                                }`} />
+                                            </div>
+                                            <div className="flex-1">
+                                                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                                                    {kpis.server?.address || "Minecraft Server"}
+                                                </h3>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <Badge 
+                                                        variant={kpis.server?.online ? "success" : "danger"}
+                                                        className="text-xs"
+                                                    >
+                                                        {kpis.server?.online ? "Online" : "Offline"}
+                                                    </Badge>
+                                                    {kpis.server?.version && (
+                                                        <span className="text-xs text-slate-600 dark:text-slate-400">
+                                                            {kpis.server.version}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Stats Grid */}
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-1.5">
+                                                    <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                                    <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                                                        Players
+                                                    </p>
+                                                </div>
+                                                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                                                    {kpis.server?.players?.online ?? 0}/{kpis.server?.players?.max ?? 0}
+                                                </p>
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-1.5">
+                                                    <ActivityIcon className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                                                    <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                                                        Latency
+                                                    </p>
+                                                </div>
+                                                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                                                    {kpis.server?.online 
+                                                        ? (kpis.server.latency ? `${kpis.server.latency}ms` : "—")
+                                                        : "N/A"}
+                                                </p>
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-1.5">
+                                                    <Wifi className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                                    <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                                                        Uptime
+                                                    </p>
+                                                </div>
+                                                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                                                    {kpis.server?.uptimePercentage !== null && kpis.server?.uptimePercentage !== undefined
+                                                        ? `${kpis.server.uptimePercentage}%`
+                                                        : "—"}
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{card.title}</p>
-                                        <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1">{card.value}</p>
+
+                                    {/* Right: Player Count Graph */}
+                                    <div className="lg:w-1/2">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                                Player Activity
+                                            </p>
+                                            <Badge variant="info" className="text-xs">
+                                                Last {kpis.server?.playerHistory?.length ?? 0} checks
+                                            </Badge>
+                                        </div>
+                                        
+                                        {kpis.server?.playerHistory && kpis.server.playerHistory.length > 0 ? (
+                                            <div className="h-32">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <AreaChart 
+                                                        data={kpis.server.playerHistory.map((point, idx) => ({
+                                                            index: idx,
+                                                            count: point.count,
+                                                        }))}
+                                                        margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
+                                                    >
+                                                        <defs>
+                                                            <linearGradient id="playerGradient" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="0%" stopColor={kpis.server.online ? "#10b981" : "#ef4444"} stopOpacity={0.8} />
+                                                                <stop offset="100%" stopColor={kpis.server.online ? "#10b981" : "#ef4444"} stopOpacity={0.1} />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <CartesianGrid 
+                                                            strokeDasharray="3 3" 
+                                                            className="stroke-slate-200 dark:stroke-slate-700" 
+                                                            vertical={false}
+                                                        />
+                                                        <XAxis 
+                                                            dataKey="index" 
+                                                            hide 
+                                                        />
+                                                        <YAxis 
+                                                            allowDecimals={false} 
+                                                            tick={{ fontSize: 11 }}
+                                                            width={30}
+                                                        />
+                                                        <Tooltip
+                                                            contentStyle={{ 
+                                                                background: "var(--bg-light)", 
+                                                                border: "1px solid rgba(148,163,184,.35)", 
+                                                                borderRadius: "8px",
+                                                                fontSize: "12px"
+                                                            }}
+                                                            labelFormatter={() => "Players"}
+                                                        />
+                                                        <Area 
+                                                            type="monotone" 
+                                                            dataKey="count" 
+                                                            stroke={kpis.server.online ? "#10b981" : "#ef4444"}
+                                                            strokeWidth={2} 
+                                                            fill="url(#playerGradient)" 
+                                                        />
+                                                    </AreaChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        ) : (
+                                            <div className="h-32 flex items-center justify-center border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg">
+                                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                                    Collecting player data...
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </>
                 )}
 
                 {/* Charts */}
                 {kpis && (
-                    <Tabs defaultValue="charts" className="w-full">
+                    <Tabs defaultValue="activity" className="w-full">
                         <TabsList>
                             <TabsTrigger value="charts">Analytics</TabsTrigger>
                             <TabsTrigger value="activity">Recent Activity</TabsTrigger>
