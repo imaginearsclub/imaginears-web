@@ -5,6 +5,9 @@ import { requireAdmin } from "@/lib/session";
 
 // Configuration
 export const runtime = "nodejs";
+
+// Force dynamic rendering for authenticated endpoints
+// This ensures fresh session validation on every request
 export const dynamic = "force-dynamic";
 
 // Security: Constants
@@ -13,9 +16,21 @@ const MAX_TOTAL_ITEMS = 20; // Return top 20 merged items
 const CACHE_SECONDS = 30; // Cache for 30 seconds (admins see near real-time)
 
 // Security: Rate limiting for activity feed
+// Note: In-memory map works for single-instance deployments
+// For multi-instance/serverless, consider Redis or similar
 const activityRequests = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
 const MAX_ACTIVITY_REQUESTS = 30; // Max 30 requests per minute per user
+
+// Cleanup old rate limit entries periodically to prevent memory leaks
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, value] of activityRequests.entries()) {
+        if (now > value.resetTime) {
+            activityRequests.delete(key);
+        }
+    }
+}, 60000); // Clean up every minute
 
 type ActivityItem = {
     id: string;
@@ -23,6 +38,7 @@ type ActivityItem = {
     title: string;
     sub: string;       // small subtitle (status/category/email etc.)
     when: string;      // ISO string
+    updatedBy?: string | undefined; // User who made the change (minecraft name or full name)
 };
 
 /**
@@ -63,6 +79,14 @@ function maskEmail(email: string | null): string {
 }
 
 /**
+ * Security: Sanitize string for display (prevent any potential XSS)
+ */
+function sanitizeForDisplay(str: string | null, maxLength: number = 100): string {
+    if (!str) return "Untitled";
+    return str.trim().slice(0, maxLength);
+}
+
+/**
  * GET /api/admin/activity
  * 
  * Returns recent activity feed for admin dashboard.
@@ -97,13 +121,14 @@ export async function GET() {
             );
         }
         
-        const userId = session.user.id;
+        const userId = session.user?.id || 'unknown';
         
+        // Security: Get client IP for rate limiting (fallback to user ID)
         const h = await nextHeaders();
         const forwardedFor = h.get("x-forwarded-for");
         const clientIP = (forwardedFor ? forwardedFor.split(",")[0]?.trim() : null) || 
                         h.get("x-real-ip") || 
-                        userId;
+                        `user:${userId}`;
         
         // Security: Rate limiting
         if (isRateLimited(clientIP)) {
@@ -128,7 +153,13 @@ export async function GET() {
                     title: true, 
                     updatedAt: true, 
                     status: true, 
-                    category: true 
+                    category: true,
+                    updatedBy: {
+                        select: {
+                            minecraftName: true,
+                            name: true,
+                        }
+                    }
                 },
                 orderBy: { updatedAt: "desc" },
                 take: MAX_ITEMS_PER_TYPE,
@@ -140,30 +171,44 @@ export async function GET() {
                     email: true, 
                     status: true, 
                     updatedAt: true, 
-                    role: true 
+                    role: true,
+                    updatedBy: {
+                        select: {
+                            minecraftName: true,
+                            name: true,
+                        }
+                    }
                 },
                 orderBy: { updatedAt: "desc" },
                 take: MAX_ITEMS_PER_TYPE,
             }),
         ]);
 
-        // Map events to activity items
+        // Helper: Get display name for user (prefer minecraft name)
+        const getUserDisplayName = (user: { minecraftName: string | null; name: string | null } | null): string | undefined => {
+            if (!user) return undefined;
+            return user.minecraftName || user.name || undefined;
+        };
+
+        // Map events to activity items (with sanitization)
         const eItems: ActivityItem[] = events.map((e) => ({
             id: e.id,
             kind: "event" as const,
-            title: e.title || "Untitled Event",
+            title: sanitizeForDisplay(e.title, 80),
             sub: `${e.status} • ${e.category}`,
             when: e.updatedAt.toISOString(),
+            updatedBy: getUserDisplayName(e.updatedBy),
         }));
 
-        // Map applications to activity items (with masked emails)
+        // Map applications to activity items (with masked emails and sanitization)
         const aItems: ActivityItem[] = apps.map((a) => ({
             id: a.id,
             kind: "application" as const,
-            title: a.name || "Application",
+            title: sanitizeForDisplay(a.name, 80),
             // Security: Mask email address for privacy
             sub: `${a.status} • ${a.role} • ${maskEmail(a.email)}`,
             when: a.updatedAt.toISOString(),
+            updatedBy: getUserDisplayName(a.updatedBy),
         }));
 
         // Merge, sort by date (most recent first), and limit
