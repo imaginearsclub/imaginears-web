@@ -1,4 +1,5 @@
 import { headers as nextHeaders } from "next/headers";
+import { NextResponse } from "next/server";
 
 // Proxy to Better-Auth sign-out so it clears the auth cookies correctly.
 export async function POST() {
@@ -22,10 +23,40 @@ export async function POST() {
             cache: "no-store",
         });
 
-        // Return the upstream response directly to propagate Set-Cookie headers
-        return res;
+        // Get the response data and headers
+        const data = await res.json().catch(() => ({ ok: true }));
+        const headers = new Headers(res.headers);
+        
+        // Explicitly clear all auth-related cookies with proper flags
+        // This ensures cookies are cleared even if Better-Auth doesn't do it properly
+        const cookiesToClear = [
+            "better-auth.session_token",
+            "better-auth.session",
+            "__Secure-better-auth.session_token",
+            "__Host-better-auth.session_token",
+            "next-auth.session-token",
+            "better-auth.csrf_token",
+        ];
+        
+        const isSecure = proto === "https";
+        for (const cookieName of cookiesToClear) {
+            headers.append(
+                "Set-Cookie",
+                `${cookieName}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${isSecure ? "; Secure" : ""}`
+            );
+        }
+        
+        // Add cache control headers
+        headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+        headers.set("Pragma", "no-cache");
+        
+        return NextResponse.json(data, {
+            status: res.status,
+            headers,
+        });
     } catch (e) {
-        return new Response(JSON.stringify({ ok: false }), {
+        console.error("[Logout] Error:", e);
+        return new Response(JSON.stringify({ ok: false, error: "Logout failed" }), {
             status: 500,
             headers: { "content-type": "application/json; charset=utf-8" },
         });
