@@ -5,7 +5,12 @@ import {requireAdmin} from '@/lib/session';
 // Buckets by day fro last N (default 30) days based on Event.createdAt
 export async function GET(req: Request){
     try {
-        await requireAdmin();
+        const session = await requireAdmin();
+        
+        // requireAdmin() returns null if unauthorized (doesn't throw)
+        if (!session) {
+            return NextResponse.json({error: "Unauthorized"}, {status: 401});
+        }
 
         const {searchParams} = new URL(req.url);
         const range = parseInt(searchParams.get('range') || '30', 10);
@@ -48,7 +53,7 @@ export async function GET(req: Request){
 
         return NextResponse.json(data);
     } catch (e: any) {
-        const code = e?.message === "UNAUTHORIZED" ? 401 : 500;
-        return NextResponse.json({error: e?.message || "Server error"}, {status: code});
+        console.error("[Stats/Events] Error:", e);
+        return NextResponse.json({error: "Server error"}, {status: 500});
     }
 }
