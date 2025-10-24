@@ -41,7 +41,7 @@ export async function GET(req: Request) {
             },
         });
 
-        const nextCursor = items.length === take ? items[items.length - 1].id : null;
+        const nextCursor = items.length === take ? items[items.length - 1]?.id ?? null : null;
 
         return NextResponse.json({ items, nextCursor });
     } catch (e) {
