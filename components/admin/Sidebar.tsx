@@ -14,7 +14,7 @@ import {
 import { memo, useCallback, useMemo, type ComponentType } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "@/lib/utils";
-import { Tooltip } from "@/components/common/Tooltip";
+import { Tooltip, Badge, Separator } from "@/components/common";
 import SignOutButton from "./SignOutButton";
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -168,7 +168,8 @@ const SidebarInner = memo(function SidebarInner({
                     </div>
 
                     {/* System Section */}
-                    <div className="pt-3 border-t border-slate-200/70 dark:border-slate-800/70">
+                    <div className="pt-3">
+                        <Separator className="mb-3" />
                         <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400 px-3 py-2">
                             System
                         </div>
@@ -183,13 +184,14 @@ const SidebarInner = memo(function SidebarInner({
             </div>
 
             {/* Bottom section */}
-            <div className="mt-6 space-y-3 border-t border-slate-200/70 dark:border-slate-800/70 pt-4">
+            <div className="mt-6 space-y-3 pt-4">
+                <Separator className="mb-4" />
                 <SignOutButton />
                 
                 <div className="flex items-center justify-center gap-2 text-[11px]">
-                    <span className="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono font-semibold">
+                    <Badge variant="default" className="font-mono">
                         v1.0.0
-                    </span>
+                    </Badge>
                     <span className="text-slate-400 dark:text-slate-500">•</span>
                     <span className="font-medium text-slate-500 dark:text-slate-400">{CURRENT_YEAR}</span>
                 </div>
