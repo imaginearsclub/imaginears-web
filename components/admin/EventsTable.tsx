@@ -12,8 +12,14 @@ import {
     ContextMenuItem,
     ContextMenuSeparator,
     ContextMenuLabel,
+    ConfirmDialog,
+    HoverCard,
+    HoverCardTrigger,
+    HoverCardContent,
 } from "@/components/common";
-import { CalendarRange, Edit, Eye, EyeOff } from "lucide-react";
+import { CalendarRange, Edit, Eye, EyeOff, Calendar, MapPin, Tag, Clock, ArrowUpDown } from "lucide-react";
+import { useTableSort } from "@/hooks/useTableSort";
+import { useTableFilter } from "@/hooks/useTableFilter";
 
 export type AdminEventRow = {
     id: string;
@@ -37,12 +43,39 @@ export default function EventsTable({
                                         rows,
                                         onEdit,
                                         onStatusChange,
+                                        isLoading,
                                     }: {
     rows?: AdminEventRow[];
     onEdit: (id: string) => void;
     onStatusChange?: (id: string, status: AdminEventRow["status"]) => void;
+    isLoading?: boolean;
 }) {
     const list = Array.isArray(rows) ? rows : [];
+    
+    // Sorting and filtering
+    const { sortedData, requestSort, getSortIcon } = useTableSort(list, "startAt");
+    const { filteredData, filterQuery, setFilterQuery } = useTableFilter(sortedData, (event, query) => {
+        const q = query.toLowerCase();
+        return (
+            event.title.toLowerCase().includes(q) ||
+            event.world.toLowerCase().includes(q) ||
+            event.category.toLowerCase().includes(q) ||
+            event.status.toLowerCase().includes(q)
+        );
+    });
+
+    // Confirmation dialog state
+    const [publishConfirm, setPublishConfirm] = useState<{
+        open: boolean;
+        id: string;
+        title: string;
+        action: "publish" | "unpublish";
+    }>({
+        open: false,
+        id: "",
+        title: "",
+        action: "publish",
+    });
 
     function fmt(dt: string) {
         try {
@@ -57,6 +90,31 @@ export default function EventsTable({
             return dt;
         }
     }
+
+    // Handle publish/unpublish with confirmation
+    const handlePublishClick = (id: string, title: string, currentStatus: AdminEventRow["status"]) => {
+        const action = currentStatus === "Published" ? "unpublish" : "publish";
+        setPublishConfirm({ open: true, id, title, action });
+    };
+
+    const handlePublishConfirm = () => {
+        if (onStatusChange && publishConfirm.id) {
+            const newStatus = publishConfirm.action === "publish" ? "Published" : "Draft";
+            onStatusChange(publishConfirm.id, newStatus);
+            toast.success(
+                publishConfirm.action === "publish" ? "Event published" : "Event unpublished",
+                {
+                    description: `${publishConfirm.title} is now ${newStatus.toLowerCase()}.`,
+                }
+            );
+        }
+    };
+
+    const getSortIndicator = (key: keyof AdminEventRow) => {
+        const icon = getSortIcon(key);
+        if (!icon) return <ArrowUpDown className="w-3 h-3 opacity-30" />;
+        return icon === "asc" ? "↑" : "↓";
+    };
 
     return (
         <div className="overflow-auto rounded-2xl border border-slate-200 dark:border-slate-800">
