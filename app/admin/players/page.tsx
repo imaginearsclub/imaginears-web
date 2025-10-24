@@ -1,41 +1,41 @@
 "use client";
 
-import PlayerTable, { Player } from "@/components/admin/PlayerTable";
+import PlayerTable, { type Player } from "@/components/admin/PlayerTable";
 
 // Mock data - will be replaced with live database feed
 const MOCK_PLAYERS: Player[] = [
     {
         name: "Steve",
         rank: "Member",
-        world: "Adventure World",
+        server: "Adventure World",
         online: true,
         joinedAt: "2024-01-15",
     },
     {
         name: "Alex",
         rank: "Creator",
-        world: "Creative Hub",
+        server: "Creative Hub",
         online: true,
         joinedAt: "2024-02-10",
     },
     {
         name: "Herobrine",
         rank: "Staff",
-        world: "Admin Lounge",
+        server: "Admin Lounge",
         online: false,
         joinedAt: "2023-12-01",
     },
     {
         name: "Notch",
         rank: "Staff",
-        world: "Development Lab",
+        server: "Development Lab",
         online: true,
         joinedAt: "2023-11-20",
     },
     {
         name: "Enderman",
         rank: "Member",
-        world: "The End",
+        server: "The End",
         online: false,
         joinedAt: "2024-03-05",
     },
