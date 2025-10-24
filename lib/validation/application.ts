@@ -69,119 +69,122 @@ function safeText(max: number, fieldName: string = "This field") {
 }
 
 /**
- * STEP-SAFE BASE SCHEMA
- * - No role-specific required fields here.
- * - This lets react-hook-form validate per step without failing the union.
+ * BASE SCHEMA WITHOUT REFINEMENTS
+ * - This allows extending for role-specific schemas
  */
-export const StepSafeSchema = z
-  .object({
-    name: safeText(100, "Name")
-      .min(2, "Please enter your full name.")
-      .regex(/^[a-zA-Z\s'-]+$/, "Name can only contain letters, spaces, hyphens, and apostrophes."),
-    
-    email: z
-      .string()
-      .trim()
-      .max(254, "Email is too long.") // RFC 5321 max length
-      .refine((val) => !CONTROL_CHARS.test(val), { message: "Email contains invalid characters." })
-      .pipe(z.email({ message: "Enter a valid email." }))
-      .transform((s) => s.toLowerCase())
-      .refine((email) => {
-        // Block disposable/temporary email domains
-        const disposableDomains = ["tempmail.com", "throwaway.email", "guerrillamail.com", "10minutemail.com"];
-        const domain = email.split("@")[1];
-        return domain ? !disposableDomains.includes(domain) : true;
-      }, { message: "Disposable email addresses are not allowed." }),
-    
-    mcUsername: z
-      .string()
-      .trim()
-      .min(2, "Minecraft username is required.")
-      .max(16, "Minecraft username must be 16 characters or less.") // Mojang max length
-      .regex(/^[a-zA-Z0-9_]+$/, "Minecraft username can only contain letters, numbers, and underscores."),
-    
-    confirm16: z.literal(true, { message: "You must be at least 16." }),
-    canDiscord: z.boolean(),
-    
-    discordUser: z
-      .string()
-      .trim()
-      .max(37, "Discord username is too long.") // Discord max: 32 + 5 for discriminator
-      .regex(/^[a-zA-Z0-9_.#]+$/, "Invalid Discord username format.")
-      .optional(),
-    
-    ageRange: z.enum(AgeRanges),
-    
-    timezone: z
-      .string()
-      .trim()
-      .min(1, "Timezone is required.")
-      .max(64)
-      .regex(/^[A-Za-z0-9_\/+\-]+$/, "Invalid timezone format."), // Removed \s to be stricter
-    
-    priorStaff: z.boolean(),
-    priorServers: safeText(500, "Prior servers").optional(),
-    visitedDisney: z.boolean(),
-    visitedDetails: safeText(500, "Disney visit details").optional(),
-    role: z.enum(Roles),
+const BaseSchema = z.object({
+  name: safeText(100, "Name")
+    .min(2, "Please enter your full name.")
+    .regex(/^[a-zA-Z\s'-]+$/, "Name can only contain letters, spaces, hyphens, and apostrophes."),
+  
+  email: z
+    .string()
+    .trim()
+    .max(254, "Email is too long.") // RFC 5321 max length
+    .refine((val) => !CONTROL_CHARS.test(val), { message: "Email contains invalid characters." })
+    .pipe(z.email({ message: "Enter a valid email." }))
+    .transform((s) => s.toLowerCase())
+    .refine((email) => {
+      // Block disposable/temporary email domains
+      const disposableDomains = ["tempmail.com", "throwaway.email", "guerrillamail.com", "10minutemail.com"];
+      const domain = email.split("@")[1];
+      return domain ? !disposableDomains.includes(domain) : true;
+    }, { message: "Disposable email addresses are not allowed." }),
+  
+  mcUsername: z
+    .string()
+    .trim()
+    .min(2, "Minecraft username is required.")
+    .max(16, "Minecraft username must be 16 characters or less.") // Mojang max length
+    .regex(/^[a-zA-Z0-9_]+$/, "Minecraft username can only contain letters, numbers, and underscores."),
+  
+  confirm16: z.literal(true, { message: "You must be at least 16." }),
+  canDiscord: z.boolean(),
+  
+  discordUser: z
+    .string()
+    .trim()
+    .max(37, "Discord username is too long.") // Discord max: 32 + 5 for discriminator
+    .regex(/^[a-zA-Z0-9_.#]+$/, "Invalid Discord username format.")
+    .optional(),
+  
+  ageRange: z.enum(AgeRanges),
+  
+  timezone: z
+    .string()
+    .trim()
+    .min(1, "Timezone is required.")
+    .max(64)
+    .regex(/^[A-Za-z0-9_\/+\-]+$/, "Invalid timezone format."), // Removed \s to be stricter
+  
+  priorStaff: z.boolean(),
+  priorServers: safeText(500, "Prior servers").optional(),
+  visitedDisney: z.boolean(),
+  visitedDetails: safeText(500, "Disney visit details").optional(),
+  role: z.enum(Roles),
 
-    // Make all role-specific fields OPTIONAL here (step-friendly)
-    // Developer
-    devPortfolioUrl: httpUrl.optional(),
-    devSpecialty: z.enum(DevSpecialties).optional(),
-    devLanguages: z
-      .array(z.string().trim().min(1).max(32))
-      .max(10, "Too many languages selected.")
-      .transform((a) => uniqTrimmed(a))
-      .optional(),
+  // Make all role-specific fields OPTIONAL here (step-friendly)
+  // Developer
+  devPortfolioUrl: httpUrl.optional(),
+  devSpecialty: z.enum(DevSpecialties).optional(),
+  devLanguages: z
+    .array(z.string().trim().min(1).max(32))
+    .max(10, "Too many languages selected.")
+    .transform((a) => uniqTrimmed(a))
+    .optional(),
 
-    // Imaginear
-    imgPortfolioUrl: httpUrl.optional(),
-    imgWorldEditLevel: z.enum(Levels).optional(),
-    imgPluginFamiliar: z.enum(Levels).optional(),
+  // Imaginear
+  imgPortfolioUrl: httpUrl.optional(),
+  imgWorldEditLevel: z.enum(Levels).optional(),
+  imgPluginFamiliar: z.enum(Levels).optional(),
 
-    // Guest Relations
-    grStory: safeText(4000, "Story").optional(),
-    grValue: safeText(4000, "Value").optional(),
-    grSuggestions: safeText(2000, "Suggestions").optional(),
-  })
-  .superRefine((data, ctx) => {
-    // If canDiscord, require a discordUser
-    if (data.canDiscord && (!data.discordUser || data.discordUser.length < 2)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["discordUser"],
-        message: "Please provide your Discord username.",
-      });
-    }
-    // If prior staff, ask where
-    if (data.priorStaff && !data.priorServers) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["priorServers"],
-        message: "Please list your prior server(s).",
-      });
-    }
-    // If visited Disney, ask details
-    if (data.visitedDisney && !data.visitedDetails) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["visitedDetails"],
-        message: "Please share details about your visit(s).",
-      });
-    }
-    // Age/consent coherence: if Under18, block proceed
-    if (data.ageRange === "Under18") {
-      ctx.addIssue({
-        code: "custom",
-        path: ["ageRange"],
-        message: "Applicants must be at least 16.",
-      });
-    }
-  });
+  // Guest Relations
+  grStory: safeText(4000, "Story").optional(),
+  grValue: safeText(4000, "Value").optional(),
+  grSuggestions: safeText(2000, "Suggestions").optional(),
+});
+
+/**
+ * STEP-SAFE SCHEMA WITH REFINEMENTS
+ * - Used for react-hook-form validation during multi-step flow
+ */
+export const StepSafeSchema = BaseSchema.superRefine((data, ctx) => {
+  // If canDiscord, require a discordUser
+  if (data.canDiscord && (!data.discordUser || data.discordUser.length < 2)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["discordUser"],
+      message: "Please provide your Discord username.",
+    });
+  }
+  // If prior staff, ask where
+  if (data.priorStaff && !data.priorServers) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["priorServers"],
+      message: "Please list your prior server(s).",
+    });
+  }
+  // If visited Disney, ask details
+  if (data.visitedDisney && !data.visitedDetails) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["visitedDetails"],
+      message: "Please share details about your visit(s).",
+    });
+  }
+  // Age/consent coherence: if Under18, block proceed
+  if (data.ageRange === "Under18") {
+    ctx.addIssue({
+      code: "custom",
+      path: ["ageRange"],
+      message: "Applicants must be at least 16.",
+    });
+  }
+});
 
 /** STRICT ROLE-SPECIFIC SCHEMAS (used only on submit) */
-export const DevFinal = StepSafeSchema.extend({
+export const DevFinal = BaseSchema.extend({
   role: z.literal("Developer"),
   devPortfolioUrl: httpUrl,
   devSpecialty: z.enum(DevSpecialties),
@@ -190,22 +193,64 @@ export const DevFinal = StepSafeSchema.extend({
     .min(1, "Choose at least one language.")
     .max(10, "Too many languages selected.")
     .transform((a) => uniqTrimmed(a)),
+}).superRefine((data, ctx) => {
+  // Apply base refinements
+  if (data.canDiscord && (!data.discordUser || data.discordUser.length < 2)) {
+    ctx.addIssue({ code: "custom", path: ["discordUser"], message: "Please provide your Discord username." });
+  }
+  if (data.priorStaff && !data.priorServers) {
+    ctx.addIssue({ code: "custom", path: ["priorServers"], message: "Please list your prior server(s)." });
+  }
+  if (data.visitedDisney && !data.visitedDetails) {
+    ctx.addIssue({ code: "custom", path: ["visitedDetails"], message: "Please share details about your visit(s)." });
+  }
+  if (data.ageRange === "Under18") {
+    ctx.addIssue({ code: "custom", path: ["ageRange"], message: "Applicants must be at least 16." });
+  }
 });
 
-export const ImgFinal = StepSafeSchema.extend({
+export const ImgFinal = BaseSchema.extend({
   role: z.literal("Imaginear"),
   imgPortfolioUrl: httpUrl,
   imgWorldEditLevel: z.enum(Levels),
   imgPluginFamiliar: z.enum(Levels),
+}).superRefine((data, ctx) => {
+  // Apply base refinements
+  if (data.canDiscord && (!data.discordUser || data.discordUser.length < 2)) {
+    ctx.addIssue({ code: "custom", path: ["discordUser"], message: "Please provide your Discord username." });
+  }
+  if (data.priorStaff && !data.priorServers) {
+    ctx.addIssue({ code: "custom", path: ["priorServers"], message: "Please list your prior server(s)." });
+  }
+  if (data.visitedDisney && !data.visitedDetails) {
+    ctx.addIssue({ code: "custom", path: ["visitedDetails"], message: "Please share details about your visit(s)." });
+  }
+  if (data.ageRange === "Under18") {
+    ctx.addIssue({ code: "custom", path: ["ageRange"], message: "Applicants must be at least 16." });
+  }
 });
 
-export const GrFinal = StepSafeSchema.extend({
+export const GrFinal = BaseSchema.extend({
   role: z.literal("GuestServices"),
   grStory: safeText(4000, "Story")
     .min(50, "Please provide more detail (50+ chars)."),
   grValue: safeText(4000, "Value")
     .min(40, "Please provide more detail (40+ chars)."),
   grSuggestions: safeText(2000, "Suggestions").optional(),
+}).superRefine((data, ctx) => {
+  // Apply base refinements
+  if (data.canDiscord && (!data.discordUser || data.discordUser.length < 2)) {
+    ctx.addIssue({ code: "custom", path: ["discordUser"], message: "Please provide your Discord username." });
+  }
+  if (data.priorStaff && !data.priorServers) {
+    ctx.addIssue({ code: "custom", path: ["priorServers"], message: "Please list your prior server(s)." });
+  }
+  if (data.visitedDisney && !data.visitedDetails) {
+    ctx.addIssue({ code: "custom", path: ["visitedDetails"], message: "Please share details about your visit(s)." });
+  }
+  if (data.ageRange === "Under18") {
+    ctx.addIssue({ code: "custom", path: ["ageRange"], message: "Applicants must be at least 16." });
+  }
 });
 
 /** Helper to get the strict schema by role */
