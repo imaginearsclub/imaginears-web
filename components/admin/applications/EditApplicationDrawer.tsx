@@ -5,7 +5,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import MarkdownToolbar from "@/components/admin/events/MarkdownToolbar";
+import { MarkdownEditor } from "@/components/common";
 
 export type EditableApplication = {
     id: string;
@@ -200,18 +200,13 @@ export default function EditApplicationDrawer({ open, app, onOpenChange, onSave 
                         </div>
 
                         <div>
-                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                                Notes
-                            </label>
-                            <MarkdownToolbar targetId="app-notes-md" />
-                            <textarea
-                                id="app-notes-md"
+                            <MarkdownEditor
                                 value={form?.notes ?? ""}
-                                onChange={(e) => setForm((f) => (f ? { ...f, notes: e.target.value } : f))}
+                                onChange={(v: string) => setForm((f) => (f ? { ...f, notes: v } : f))}
+                                label="Notes"
                                 rows={6}
-                                className={inputClass}
                                 placeholder="Internal notes (Markdown supported)"
-                                disabled={submitting}
+                                maxLength={5000}
                             />
                         </div>
                     </form>

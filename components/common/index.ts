@@ -127,3 +127,6 @@ export { HoverCard, HoverCardTrigger, HoverCardContent } from "./HoverCard";
 
 // TableSkeleton
 export { TableSkeleton } from "./TableSkeleton";
+
+// MarkdownEditor
+export { default as MarkdownEditor } from "./MarkdownEditor";
