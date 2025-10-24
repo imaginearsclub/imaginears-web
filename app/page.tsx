@@ -7,6 +7,7 @@ import ServerCTA from "@/components/home/ServerCTA";
 import Newsletter from "@/components/home/Newsletter";
 import FAQ from "@/components/home/FAQ";
 import EventTeaser from "@/components/public/EventTeaser";
+import { Skeleton } from "@/components/common";
 
 // Force Node.js runtime to ensure compatibility with server-only modules (e.g., Prisma) used by children.
 export const runtime = "nodejs";
@@ -48,7 +49,7 @@ function EventTeaserSkeleton() {
     <section className="mx-auto max-w-6xl px-4 sm:px-6 mt-10" aria-busy="true" aria-live="polite">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">Happening Now</h2>
-        <div className="h-5 w-20 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+        <Skeleton className="h-5 w-20" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {[0, 1, 2].map((i) => (
@@ -59,23 +60,23 @@ function EventTeaserSkeleton() {
           >
             {/* Header skeleton */}
             <header className="flex items-start justify-between gap-3">
-              <div className="h-6 w-3/4 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-              <div className="h-6 w-16 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700" />
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="h-6 w-16 rounded-full" />
             </header>
             {/* Schedule skeleton */}
             <div className="mt-2 space-y-1">
-              <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-              <div className="h-4 w-1/2 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-4 w-1/2" />
             </div>
             {/* Description skeleton */}
             <div className="mt-3 space-y-2">
-              <div className="h-3 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-              <div className="h-3 w-5/6 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-              <div className="h-3 w-4/6 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-5/6" />
+              <Skeleton className="h-3 w-4/6" />
             </div>
             {/* Footer skeleton */}
             <footer className="mt-4">
-              <div className="h-4 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+              <Skeleton className="h-4 w-24" />
             </footer>
           </article>
         ))}
