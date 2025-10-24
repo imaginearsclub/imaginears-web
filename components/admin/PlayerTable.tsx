@@ -1,8 +1,8 @@
 import { memo, useCallback, useMemo } from "react";
 import RowActions from "@/components/admin/RowActions";
-import { Shield, Crown, User, Calendar, Globe } from "lucide-react";
+import { Shield, Crown, User, Calendar, Globe, Volume2, UserX, Navigation } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Avatar, EmptyState } from "@/components/common";
+import { Avatar, EmptyState, ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuLabel } from "@/components/common";
 
 export type Player = {
     name: string;
@@ -132,54 +132,87 @@ const PlayerRow = memo(function PlayerRow({
     const handleTeleport = useCallback(() => onTeleport(safeName), [onTeleport, safeName]);
 
     return (
-        <tr className={cn(
-            "group transition-colors",
-            "bg-white dark:bg-slate-900",
-            "hover:bg-slate-50 dark:hover:bg-slate-800/50",
-            "border-b border-slate-200 dark:border-slate-800",
-            "last:border-0"
-        )}>
-            <td className="py-3.5 pl-6 pr-4">
-                <div className="flex items-center gap-2.5">
-                    <Avatar
-                        fallback={safeName.charAt(0).toUpperCase()}
-                        size="sm"
-                    />
-                    <span className="font-semibold text-slate-900 dark:text-white">
-                        {safeName}
-                    </span>
-                </div>
-            </td>
-            <td className="py-3.5 pr-4">
-                <RankBadge rank={player.rank} />
-            </td>
-            <td className="py-3.5 pr-4">
-                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-                    <Globe className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0" aria-hidden="true" />
-                    <span>{safeWorld}</span>
-                </div>
-            </td>
-            <td className="py-3.5 pr-4">
-                <StatusBadge online={player.online} />
-            </td>
-            <td className="py-3.5 pr-4">
-                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                    <Calendar className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
-                    <time dateTime={player.joinedAt}>{formattedDate}</time>
-                </div>
-            </td>
-            <td className="py-3.5 pl-4 pr-6">
-                <div className="flex justify-end">
-                    <RowActions
-                        name={safeName}
-                        online={player.online}
-                        onMute={handleMute}
-                        onKick={handleKick}
-                        onTeleport={handleTeleport}
-                    />
-                </div>
-            </td>
-        </tr>
+        <ContextMenu>
+            <ContextMenuTrigger asChild>
+                <tr className={cn(
+                    "group transition-colors cursor-pointer",
+                    "bg-white dark:bg-slate-900",
+                    "hover:bg-slate-50 dark:hover:bg-slate-800/50",
+                    "border-b border-slate-200 dark:border-slate-800",
+                    "last:border-0"
+                )}>
+                    <td className="py-3.5 pl-6 pr-4">
+                        <div className="flex items-center gap-2.5">
+                            <Avatar
+                                fallback={safeName.charAt(0).toUpperCase()}
+                                size="sm"
+                            />
+                            <span className="font-semibold text-slate-900 dark:text-white">
+                                {safeName}
+                            </span>
+                        </div>
+                    </td>
+                    <td className="py-3.5 pr-4">
+                        <RankBadge rank={player.rank} />
+                    </td>
+                    <td className="py-3.5 pr-4">
+                        <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                            <Globe className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0" aria-hidden="true" />
+                            <span>{safeWorld}</span>
+                        </div>
+                    </td>
+                    <td className="py-3.5 pr-4">
+                        <StatusBadge online={player.online} />
+                    </td>
+                    <td className="py-3.5 pr-4">
+                        <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                            <Calendar className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+                            <time dateTime={player.joinedAt}>{formattedDate}</time>
+                        </div>
+                    </td>
+                    <td className="py-3.5 pl-4 pr-6">
+                        <div className="flex justify-end">
+                            <RowActions
+                                name={safeName}
+                                online={player.online}
+                                onMute={handleMute}
+                                onKick={handleKick}
+                                onTeleport={handleTeleport}
+                            />
+                        </div>
+                    </td>
+                </tr>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+                <ContextMenuLabel>Player Actions</ContextMenuLabel>
+                <ContextMenuSeparator />
+                
+                {player.online && (
+                    <>
+                        <ContextMenuItem onSelect={handleTeleport}>
+                            <Navigation className="w-4 h-4 mr-2" />
+                            Teleport to Player
+                        </ContextMenuItem>
+                        <ContextMenuSeparator />
+                    </>
+                )}
+                
+                <ContextMenuItem onSelect={handleMute}>
+                    <Volume2 className="w-4 h-4 mr-2" />
+                    Mute Player
+                </ContextMenuItem>
+                
+                <ContextMenuSeparator />
+                
+                <ContextMenuItem 
+                    onSelect={handleKick}
+                    className="text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/20"
+                >
+                    <UserX className="w-4 h-4 mr-2" />
+                    Kick Player
+                </ContextMenuItem>
+            </ContextMenuContent>
+        </ContextMenu>
     );
 });
 
