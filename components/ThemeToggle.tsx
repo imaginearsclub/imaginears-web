@@ -30,9 +30,10 @@ function applyTheme(theme: Theme) {
   }
 }
 
-function readSessionTheme(): Theme | null {
+function readPersistedTheme(): Theme | null {
   try {
-    const v = sessionStorage.getItem(STORAGE_KEY);
+    // Use localStorage so theme persists across sessions and logout
+    const v = localStorage.getItem(STORAGE_KEY);
     // Strict validation: only accept exact values
     if (v !== "dark" && v !== "light") return null;
     return v;
@@ -42,14 +43,15 @@ function readSessionTheme(): Theme | null {
   }
 }
 
-function writeSessionTheme(theme: Theme) {
+function writePersistedTheme(theme: Theme) {
   try {
     // Validate before writing
     if (theme !== "dark" && theme !== "light") {
       console.warn("[ThemeToggle] Attempted to write invalid theme:", theme);
       return;
     }
-    sessionStorage.setItem(STORAGE_KEY, theme);
+    // Use localStorage so theme persists across sessions and logout
+    localStorage.setItem(STORAGE_KEY, theme);
   } catch (err) {
     // Log quota exceeded errors in development for debugging
     if (process.env.NODE_ENV === "development") {
@@ -60,7 +62,7 @@ function writeSessionTheme(theme: Theme) {
 
 function hasUserOverride(): boolean {
   try {
-    return sessionStorage.getItem(STORAGE_KEY) !== null;
+    return localStorage.getItem(STORAGE_KEY) !== null;
   } catch {
     return false;
   }
@@ -79,7 +81,7 @@ export default function ThemeToggle() {
       mediaQueryRef.current = window.matchMedia("(prefers-color-scheme: dark)");
     }
     const mq = mediaQueryRef.current;
-    const stored = readSessionTheme();
+    const stored = readPersistedTheme();
 
     // Check if user has explicitly set a theme preference
     if (stored) {
@@ -126,9 +128,9 @@ export default function ThemeToggle() {
 
   const toggle = useCallback((checked: boolean) => {
     const next: Theme = checked ? "dark" : "light";
-    hasOverrideRef.current = true; // user explicitly chose a theme for this session
+    hasOverrideRef.current = true; // user explicitly chose a theme preference
     applyTheme(next);
-    writeSessionTheme(next);
+    writePersistedTheme(next);
     setDark(checked);
   }, []);
 
