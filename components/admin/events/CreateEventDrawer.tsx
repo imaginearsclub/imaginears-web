@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import MarkdownEditor from "@/components/common/MarkdownEditor";
-import RecurrenceEditor, { RecurrenceValue } from "./RecurrenceEditor";
+import RecurrenceEditor, { type RecurrenceValue } from "./RecurrenceEditor";
 
 type Props = {
     open: boolean;
@@ -31,26 +34,27 @@ export default function CreateEventDrawer({ open, onOpenChange, onCreated }: Pro
     });
 
     const [submitting, setSubmitting] = useState(false);
-    const [err, setErr] = useState<string | null>(null);
-
-    useEffect(() => {
-        function onEsc(e: KeyboardEvent) { if (e.key === "Escape") onOpenChange(false); }
-        if (open) document.addEventListener("keydown", onEsc);
-        return () => document.removeEventListener("keydown", onEsc);
-    }, [open, onOpenChange]);
-
-    if (!open) return null;
 
     async function handleCreate(e?: React.FormEvent) {
         e?.preventDefault();
 
-        if (!title.trim()) return setErr("Title is required.");
-        if (!world.trim()) return setErr("World is required.");
-        if (!startAt || !endAt) return setErr("Start and end are required.");
+        // Validation
+        if (!title.trim()) {
+            toast.error("Title is required");
+            return;
+        }
+        if (!world.trim()) {
+            toast.error("World is required");
+            return;
+        }
+        if (!startAt || !endAt) {
+            toast.error("Start and end dates are required");
+            return;
+        }
 
-        setErr(null);
         setSubmitting(true);
-        try {
+
+        const createPromise = (async () => {
             const res = await fetch("/api/events", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -60,7 +64,7 @@ export default function CreateEventDrawer({ open, onOpenChange, onCreated }: Pro
                     category,
                     details,
                     shortDescription: shortDesc,
-                    startAt, // "YYYY-MM-DDTHH:mm" from datetime-local (treated as local)
+                    startAt,
                     endAt,
                     status: "Published",
                     timezone: recurrence.timezone,
@@ -70,87 +74,190 @@ export default function CreateEventDrawer({ open, onOpenChange, onCreated }: Pro
                     recurrenceUntil: recurrence.recurrenceUntil || null,
                 }),
             });
-            if (!res.ok) throw new Error("Failed to create event");
-            onOpenChange(false);
-            onCreated();
-        } catch (ex: any) {
-            setErr(ex?.message || "Failed to create event");
+            
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({ error: "Failed to create event" }));
+                throw new Error(error.error || "Failed to create event");
+            }
+            
+            return await res.json();
+        })();
+
+        toast.promise(createPromise, {
+            loading: "Creating event...",
+            success: () => {
+                onOpenChange(false);
+                onCreated();
+                return "Event created successfully!";
+            },
+            error: (err) => err.message || "Failed to create event",
+        });
+
+        try {
+            await createPromise;
         } finally {
             setSubmitting(false);
         }
     }
 
+    const inputClass = cn(
+        "mt-1 w-full rounded-2xl px-4 py-3",
+        "border border-slate-300 dark:border-slate-700",
+        "bg-white dark:bg-slate-800",
+        "text-slate-900 dark:text-white",
+        "focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+    );
+
     return (
-        <div className="fixed inset-0 z-50 flex">
-            <button className="absolute inset-0 bg-black/40" onClick={() => onOpenChange(false)} aria-label="Close backdrop" />
-            <aside className="relative ml-auto h-full w-full max-w-2xl bg-white dark:bg-slate-900 shadow-2xl flex flex-col">
-                <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Create Event</h2>
-                    <button className="btn btn-icon btn-ghost" onClick={() => onOpenChange(false)} aria-label="Close">
-                        <X className="h-5 w-5" />
-                    </button>
-                </div>
+        <Dialog.Root open={open} onOpenChange={onOpenChange}>
+            <Dialog.Portal>
+                <Dialog.Overlay className="fixed inset-0 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 z-50" />
+                <Dialog.Content
+                    className={cn(
+                        "fixed right-0 top-0 bottom-0 z-50",
+                        "h-full w-full max-w-2xl",
+                        "bg-white dark:bg-slate-900 shadow-2xl",
+                        "flex flex-col",
+                        "data-[state=open]:animate-in data-[state=closed]:animate-out",
+                        "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
+                        "duration-300"
+                    )}
+                >
+                    {/* Header */}
+                    <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
+                        <Dialog.Title className="text-lg font-semibold text-slate-900 dark:text-white">
+                            Create Event
+                        </Dialog.Title>
+                        <Dialog.Close asChild>
+                            <button className="btn btn-icon btn-ghost" aria-label="Close">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </Dialog.Close>
+                    </div>
 
-                <form onSubmit={handleCreate} className="flex-1 overflow-auto p-4 space-y-4">
-                    {err && <div className="rounded-xl bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 p-3 text-sm">{err}</div>}
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Title *</label>
-                            <input className="mt-1 w-full rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3" value={title} onChange={(e) => setTitle(e.target.value)} />
+                    {/* Form */}
+                    <form onSubmit={handleCreate} className="flex-1 overflow-auto p-4 space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    Title *
+                                </label>
+                                <input
+                                    type="text"
+                                    className={inputClass}
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    disabled={submitting}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    World *
+                                </label>
+                                <input
+                                    type="text"
+                                    className={inputClass}
+                                    value={world}
+                                    onChange={(e) => setWorld(e.target.value)}
+                                    disabled={submitting}
+                                />
+                            </div>
                         </div>
-                        <div>
-                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">World *</label>
-                            <input className="mt-1 w-full rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3" value={world} onChange={(e) => setWorld(e.target.value)} />
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    Start *
+                                </label>
+                                <input
+                                    type="datetime-local"
+                                    className={inputClass}
+                                    value={startAt}
+                                    onChange={(e) => setStartAt(e.target.value)}
+                                    disabled={submitting}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    End *
+                                </label>
+                                <input
+                                    type="datetime-local"
+                                    className={inputClass}
+                                    value={endAt}
+                                    onChange={(e) => setEndAt(e.target.value)}
+                                    disabled={submitting}
+                                />
+                            </div>
                         </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Start *</label>
-                            <input type="datetime-local" className="mt-1 w-full rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3" value={startAt} onChange={(e) => setStartAt(e.target.value)} />
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                Category
+                            </label>
+                            <select
+                                className={inputClass}
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value as any)}
+                                disabled={submitting}
+                            >
+                                <option value="Fireworks">Fireworks</option>
+                                <option value="Seasonal">Seasonal</option>
+                                <option value="MeetAndGreet">Meet & Greet</option>
+                                <option value="Parade">Parade</option>
+                                <option value="Other">Other</option>
+                            </select>
                         </div>
+
                         <div>
-                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">End *</label>
-                            <input type="datetime-local" className="mt-1 w-full rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3" value={endAt} onChange={(e) => setEndAt(e.target.value)} />
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                Short Description
+                            </label>
+                            <input
+                                type="text"
+                                className={inputClass}
+                                value={shortDesc}
+                                onChange={(e) => setShortDesc(e.target.value)}
+                                disabled={submitting}
+                            />
                         </div>
-                    </div>
 
-                    <div>
-                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Category</label>
-                        <select className="mt-1 w-full rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3" value={category} onChange={(e) => setCategory(e.target.value as any)}>
-                            <option value="Fireworks">Fireworks</option>
-                            <option value="Seasonal">Seasonal</option>
-                            <option value="MeetAndGreet">Meet & Greet</option>
-                            <option value="Parade">Parade</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
+                        <div>
+                            <MarkdownEditor
+                                value={details}
+                                onChange={setDetails}
+                                label="Details (Markdown)"
+                                rows={12}
+                            />
+                        </div>
 
-                    <div>
-                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Short Description</label>
-                        <input className="mt-1 w-full rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3" value={shortDesc} onChange={(e) => setShortDesc(e.target.value)} />
-                    </div>
+                        <div className="pt-2">
+                            <RecurrenceEditor value={recurrence} onChange={setRecurrence} />
+                        </div>
+                    </form>
 
-                    <div>
-                        <MarkdownEditor value={details} onChange={setDetails} label="Details (Markdown)" rows={12} />
+                    {/* Footer */}
+                    <div className="p-4 flex justify-end gap-2 border-t border-slate-200 dark:border-slate-800">
+                        <Dialog.Close asChild>
+                            <button
+                                type="button"
+                                className="btn btn-muted"
+                                disabled={submitting}
+                            >
+                                Cancel
+                            </button>
+                        </Dialog.Close>
+                        <button
+                            type="submit"
+                            onClick={handleCreate}
+                            className={cn("btn btn-primary", submitting && "is-loading")}
+                            disabled={submitting}
+                        >
+                            {submitting ? "Creating..." : "Create"}
+                        </button>
                     </div>
-
-                    {/* Recurrence */}
-                    <div className="pt-2">
-                        <RecurrenceEditor value={recurrence} onChange={setRecurrence} />
-                    </div>
-                </form>
-
-                <div className="p-4 flex justify-end gap-2 border-t border-slate-200 dark:border-slate-800">
-                    <button type="button" className="btn btn-muted" onClick={() => onOpenChange(false)} disabled={submitting}>
-                        Cancel
-                    </button>
-                    <button type="submit" formAction="" onClick={handleCreate} className={`btn btn-primary ${submitting ? "is-loading" : ""}`} disabled={submitting}>
-                        Create
-                    </button>
-                </div>
-            </aside>
-        </div>
+                </Dialog.Content>
+            </Dialog.Portal>
+        </Dialog.Root>
     );
 }
