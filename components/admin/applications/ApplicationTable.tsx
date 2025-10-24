@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { Checkbox } from "@/components/common/Checkbox";
 
 /** Keep these in sync with your Prisma enums */
 export type AppRole = "Developer" | "Imaginear" | "GuestServices";
@@ -100,13 +101,10 @@ export default function ApplicationTable({
                     <tr className="border-b border-slate-200 dark:border-slate-800">
                         <th className="px-3 py-2 w-10">
                             <label className="inline-flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    checked={allSelected}
-                                    ref={(el) => {
-                                        if (el) el.indeterminate = someSelected;
-                                    }}
-                                    onChange={toggleAll}
+                                <Checkbox
+                                    checked={someSelected ? "indeterminate" : allSelected}
+                                    onCheckedChange={toggleAll}
+                                    aria-label="Select all applications"
                                 />
                             </label>
                         </th>
@@ -122,10 +120,10 @@ export default function ApplicationTable({
                     {list.map((r) => (
                         <tr key={r.id} className="border-b border-slate-100 dark:border-slate-800">
                             <td className="px-3 py-2">
-                                <input
-                                    type="checkbox"
+                                <Checkbox
                                     checked={selected.includes(r.id)}
-                                    onChange={() => toggleOne(r.id)}
+                                    onCheckedChange={() => toggleOne(r.id)}
+                                    aria-label={`Select ${r.name}`}
                                 />
                             </td>
                             <td className="px-3 py-2 font-medium">
@@ -133,9 +131,9 @@ export default function ApplicationTable({
                                     <a
                                         className="hover:underline"
                                         href={`/admin/applications/${r.id}`}
-                                        onClick={(e) => {
+                                        onClick={(_e) => {
                                             // if you prefer drawer-only, prevent default:
-                                            // e.preventDefault(); onEdit(r.id);
+                                            // _e.preventDefault(); onEdit(r.id);
                                         }}
                                     >
                                         {r.name}
@@ -159,11 +157,11 @@ export default function ApplicationTable({
                             <td className="px-3 py-2 text-right">
                                 <RowActions
                                     row={r}
-                                    onEdit={() => onEdit?.(r.id)}
-                                    onOpenNotes={() => onOpenNotes?.(r.id)}
-                                    onChangeStatus={onChangeStatus}
-                                    onChangeRole={onChangeRole}
-                                    onDelete={() => onDelete?.(r.id)}
+                                    {...(onEdit && { onEdit: () => onEdit(r.id) })}
+                                    {...(onOpenNotes && { onOpenNotes: () => onOpenNotes(r.id) })}
+                                    {...(onChangeStatus && { onChangeStatus })}
+                                    {...(onChangeRole && { onChangeRole })}
+                                    {...(onDelete && { onDelete: () => onDelete(r.id) })}
                                 />
                             </td>
                         </tr>
