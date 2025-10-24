@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Checkbox, Badge } from "@/components/common";
+import { Checkbox, Badge, EmptyState } from "@/components/common";
+import { FileText } from "lucide-react";
 
 /** Keep these in sync with your Prisma enums */
 export type AppRole = "Developer" | "Imaginear" | "GuestServices";
@@ -169,8 +170,12 @@ export default function ApplicationTable({
 
                     {!list.length && (
                         <tr>
-                            <td colSpan={7} className="px-3 py-10 text-center text-slate-500">
-                                No applications found.
+                            <td colSpan={7} className="p-0">
+                                <EmptyState
+                                    icon={<FileText className="w-12 h-12 font-black dark:text-slate-600" />}
+                                    title="No applications yet"
+                                    description="Applications will appear here when users submit them through the application form."
+                                />
                             </td>
                         </tr>
                     )}

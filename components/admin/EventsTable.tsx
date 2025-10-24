@@ -3,7 +3,17 @@
 import { useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { toast } from "sonner";
-import { Badge } from "@/components/common";
+import {
+    Badge,
+    EmptyState,
+    ContextMenu,
+    ContextMenuTrigger,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    ContextMenuLabel,
+} from "@/components/common";
+import { CalendarRange, Edit, Eye, EyeOff } from "lucide-react";
 
 export type AdminEventRow = {
     id: string;
@@ -64,43 +74,79 @@ export default function EventsTable({
                 </thead>
                 <tbody className="text-sm">
                 {list.map((r) => (
-                    <tr key={r.id} className="border-b border-slate-100 dark:border-slate-800">
-                        <td className="px-3 py-2 font-medium">{r.title}</td>
-                        <td className="px-3 py-2">{r.world}</td>
-                        <td className="px-3 py-2">{r.category}</td>
-                        <td className="px-3 py-2">
-                            <Badge
-                                variant={
-                                    r.status === "Published" ? "success" :
-                                    r.status === "Cancelled" ? "danger" :
-                                    "default"
-                                }
-                            >
-                                {r.status}
-                            </Badge>
-                        </td>
-                        <td className="px-3 py-2">{fmt(r.startAt)}</td>
-                        <td className="px-3 py-2">{fmt(r.endAt)}</td>
-                        <td className="px-3 py-2 text-right">
-                            <RowActions
-                                status={r.status}
-                                onEdit={() => onEdit(r.id)}
-                                {...(onStatusChange && {
-                                    onTogglePublish: () =>
-                                        onStatusChange(
-                                            r.id,
-                                            r.status === "Published" ? "Draft" : "Published"
-                                        )
-                                })}
-                            />
-                        </td>
-                    </tr>
+                    <ContextMenu key={r.id}>
+                        <ContextMenuTrigger asChild>
+                            <tr className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors cursor-pointer">
+                                <td className="px-3 py-2 font-medium">{r.title}</td>
+                                <td className="px-3 py-2">{r.world}</td>
+                                <td className="px-3 py-2">{r.category}</td>
+                                <td className="px-3 py-2">
+                                    <Badge
+                                        variant={
+                                            r.status === "Published" ? "success" :
+                                            r.status === "Cancelled" ? "danger" :
+                                            "default"
+                                        }
+                                    >
+                                        {r.status}
+                                    </Badge>
+                                </td>
+                                <td className="px-3 py-2">{fmt(r.startAt)}</td>
+                                <td className="px-3 py-2">{fmt(r.endAt)}</td>
+                                <td className="px-3 py-2 text-right">
+                                    <RowActions
+                                        status={r.status}
+                                        onEdit={() => onEdit(r.id)}
+                                        {...(onStatusChange && {
+                                            onTogglePublish: () =>
+                                                onStatusChange(
+                                                    r.id,
+                                                    r.status === "Published" ? "Draft" : "Published"
+                                                )
+                                        })}
+                                    />
+                                </td>
+                            </tr>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent>
+                            <ContextMenuLabel>Event Actions</ContextMenuLabel>
+                            <ContextMenuSeparator />
+                            <ContextMenuItem onSelect={() => onEdit(r.id)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Event
+                            </ContextMenuItem>
+                            {onStatusChange && (
+                                <>
+                                    <ContextMenuSeparator />
+                                    <ContextMenuItem
+                                        onSelect={() => onStatusChange(r.id, r.status === "Published" ? "Draft" : "Published")}
+                                    >
+                                        {r.status === "Published" ? (
+                                            <>
+                                                <EyeOff className="w-4 h-4 mr-2" />
+                                                Unpublish
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Eye className="w-4 h-4 mr-2" />
+                                                Publish
+                                            </>
+                                        )}
+                                    </ContextMenuItem>
+                                </>
+                            )}
+                        </ContextMenuContent>
+                    </ContextMenu>
                 ))}
 
                 {!list.length && (
                     <tr>
-                        <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
-                            No events found.
+                        <td colSpan={7} className="p-0">
+                            <EmptyState
+                                icon={<CalendarRange className="w-12 h-12" />}
+                                title="No events found"
+                                description="Create your first event to get started organizing activities for your community."
+                            />
                         </td>
                     </tr>
                 )}

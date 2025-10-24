@@ -59,4 +59,62 @@ export { Tooltip, TooltipProvider } from "./Tooltip";
 
 // Interactive Components
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "./Tabs";
+export { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "./Accordion";
+export { RadioGroup, RadioGroupItem } from "./RadioGroup";
+export { Separator } from "./Separator";
+export { Switch } from "./Switch";
+
+// Overlay Components
+export { Popover, PopoverTrigger, PopoverContent } from "./Popover";
+export {
+  Dialog,
+  DialogPortal,
+  DialogOverlay,
+  DialogClose,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "./Dialog";
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuGroup,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuRadioGroup,
+} from "./DropdownMenu";
+export {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuCheckboxItem,
+  ContextMenuRadioItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuGroup,
+  ContextMenuPortal,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuRadioGroup,
+} from "./ContextMenu";
+
+// Advanced Components
+export { CommandPalette } from "./CommandPalette";
+export type { CommandItem } from "./CommandPalette";
+export { Combobox } from "./Combobox";
+export type { ComboboxOption } from "./Combobox";
+export { DatePicker, DateRangePicker } from "./DatePicker";
 

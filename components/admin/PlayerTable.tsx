@@ -2,6 +2,7 @@ import { memo, useCallback, useMemo } from "react";
 import RowActions from "@/components/admin/RowActions";
 import { Shield, Crown, User, Calendar, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Avatar, EmptyState } from "@/components/common";
 
 export type Player = {
     name: string;
@@ -140,13 +141,10 @@ const PlayerRow = memo(function PlayerRow({
         )}>
             <td className="py-3.5 pl-6 pr-4">
                 <div className="flex items-center gap-2.5">
-                    <div className={cn(
-                        "w-8 h-8 rounded-full flex items-center justify-center",
-                        "bg-gradient-to-br from-blue-400 to-purple-500",
-                        "text-white font-bold text-sm shadow-sm flex-shrink-0"
-                    )}>
-                        {safeName.charAt(0).toUpperCase()}
-                    </div>
+                    <Avatar
+                        fallback={safeName.charAt(0).toUpperCase()}
+                        size="sm"
+                    />
                     <span className="font-semibold text-slate-900 dark:text-white">
                         {safeName}
                     </span>
@@ -195,25 +193,11 @@ const PlayerTable = memo(function PlayerTable({
     // Empty state
     if (!rows || rows.length === 0) {
         return (
-            <div className={cn(
-                "flex flex-col items-center justify-center py-16 px-4 text-center",
-                "bg-white dark:bg-slate-900/50 rounded-xl",
-                "border border-slate-300 dark:border-slate-800"
-            )}>
-                <div className={cn(
-                    "w-16 h-16 rounded-full mb-4",
-                    "bg-slate-200 dark:bg-slate-800",
-                    "flex items-center justify-center"
-                )}>
-                    <User className="w-8 h-8 text-slate-400 dark:text-slate-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-                    No players found
-                </h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm">
-                    There are currently no players to display. Players will appear here when they join.
-                </p>
-            </div>
+            <EmptyState
+                icon={<User className="w-12 h-12" />}
+                title="No players found"
+                description="There are currently no players to display. Players will appear here when they join."
+            />
         );
     }
 
