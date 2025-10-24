@@ -4,8 +4,9 @@ import {requireAdmin} from '@/lib/session';
 
 export const runtime = "nodejs";
 
-// Cache for 5 minutes to reduce database load
-export const revalidate = 300;
+// Force dynamic rendering for authenticated endpoints
+// This ensures fresh session validation on every request
+export const dynamic = "force-dynamic";
 
 // Buckets by day for last N (default 30) days based on Event.createdAt
 export async function GET(req: Request){
@@ -36,19 +37,6 @@ export async function GET(req: Request){
         start.setUTCDate(end.getUTCDate() - (days - 1));
         start.setUTCHours(0, 0, 0, 0);
 
-        // Use database aggregation instead of fetching all records
-        // This is much more efficient for large datasets
-        const rows = await prisma.$queryRaw<Array<{date: string; count: bigint}>>`
-            SELECT 
-                DATE(createdAt) as date,
-                COUNT(*)::bigint as count
-            FROM "Event"
-            WHERE createdAt >= ${start}
-                AND createdAt <= ${end}
-            GROUP BY DATE(createdAt)
-            ORDER BY date ASC
-        `;
-
         // Create map with all dates initialized to 0
         const map = new Map<string, number>();
         const tempDate = new Date(start);
@@ -58,10 +46,30 @@ export async function GET(req: Request){
             tempDate.setUTCDate(tempDate.getUTCDate() + 1);
         }
 
-        // Fill in actual counts from database
-        for (const row of rows) {
-            const dateStr = String(row.date).slice(0, 10);
-            map.set(dateStr, Number(row.count));
+        // Try to get data from database
+        try {
+            // Use database aggregation instead of fetching all records
+            // This is much more efficient for large datasets
+            const rows = await prisma.$queryRaw<Array<{date: string; count: bigint}>>`
+                SELECT 
+                    DATE("createdAt") as date,
+                    COUNT(*)::bigint as count
+                FROM "Event"
+                WHERE "createdAt" >= ${start}
+                    AND "createdAt" <= ${end}
+                GROUP BY DATE("createdAt")
+                ORDER BY date ASC
+            `;
+
+            // Fill in actual counts from database
+            for (const row of rows) {
+                const dateStr = String(row.date).slice(0, 10);
+                map.set(dateStr, Number(row.count));
+            }
+        } catch (dbError: any) {
+            console.error("[Stats/Events] Database query error:", dbError);
+            // Continue with empty data (all zeros) if query fails
+            // This allows the dashboard to load even if Event table is empty or has issues
         }
 
         const data = Array.from(map.entries()).map(([key, count]) => ({
@@ -72,6 +80,7 @@ export async function GET(req: Request){
         return NextResponse.json(data);
     } catch (e: any) {
         console.error("[Stats/Events] Error:", e);
-        return NextResponse.json({error: "Server error"}, {status: 500});
+        // Return empty array instead of error to allow dashboard to load
+        return NextResponse.json([]);
     }
 }
