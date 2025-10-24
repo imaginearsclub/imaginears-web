@@ -1,79 +1,80 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import PlayerTable, { Player } from "@/components/admin/PlayerTable";
 
-const INITIAL_PLAYERS: Player[] = [
+// Mock data - will be replaced with live database feed
+const MOCK_PLAYERS: Player[] = [
     {
-        id: "p1",
-        name: "Mickey Mouse",
-        email: "mickey@imaginears.club",
-        role: "Player",
-        status: "Active",
-        createdAt: new Date().toISOString(),
+        name: "Steve",
+        rank: "Member",
+        world: "Adventure World",
+        online: true,
+        joinedAt: "2024-01-15",
     },
     {
-        id: "p2",
-        name: "Minnie Mouse",
-        email: "minnie@imaginears.club",
-        role: "Player",
-        status: "Active",
-        createdAt: new Date().toISOString(),
+        name: "Alex",
+        rank: "Creator",
+        world: "Creative Hub",
+        online: true,
+        joinedAt: "2024-02-10",
+    },
+    {
+        name: "Herobrine",
+        rank: "Staff",
+        world: "Admin Lounge",
+        online: false,
+        joinedAt: "2023-12-01",
+    },
+    {
+        name: "Notch",
+        rank: "Staff",
+        world: "Development Lab",
+        online: true,
+        joinedAt: "2023-11-20",
+    },
+    {
+        name: "Enderman",
+        rank: "Member",
+        world: "The End",
+        online: false,
+        joinedAt: "2024-03-05",
     },
 ];
 
 export default function PlayersPage() {
-    const [query, setQuery] = useState("");
-    const [rows, setRows] = useState<Player[]>(INITIAL_PLAYERS);
+    // Player actions - these will eventually connect to your backend
+    const handleMute = async (name: string) => {
+        console.log(`Muting player: ${name}`);
+        // TODO: Connect to backend API
+    };
 
-    const filtered = useMemo(() => {
-        if (!query.trim()) return rows;
-        const q = query.toLowerCase();
-        return rows.filter(
-            (r) =>
-                r.name.toLowerCase().includes(q) ||
-                r.email.toLowerCase().includes(q) ||
-                r.status.toLowerCase().includes(q)
-        );
-    }, [rows, query]);
+    const handleKick = async (name: string) => {
+        console.log(`Kicking player: ${name}`);
+        // TODO: Connect to backend API
+    };
+
+    const handleTeleport = async (name: string) => {
+        console.log(`Teleporting to player: ${name}`);
+        // TODO: Connect to backend API
+    };
 
     return (
         <section className="band">
             <div className="container py-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex flex-col gap-4">
                     <h1 className="section-title text-2xl md:text-3xl">Players</h1>
-                    <div className="flex items-center gap-2">
-                        <input
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Search players…"
-                            className="rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2 outline-none focus:ring-2 focus:ring-brandStart/50"
-                        />
-                        <button
-                            className="btn btn-primary"
-                            onClick={() =>
-                                setRows((prev) => [
-                                    ...prev,
-                                    {
-                                        id: `p${prev.length + 1}`,
-                                        name: `Player ${prev.length + 1}`,
-                                        email: `player${prev.length + 1}@example.com`,
-                                        role: "Player",
-                                        status: "Active",
-                                        createdAt: new Date().toISOString(),
-                                    },
-                                ])
-                            }
-                        >
-                            Add
-                        </button>
-                    </div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                        Live feed from Minecraft server • Updates automatically
+                    </p>
                 </div>
 
-                <div className="mt-5 card overflow-hidden">
-                    <div className="card-content p-0">
-                        <PlayerTable rows={filtered} />
-                    </div>
+                <div className="mt-6">
+                    <PlayerTable
+                        rows={MOCK_PLAYERS}
+                        onMute={handleMute}
+                        onKick={handleKick}
+                        onTeleport={handleTeleport}
+                    />
                 </div>
             </div>
         </section>
