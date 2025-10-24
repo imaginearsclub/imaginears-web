@@ -1,9 +1,8 @@
 import { auth } from "@/lib/auth";
-import { headers as nextHeaders } from "next/headers";
-
-// Roles that are allowed to access admin functionality
-// Frozen to prevent runtime tampering
-const ADMIN_ROLES = Object.freeze(new Set(["owner", "admin"] as const));
+import { headers as nextHeaders, cookies as nextCookies } from "next/headers";
+import { prisma } from "@/lib/prisma";
+import { isAdminRole, type Permission } from "@/lib/rbac";
+import { userHasPermissionAsync } from "@/lib/rbac-server";
 
 // Session validity window (e.g., 24 hours in milliseconds)
 // Adjust based on your security requirements
@@ -12,14 +11,28 @@ const MAX_SESSION_AGE_MS = 24 * 60 * 60 * 1000;
 /**
  * Convert Next.js readonly headers to mutable Headers instance.
  * Reusable helper to avoid duplication and improve maintainability.
+ * Also ensures cookies are properly included for Better Auth.
  */
 async function getHeaders(): Promise<Headers> {
     const h = await nextHeaders();
+    const c = await nextCookies();
+    
     // Type-safe conversion: iterate and copy headers
     const headers = new Headers();
     h.forEach((value, key) => {
         headers.set(key, value);
     });
+    
+    // Ensure cookie header is properly set for Better Auth
+    // Better Auth needs cookies in the standard Cookie header format
+    const cookieHeader = c.getAll()
+        .map(cookie => `${cookie.name}=${cookie.value}`)
+        .join('; ');
+    
+    if (cookieHeader) {
+        headers.set('cookie', cookieHeader);
+    }
+    
     return headers;
 }
 
@@ -82,52 +95,192 @@ export async function getServerSession() {
 }
 
 /**
- * Ensure the current user is an admin (owner/admin org role).
- * Returns the session when authorized, or null when unauthorized.
+ * Get user data including role from database
+ * This provides more detailed user information than just the session
+ */
+async function getUserWithRole(userId: string) {
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true, // Now string instead of enum
+                permissions: true,
+                image: true,
+            } as any,
+        });
+        
+        return user as {
+            id: string;
+            name: string | null;
+            email: string | null;
+            role: string;
+            permissions: any;
+            image: string | null;
+        } | null;
+    } catch (error) {
+        console.error("[Session] Failed to get user:", error);
+        return null;
+    }
+}
+
+/**
+ * Ensure the current user is an admin (OWNER or ADMIN role).
+ * Returns the session with user data when authorized, or null when unauthorized.
  * Fails closed on any error.
  */
 // noinspection JSUnusedGlobalSymbols
 export async function requireAdmin() {
     try {
         const headers = await getHeaders();
-
-        // Do both requests in parallel for better latency
-        const [session, roleResult] = await Promise.all([
-            auth.api.getSession({ headers }),
-            auth.api.getActiveMemberRole({ headers })
-        ]);
+        const session = await auth.api.getSession({ headers });
 
         // Validate session integrity and freshness
         if (!isSessionValid(session)) {
+            if (process.env.NODE_ENV === "development") {
+                console.warn("[requireAdmin] Session invalid");
+            }
             return null;
         }
 
-        // Normalize role to array for consistent handling
-        const roleRaw = (roleResult?.role ?? undefined) as string | string[] | undefined;
-        const roles = Array.isArray(roleRaw) ? roleRaw : roleRaw ? [roleRaw] : [];
+        const userId = session?.user?.id;
+        if (!userId) {
+            return null;
+        }
+
+        // Get user with role from database
+        const user = await getUserWithRole(userId);
         
-        // Check if user has any admin role (type-safe check)
-        const isAdmin = roles.some((r) => ADMIN_ROLES.has(r as "owner" | "admin"));
-        
-        if (!isAdmin) {
-            // Log unauthorized admin access attempts in production for security monitoring
-            if (process.env.NODE_ENV === "production" && session) {
+        if (!user) {
+            console.warn("[requireAdmin] User not found:", userId);
+            return null;
+        }
+
+        // Check if user has admin role (OWNER or ADMIN)
+        if (!isAdminRole(user.role)) {
+            if (process.env.NODE_ENV === "development") {
+                console.warn("[requireAdmin] Not admin:", {
+                    userId: user.id,
+                    role: user.role,
+                });
+            }
+            if (process.env.NODE_ENV === "production") {
                 console.warn("[Security] Unauthorized admin access attempt:", {
-                    userId: session.user?.id,
-                    roles,
+                    userId: user.id,
+                    role: user.role,
                     timestamp: new Date().toISOString(),
                 });
             }
             return null;
         }
 
-        return session;
+        // Attach user data to session for convenience
+        return {
+            ...session,
+            user: {
+                ...session.user,
+                role: user.role,
+                permissions: user.permissions,
+            },
+        };
     } catch (error) {
         // Fail closed: on any error, treat as unauthorized
-        // Log security-relevant errors for monitoring
-        if (process.env.NODE_ENV === "production") {
-            console.error("[Security] Admin auth error:", error);
+        console.error("[requireAdmin] Error:", error);
+        return null;
+    }
+}
+
+/**
+ * Check if the current user has a specific permission.
+ * This checks both role-based permissions and custom user permissions.
+ */
+// noinspection JSUnusedGlobalSymbols
+export async function requirePermission(permission: Permission) {
+    try {
+        const headers = await getHeaders();
+        const session = await auth.api.getSession({ headers });
+
+        if (!isSessionValid(session)) {
+            return null;
         }
+
+        const userId = session?.user?.id;
+        if (!userId) {
+            return null;
+        }
+
+        const user = await getUserWithRole(userId);
+        
+        if (!user) {
+            return null;
+        }
+
+        // Check if user has the required permission (async for custom roles)
+        const customPerms = user.permissions as unknown as Record<string, boolean> | null;
+        const hasPermission = await userHasPermissionAsync(user.role, permission, customPerms);
+
+        if (!hasPermission) {
+            if (process.env.NODE_ENV === "development") {
+                console.warn("[requirePermission] Permission denied:", {
+                    userId: user.id,
+                    role: user.role,
+                    permission,
+                });
+            }
+            return null;
+        }
+
+        return {
+            ...session,
+            user: {
+                ...session.user,
+                role: user.role,
+                permissions: user.permissions,
+            },
+        };
+    } catch (error) {
+        console.error("[requirePermission] Error:", error);
+        return null;
+    }
+}
+
+/**
+ * Get the current user with their role and permissions.
+ * Does not require any specific role or permission.
+ */
+// noinspection JSUnusedGlobalSymbols
+export async function getCurrentUser() {
+    try {
+        const headers = await getHeaders();
+        const session = await auth.api.getSession({ headers });
+
+        if (!isSessionValid(session)) {
+            return null;
+        }
+
+        const userId = session?.user?.id;
+        if (!userId) {
+            return null;
+        }
+
+        const user = await getUserWithRole(userId);
+        
+        if (!user) {
+            return null;
+        }
+
+        return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            permissions: user.permissions as Record<string, boolean> | null,
+            image: user.image,
+        };
+    } catch (error) {
+        console.error("[getCurrentUser] Error:", error);
         return null;
     }
 }
