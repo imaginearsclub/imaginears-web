@@ -27,7 +27,9 @@ const ContextMenuSubTrigger = forwardRef<
     ref={ref}
     className={cn(
       "flex cursor-pointer select-none items-center rounded-lg px-2 py-2 text-sm outline-none",
+      "text-slate-900 dark:text-slate-100",
       "focus:bg-slate-100 dark:focus:bg-slate-800",
+      "hover:bg-slate-50 dark:hover:bg-slate-800/50",
       "data-[state=open]:bg-slate-100 dark:data-[state=open]:bg-slate-800",
       inset && "pl-8",
       className
@@ -48,7 +50,7 @@ const ContextMenuSubContent = forwardRef<
     ref={ref}
     className={cn(
       "z-50 min-w-[8rem] overflow-hidden rounded-xl border-2 border-slate-200 dark:border-slate-800",
-      "bg-white dark:bg-slate-900 p-1 shadow-md",
+      "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-1 shadow-md",
       "data-[state=open]:animate-in data-[state=closed]:animate-out",
       "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -70,7 +72,7 @@ const ContextMenuContent = forwardRef<
       ref={ref}
       className={cn(
         "z-50 min-w-[8rem] overflow-hidden rounded-xl border-2 border-slate-200 dark:border-slate-800",
-        "bg-white dark:bg-slate-900 p-1 shadow-md",
+        "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-1 shadow-md",
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -94,7 +96,9 @@ const ContextMenuItem = forwardRef<
     ref={ref}
     className={cn(
       "relative flex cursor-pointer select-none items-center rounded-lg px-2 py-2 text-sm outline-none",
+      "text-slate-900 dark:text-slate-100",
       "focus:bg-slate-100 dark:focus:bg-slate-800",
+      "hover:bg-slate-50 dark:hover:bg-slate-800/50",
       "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       "transition-colors",
       inset && "pl-8",
@@ -113,7 +117,9 @@ const ContextMenuCheckboxItem = forwardRef<
     ref={ref}
     className={cn(
       "relative flex cursor-pointer select-none items-center rounded-lg py-2 pl-8 pr-2 text-sm outline-none",
+      "text-slate-900 dark:text-slate-100",
       "focus:bg-slate-100 dark:focus:bg-slate-800",
+      "hover:bg-slate-50 dark:hover:bg-slate-800/50",
       "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       "transition-colors",
       className
@@ -138,7 +144,9 @@ const ContextMenuRadioItem = forwardRef<
     ref={ref}
     className={cn(
       "relative flex cursor-pointer select-none items-center rounded-lg py-2 pl-8 pr-2 text-sm outline-none",
+      "text-slate-900 dark:text-slate-100",
       "focus:bg-slate-100 dark:focus:bg-slate-800",
+      "hover:bg-slate-50 dark:hover:bg-slate-800/50",
       "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       "transition-colors",
       className
