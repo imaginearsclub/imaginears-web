@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import ApplicationTable, {
     type ApplicationRow,
     exportApplicationsCSV,
@@ -156,19 +158,34 @@ export default function AdminApplicationsPage() {
     return (
         <div className="p-4 space-y-4">
             {/* Toolbar */}
-            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
+            <div className={cn(
+                "flex flex-col sm:flex-row gap-2",
+                "items-stretch sm:items-center justify-between"
+            )}>
                 <div className="flex gap-2">
                     <input
                         value={q}
                         onChange={(e) => setQ(e.target.value.slice(0, 200))}
                         placeholder="Search name, email, MC, Discord…"
-                        className="rounded-2xl border px-4 py-2 w-64"
+                        className={cn(
+                            "rounded-2xl border px-4 py-2 w-64",
+                            "border-slate-300 dark:border-slate-700",
+                            "bg-white dark:bg-slate-900",
+                            "text-slate-900 dark:text-white",
+                            "placeholder:text-slate-400 dark:placeholder:text-slate-500",
+                            "focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                        )}
                         aria-label="Search applications"
                     />
                     <select
                         value={status ?? ""}
                         onChange={(e) => setStatus((e.target.value as Query["status"]) ?? "")}
-                        className="rounded-2xl border px-3 py-2"
+                        className={cn(
+                            "rounded-2xl border px-3 py-2",
+                            "border-slate-300 dark:border-slate-700",
+                            "bg-white dark:bg-slate-900",
+                            "text-slate-900 dark:text-white"
+                        )}
                         aria-label="Filter by status"
                     >
                         <option value="">All statuses</option>
@@ -182,7 +199,7 @@ export default function AdminApplicationsPage() {
                     </button>
                 </div>
                 {error && (
-                    <div className="text-sm text-red-600" role="alert" aria-live="polite">
+                    <div className="text-sm text-red-600 dark:text-red-400" role="alert" aria-live="polite">
                         {error}
                     </div>
                 )}
@@ -193,26 +210,45 @@ export default function AdminApplicationsPage() {
                 onEdit={(id) => setEditingId(id)}
                 onOpenNotes={(id) => setEditingId(id)}
                 onChangeStatus={async (id, status) => {
-                    try {
+                    const updatePromise = (async () => {
                         await patch(id, { status });
                         updateRowLocal(id, { status });
+                    })();
+
+                    toast.promise(updatePromise, {
+                        loading: "Updating status...",
+                        success: "Status updated successfully!",
+                        error: "Failed to update status",
+                    });
+
+                    try {
+                        await updatePromise;
                     } catch (e) {
                         console.error(e);
-                        alert("Failed to update status.");
                     }
                 }}
                 onChangeRole={async (id, role) => {
-                    try {
+                    const updatePromise = (async () => {
                         await patch(id, { role });
                         updateRowLocal(id, { role });
+                    })();
+
+                    toast.promise(updatePromise, {
+                        loading: "Updating role...",
+                        success: "Role updated successfully!",
+                        error: "Failed to update role",
+                    });
+
+                    try {
+                        await updatePromise;
                     } catch (e) {
                         console.error(e);
-                        alert("Failed to update role.");
                     }
                 }}
                 onDelete={async (id) => {
-                    if (!confirm("Delete this application?")) return;
-                    try {
+                    if (!confirm("Delete this application? This cannot be undone.")) return;
+                    
+                    const deletePromise = (async () => {
                         const res = await fetch(`/api/admin/applications/${id}`, { method: "DELETE" });
                         if (!res.ok) {
                             let message = `Failed to delete (${res.status})`;
@@ -223,20 +259,37 @@ export default function AdminApplicationsPage() {
                             throw new Error(message);
                         }
                         setRows((rs) => rs.filter((r) => r.id !== id));
+                    })();
+
+                    toast.promise(deletePromise, {
+                        loading: "Deleting application...",
+                        success: "Application deleted successfully!",
+                        error: (err) => err.message || "Failed to delete",
+                    });
+
+                    try {
+                        await deletePromise;
                     } catch (e) {
                         console.error(e);
-                        alert("Failed to delete.");
                     }
                 }}
                 onExportCSV={() => exportApplicationsCSV(rows)}
                 onBulkChangeStatus={async (ids, status) => {
-                    try {
-                        // parallel updates; in production, you could add a bulk endpoint
+                    const bulkPromise = (async () => {
                         await Promise.all(ids.map((id) => patch(id, { status })));
                         setRows((rs) => rs.map((r) => (ids.includes(r.id) ? { ...r, status } : r)));
+                    })();
+
+                    toast.promise(bulkPromise, {
+                        loading: `Updating ${ids.length} application(s)...`,
+                        success: `${ids.length} application(s) updated successfully!`,
+                        error: "Failed to update some applications",
+                    });
+
+                    try {
+                        await bulkPromise;
                     } catch (e) {
                         console.error(e);
-                        alert("Failed to change status for some items.");
                     }
                 }}
             />
@@ -246,25 +299,22 @@ export default function AdminApplicationsPage() {
                 app={editingApp}
                 onOpenChange={(v) => !v && setEditingId(null)}
                 onSave={async (updated) => {
-                    try {
-                        await patch(updated.id, {
-                            name: updated.name,
-                            email: updated.email,
-                            role: updated.role,
-                            status: updated.status,
-                            notes: updated.notes ?? "",
-                        });
-                        updateRowLocal(updated.id, {
-                            name: updated.name,
-                            email: updated.email,
-                            role: updated.role,
-                            status: updated.status,
-                            notes: updated.notes ?? "",
-                        });
-                    } catch (e) {
-                        console.error(e);
-                        alert("Failed to save changes.");
-                    }
+                    // Note: EditApplicationDrawer already shows toast notifications
+                    // Just handle the API call and update local state
+                    await patch(updated.id, {
+                        name: updated.name,
+                        email: updated.email,
+                        role: updated.role,
+                        status: updated.status,
+                        notes: updated.notes ?? "",
+                    });
+                    updateRowLocal(updated.id, {
+                        name: updated.name,
+                        email: updated.email,
+                        role: updated.role,
+                        status: updated.status,
+                        notes: updated.notes ?? "",
+                    });
                 }}
             />
         </div>
