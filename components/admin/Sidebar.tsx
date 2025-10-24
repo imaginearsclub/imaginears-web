@@ -8,10 +8,12 @@ import {
     FileText,
     Users,
     Settings,
-    Building2,
+    Shield,
+    Sliders,
     X,
+    ChevronDown,
 } from "lucide-react";
-import { memo, useCallback, useMemo, type ComponentType } from "react";
+import { memo, useCallback, useMemo, useState, type ComponentType } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "@/lib/utils";
 import { Tooltip, Badge, Separator } from "@/components/common";
@@ -25,18 +27,23 @@ const NavItem = memo(function NavItem({
     icon: Icon,
     label,
     onClick,
+    exactMatch = false,
 }: {
     href: string;
     icon: ComponentType<{ className?: string }>;
     label: string;
     onClick?: () => void;
+    exactMatch?: boolean;
 }) {
     const pathname = usePathname();
     
-    // Memoize active state calculation
+    // Memoize active state calculation with exact match option
     const active = useMemo(() => {
+        if (exactMatch) {
+            return pathname === href;
+        }
         return pathname === href || pathname.startsWith(`${href}/`);
-    }, [pathname, href]);
+    }, [pathname, href, exactMatch]);
 
     // Memoize click handler to prevent re-creation
     const handleClick = useCallback(() => {
@@ -73,6 +80,138 @@ const NavItem = memo(function NavItem({
                 <span className="font-medium text-sm">{label}</span>
             </Link>
         </Tooltip>
+    );
+});
+
+/* ---------- Nav Item with Submenu ---------- */
+const NavItemWithSubmenu = memo(function NavItemWithSubmenu({
+    href,
+    icon: Icon,
+    label,
+    onClick,
+    children,
+}: {
+    href: string;
+    icon: ComponentType<{ className?: string }>;
+    label: string;
+    onClick?: () => void;
+    children?: React.ReactNode;
+}) {
+    const pathname = usePathname();
+    const [isOpen, setIsOpen] = useState(false);
+    
+    // Check if current path or any child path is active
+    const isActive = useMemo(() => {
+        return pathname === href || pathname.startsWith(`${href}/`);
+    }, [pathname, href]);
+
+    // Auto-expand if a child is active
+    useMemo(() => {
+        if (isActive) {
+            setIsOpen(true);
+        }
+    }, [isActive]);
+
+    const toggleSubmenu = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsOpen(prev => !prev);
+    }, []);
+
+    const handleItemClick = useCallback(() => {
+        onClick?.();
+    }, [onClick]);
+
+    return (
+        <div>
+            <Tooltip content={label} side="right">
+                <div className="relative">
+                    <Link
+                        href={href}
+                        onClick={handleItemClick}
+                        className={cn(
+                            "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200",
+                            pathname === href
+                                ? "bg-gradient-to-r from-blue-50 to-violet-50 dark:from-blue-950/30 dark:to-violet-950/30 text-slate-900 dark:text-white shadow-sm border border-blue-200/60 dark:border-blue-800/60 font-semibold"
+                                : "text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white"
+                        )}
+                        aria-current={pathname === href ? "page" : undefined}
+                    >
+                        {/* Active indicator */}
+                        {pathname === href && (
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-[var(--brand-start)] to-[var(--brand-end)] rounded-r-full" />
+                        )}
+                        
+                        <Icon
+                            className={cn(
+                                "h-5 w-5 transition-all duration-200 flex-shrink-0",
+                                pathname === href
+                                    ? "text-[var(--brand-end)]"
+                                    : "text-slate-500 dark:text-slate-400 group-hover:text-[var(--brand-start)] group-hover:scale-110"
+                            )}
+                            aria-hidden="true"
+                        />
+                        <span className="font-medium text-sm flex-1">{label}</span>
+                        {children && (
+                            <button
+                                onClick={toggleSubmenu}
+                                className="p-0.5 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded"
+                                aria-label={isOpen ? "Collapse submenu" : "Expand submenu"}
+                            >
+                                <ChevronDown
+                                    className={cn(
+                                        "h-4 w-4 transition-transform duration-200",
+                                        isOpen && "rotate-180"
+                                    )}
+                                />
+                            </button>
+                        )}
+                    </Link>
+                </div>
+            </Tooltip>
+            
+            {/* Submenu */}
+            {children && isOpen && (
+                <div className="ml-8 mt-1 space-y-1 border-l-2 border-slate-200 dark:border-slate-700 pl-2">
+                    {children}
+                </div>
+            )}
+        </div>
+    );
+});
+
+/* ---------- Submenu Item ---------- */
+const SubmenuItem = memo(function SubmenuItem({
+    href,
+    icon: Icon,
+    label,
+    onClick,
+}: {
+    href: string;
+    icon: ComponentType<{ className?: string }>;
+    label: string;
+    onClick?: () => void;
+}) {
+    const pathname = usePathname();
+    const active = pathname === href;
+
+    const handleClick = useCallback(() => {
+        onClick?.();
+    }, [onClick]);
+
+    return (
+        <Link
+            href={href}
+            onClick={handleClick}
+            className={cn(
+                "flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-all duration-200",
+                active
+                    ? "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 font-medium"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white"
+            )}
+        >
+            <Icon className="h-4 w-4 flex-shrink-0" />
+            <span>{label}</span>
+        </Link>
     );
 });
 
@@ -159,12 +298,19 @@ const SidebarInner = memo(function SidebarInner({
                             label="Players" 
                             onClick={handleClose} 
                         />
-                        <NavItem 
-                            href="/admin/organizations" 
-                            icon={Building2} 
-                            label="Organizations" 
-                            onClick={handleClose} 
-                        />
+                        <NavItemWithSubmenu
+                            href="/admin/roles" 
+                            icon={Shield} 
+                            label="User Roles" 
+                            onClick={handleClose}
+                        >
+                            <SubmenuItem
+                                href="/admin/roles/configure"
+                                icon={Sliders}
+                                label="Configure Roles"
+                                onClick={handleClose}
+                            />
+                        </NavItemWithSubmenu>
                     </div>
 
                     {/* System Section */}
