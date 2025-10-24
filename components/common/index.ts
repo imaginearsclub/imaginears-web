@@ -118,3 +118,12 @@ export { Combobox } from "./Combobox";
 export type { ComboboxOption } from "./Combobox";
 export { DatePicker, DateRangePicker } from "./DatePicker";
 
+// ConfirmDialog
+export { ConfirmDialog } from "./ConfirmDialog";
+export type { ConfirmDialogProps } from "./ConfirmDialog";
+
+// HoverCard
+export { HoverCard, HoverCardTrigger, HoverCardContent } from "./HoverCard";
+
+// TableSkeleton
+export { TableSkeleton } from "./TableSkeleton";
