@@ -4,9 +4,10 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { Menu, Home, CalendarRange, FileText, Users, Settings, Plus, Search, Moon, Sun, Palette, LogOut, Code } from "lucide-react";
 import { SidebarDesktop, SidebarDrawer } from "@/components/admin/Sidebar";
-import { CommandPalette } from "@/components/common";
+import { CommandPalette, Badge } from "@/components/common";
 import type { CommandItem } from "@/components/common";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 export default function AdminChrome({ children }: { children: ReactNode }) {
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -161,21 +162,40 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
     return (
         <div className="min-h-screen">
             {/* Top bar */}
-            <header className="sticky top-0 z-30 border-b border-slate-200/70 dark:border-slate-800/60 bg-white/80 dark:bg-slate-900/70 backdrop-blur">
-                <div className="container flex items-center justify-between py-3">
-                    <button
-                        className="md:hidden btn btn-icon btn-ghost"
-                        aria-label="Open menu"
-                        onClick={() => setMobileOpen(true)}
-                    >
-                        <Menu className="h-5 w-5" />
-                    </button>
-                    <h1 className="text-base md:text-lg font-semibold tracking-tight">
-                        Admin
-                        <span className="ml-2 text-slate-500 dark:text-slate-400 hidden sm:inline">
-              / {process.env.NODE_ENV === "development" ? "Dev" : "Live"}
-            </span>
-                    </h1>
+            <header className={cn(
+                "sticky top-0 z-30",
+                "border-b border-slate-200/70 dark:border-slate-800/60",
+                "bg-white/80 dark:bg-slate-900/70 backdrop-blur-sm"
+            )}>
+                <div className="container flex items-center justify-between py-3 gap-4">
+                    <div className="flex items-center gap-3">
+                        <button
+                            className={cn(
+                                "md:hidden inline-flex items-center justify-center",
+                                "h-9 w-9 rounded-lg",
+                                "text-slate-700 dark:text-slate-300",
+                                "hover:bg-slate-100 dark:hover:bg-slate-800",
+                                "transition-colors",
+                                "focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            )}
+                            aria-label="Open menu"
+                            onClick={() => setMobileOpen(true)}
+                        >
+                            <Menu className="h-5 w-5" />
+                        </button>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-base md:text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+                                Admin
+                            </h1>
+                            <Badge 
+                                variant={process.env.NODE_ENV === "development" ? "warning" : "success"}
+                                size="sm"
+                                className="hidden sm:inline-flex"
+                            >
+                                {process.env.NODE_ENV === "development" ? "Dev" : "Live"}
+                            </Badge>
+                        </div>
+                    </div>
                     {/* Command Palette Trigger */}
                     <div className="flex items-center gap-2">
                         <CommandPalette items={commandItems} />
