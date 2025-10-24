@@ -58,6 +58,14 @@ function writeSessionTheme(theme: Theme) {
   }
 }
 
+function hasUserOverride(): boolean {
+  try {
+    return sessionStorage.getItem(STORAGE_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export default function ThemeToggle() {
   const [dark, setDark] = useState(false);
   const hasOverrideRef = useRef(false);
@@ -73,6 +81,7 @@ export default function ThemeToggle() {
     const mq = mediaQueryRef.current;
     const stored = readSessionTheme();
 
+    // Check if user has explicitly set a theme preference
     if (stored) {
       hasOverrideRef.current = true;
       applyTheme(stored);
@@ -85,11 +94,20 @@ export default function ThemeToggle() {
 
     // Respond to system theme changes only if no user override is set
     const handleChange = (e: MediaQueryListEvent | MediaQueryList) => {
-      if (hasOverrideRef.current) return;
+      // Check both the ref AND storage to persist override across refreshes
+      if (hasOverrideRef.current || hasUserOverride()) {
+        if (process.env.NODE_ENV === "development") {
+          console.log("[ThemeToggle] Ignoring system theme change (user override active)");
+        }
+        return;
+      }
       const matches = "matches" in e ? e.matches : (e as MediaQueryListEvent).matches;
       const next: Theme = matches ? "dark" : "light";
       applyTheme(next);
       setDark(next === "dark");
+      if (process.env.NODE_ENV === "development") {
+        console.log("[ThemeToggle] Following system theme change:", next);
+      }
     };
 
     // Modern browsers support addEventListener
