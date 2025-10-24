@@ -1,26 +1,32 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/session";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
-let _prisma: PrismaClient | null = null;
-function prisma() {
-    if (!_prisma) {
-        // @ts-expect-error dev singleton
-        _prisma = globalThis.__PRISMA__ ?? new PrismaClient();
-        // @ts-expect-error dev singleton
-        if (!globalThis.__PRISMA__) globalThis.__PRISMA__ = _prisma;
-    }
-    return _prisma!;
-}
+// Force dynamic rendering for authenticated endpoints
+// This ensures fresh session validation on every request
+export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
     try {
-        const { searchParams } = new URL(req.url);
-        const take = Math.min(Number(searchParams.get("take") || 200), 500);
+        const session = await requireAdmin();
+        
+        if (!session) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
 
-        const items = await prisma().event.findMany({
+        const { searchParams } = new URL(req.url);
+        const takeParam = searchParams.get("take") || "200";
+        
+        // Validate input
+        if (!/^\d+$/.test(takeParam)) {
+            return NextResponse.json({ error: "Invalid take parameter" }, { status: 400 });
+        }
+        
+        const take = Math.min(Number(takeParam), 500);
+
+        const items = await prisma.event.findMany({
             orderBy: { updatedAt: "desc" },
             take,
             select: {
