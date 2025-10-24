@@ -5,6 +5,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { MoreVertical, VolumeX, UserX, MapPin, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Tooltip } from "@/components/common/Tooltip";
 
 interface RowActionsProps {
     name: string;
@@ -56,26 +57,28 @@ const RowActions = memo(function RowActions({
 
     return (
         <DropdownMenu.Root open={open} onOpenChange={setOpen}>
-            <DropdownMenu.Trigger asChild>
-                <button
-                    type="button"
-                    aria-label={`Actions for ${name}`}
-                    className={cn(
-                        "inline-flex items-center justify-center w-8 h-8 rounded-lg",
-                        "border border-slate-300 dark:border-slate-700",
-                        "bg-white dark:bg-slate-800",
-                        "text-slate-700 dark:text-slate-300",
-                        "hover:bg-slate-100 dark:hover:bg-slate-700",
-                        "hover:border-slate-400 dark:hover:border-slate-600",
-                        "transition-all duration-200",
-                        "focus:outline-none focus:ring-2 focus:ring-blue-500/50",
-                        "active:scale-95",
-                        "data-[state=open]:bg-slate-100 data-[state=open]:dark:bg-slate-700"
-                    )}
-                >
-                    <MoreVertical className="w-4 h-4" aria-hidden="true" />
-                </button>
-            </DropdownMenu.Trigger>
+            <Tooltip content="Player actions" side="left">
+                <DropdownMenu.Trigger asChild>
+                    <button
+                        type="button"
+                        aria-label={`Actions for ${name}`}
+                        className={cn(
+                            "inline-flex items-center justify-center w-8 h-8 rounded-lg",
+                            "border border-slate-300 dark:border-slate-700",
+                            "bg-white dark:bg-slate-800",
+                            "text-slate-700 dark:text-slate-300",
+                            "hover:bg-slate-100 dark:hover:bg-slate-700",
+                            "hover:border-slate-400 dark:hover:border-slate-600",
+                            "transition-all duration-200",
+                            "focus:outline-none focus:ring-2 focus:ring-blue-500/50",
+                            "active:scale-95",
+                            "data-[state=open]:bg-slate-100 data-[state=open]:dark:bg-slate-700"
+                        )}
+                    >
+                        <MoreVertical className="w-4 h-4" aria-hidden="true" />
+                    </button>
+                </DropdownMenu.Trigger>
+            </Tooltip>
 
             <DropdownMenu.Portal>
                 <DropdownMenu.Content

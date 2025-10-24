@@ -6,6 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
 import Turnstile from "react-turnstile";
 import { toast } from "sonner";
+import { Input, Alert, Checkbox } from "@/components/common";
+import { cn } from "@/lib/utils";
 import {
     StepSafeSchema,
     type StepSafeInput,
@@ -42,26 +44,26 @@ export default function ApplyPage() {
             confirm16: false,
             canDiscord: true,
             discordUser: "",
-            ageRange: "Under18",
+            ageRange: "Under18" as const,
             timezone: getLocalTZ(),
             priorStaff: false,
             priorServers: "",
             visitedDisney: false,
             visitedDetails: "",
-            role: "Developer",
+            role: "Developer" as const,
             // developer
             devPortfolioUrl: "",
-            devSpecialty: "Web",
+            devSpecialty: "Web" as const,
             devLanguages: [],
             // imaginear
             imgPortfolioUrl: "",
-            imgWorldEditLevel: "Beginner",
-            imgPluginFamiliar: "Beginner",
+            imgWorldEditLevel: "Beginner" as const,
+            imgPluginFamiliar: "Beginner" as const,
             // guest relations
             grStory: "",
             grValue: "",
             grSuggestions: "",
-        },
+        } as const as any,
         mode: "onBlur",
     });
 
@@ -154,9 +156,9 @@ export default function ApplyPage() {
     const errorList = useMemo(
         () =>
             Object.values(errors).length > 0 ? (
-                <div className="mb-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 px-4 py-3 text-sm">
+                <Alert variant="error" className="mb-3">
                     Please check the highlighted fields.
-                </div>
+                </Alert>
             ) : null,
         [errors]
     );
@@ -208,9 +210,9 @@ export default function ApplyPage() {
                                     />
                                     <FieldCheckbox name="confirm16" label="I confirm that I am at least 16 years old." />
                                     {!confirm16 && (
-                                        <div className="rounded-xl bg-amber-50 text-amber-800 px-3 py-2 text-sm">
+                                        <Alert variant="warning">
                                             Applicants must be 16 or older.
-                                        </div>
+                                        </Alert>
                                     )}
                                 </motion.div>
                             )}
@@ -332,7 +334,8 @@ export default function ApplyPage() {
                                             onVerify={(token) => setTsToken(token)}
                                             onExpire={() => setTsToken("")}
                                             onError={() => setTsToken("")}
-                                            options={{ appearance: "interaction-only", theme: "auto" }}
+                                            appearance="interaction-only"
+                                            theme="auto"
                                         />
                                         {!tsToken && (
                                             <p className="mt-2 text-xs text-slate-500">
@@ -403,14 +406,15 @@ function FieldError({ name }: { name: keyof StepSafeInput | string }) {
 }
 
 function FieldText(props: { name: keyof StepSafeInput; label: string; placeholder?: string }) {
-    const { register } = useFormContext<StepSafeInput>();
+    const { register, formState: { errors } } = useFormContext<StepSafeInput>();
+    const hasError = !!(errors as any)[props.name];
     return (
         <div>
-            <label className="text-sm font-medium">{props.label}</label>
-            <input
+            <label className="text-sm font-medium block mb-1">{props.label}</label>
+            <Input
                 {...register(props.name)}
                 placeholder={props.placeholder}
-                className="mt-1 w-full rounded-2xl border px-4 py-3"
+                state={hasError ? "error" : "default"}
             />
             <FieldError name={props.name} />
         </div>
@@ -418,33 +422,60 @@ function FieldText(props: { name: keyof StepSafeInput; label: string; placeholde
 }
 
 function FieldEmail(props: { name: keyof StepSafeInput; label: string; placeholder?: string }) {
-    const { register } = useFormContext<StepSafeInput>();
+    const { register, formState: { errors } } = useFormContext<StepSafeInput>();
+    const hasError = !!(errors as any)[props.name];
     return (
         <div>
-            <label className="text-sm font-medium">{props.label}</label>
-            <input type="email" {...register(props.name)} placeholder={props.placeholder} className="mt-1 w-full rounded-2xl border px-4 py-3" />
+            <label className="text-sm font-medium block mb-1">{props.label}</label>
+            <Input
+                type="email"
+                {...register(props.name)}
+                placeholder={props.placeholder}
+                state={hasError ? "error" : "default"}
+            />
             <FieldError name={props.name} />
         </div>
     );
 }
 
 function FieldUrl(props: { name: keyof StepSafeInput; label: string; placeholder?: string }) {
-    const { register } = useFormContext<StepSafeInput>();
+    const { register, formState: { errors } } = useFormContext<StepSafeInput>();
+    const hasError = !!(errors as any)[props.name];
     return (
         <div>
-            <label className="text-sm font-medium">{props.label}</label>
-            <input type="url" {...register(props.name)} placeholder={props.placeholder} className="mt-1 w-full rounded-2xl border px-4 py-3" />
+            <label className="text-sm font-medium block mb-1">{props.label}</label>
+            <Input
+                type="url"
+                {...register(props.name)}
+                placeholder={props.placeholder}
+                state={hasError ? "error" : "default"}
+            />
             <FieldError name={props.name} />
         </div>
     );
 }
 
 function FieldTextarea(props: { name: keyof StepSafeInput; label: string; rows?: number }) {
-    const { register } = useFormContext<StepSafeInput>();
+    const { register, formState: { errors } } = useFormContext<StepSafeInput>();
+    const hasError = !!(errors as any)[props.name];
     return (
         <div>
-            <label className="text-sm font-medium">{props.label}</label>
-            <textarea {...register(props.name)} rows={props.rows ?? 4} className="mt-1 w-full rounded-2xl border px-4 py-3" />
+            <label className="text-sm font-medium block mb-1">{props.label}</label>
+            <textarea
+                {...register(props.name)}
+                rows={props.rows ?? 4}
+                className={cn(
+                    "w-full rounded-xl border-2 transition-all duration-150 px-3 py-2 text-sm",
+                    "bg-white dark:bg-slate-900",
+                    "text-slate-900 dark:text-white",
+                    "placeholder:text-slate-400 dark:placeholder:text-slate-500",
+                    "focus:outline-none focus:ring-2 focus:ring-offset-2",
+                    "focus:ring-offset-white dark:focus:ring-offset-slate-900",
+                    hasError
+                        ? "border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500/50"
+                        : "border-slate-300 dark:border-slate-700 focus:border-blue-500 focus:ring-blue-500/50"
+                )}
+            />
             <FieldError name={props.name} />
         </div>
     );
@@ -455,11 +486,24 @@ function FieldSelect(props: {
     label: string;
     options: { value: string; label: string }[];
 }) {
-    const { register } = useFormContext<StepSafeInput>();
+    const { register, formState: { errors } } = useFormContext<StepSafeInput>();
+    const hasError = !!(errors as any)[props.name];
     return (
         <div>
-            <label className="text-sm font-medium">{props.label}</label>
-            <select {...register(props.name)} className="mt-1 w-full rounded-2xl border px-4 py-3">
+            <label className="text-sm font-medium block mb-1">{props.label}</label>
+            <select
+                {...register(props.name)}
+                className={cn(
+                    "w-full rounded-xl border-2 transition-all duration-150 px-3 py-2 text-sm h-10",
+                    "bg-white dark:bg-slate-900",
+                    "text-slate-900 dark:text-white",
+                    "focus:outline-none focus:ring-2 focus:ring-offset-2",
+                    "focus:ring-offset-white dark:focus:ring-offset-slate-900",
+                    hasError
+                        ? "border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500/50"
+                        : "border-slate-300 dark:border-slate-700 focus:border-blue-500 focus:ring-blue-500/50"
+                )}
+            >
                 {props.options.map((o) => (
                     <option key={o.value} value={o.value}>
                         {o.label}
@@ -472,11 +516,12 @@ function FieldSelect(props: {
 }
 
 function FieldCheckbox(props: { name: keyof StepSafeInput; label: string }) {
-    const { register } = useFormContext<StepSafeInput>();
+    const { register, watch } = useFormContext<StepSafeInput>();
+    const value = watch(props.name);
     return (
-        <label className="inline-flex items-center gap-2 text-sm">
-            <input type="checkbox" {...register(props.name)} />
-            {props.label}
+        <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+            <Checkbox {...register(props.name)} checked={!!value} />
+            <span>{props.label}</span>
             <FieldError name={props.name} />
         </label>
     );
@@ -494,14 +539,27 @@ function FieldSwitch(props: { name: keyof StepSafeInput; label: string }) {
 }
 
 function FieldTimezone() {
-    const { register } = useFormContext<StepSafeInput>();
+    const { register, formState: { errors } } = useFormContext<StepSafeInput>();
+    const hasError = !!(errors as any)["timezone"];
     const options =
         (Intl as any).supportedValuesOf?.("timeZone")?.map((tz: string) => ({ value: tz, label: tz })) ??
         [{ value: "America/New_York", label: "America/New_York" }];
     return (
         <div>
-            <label className="text-sm font-medium">Time Zone *</label>
-            <select {...register("timezone")} className="mt-1 w-full rounded-2xl border px-4 py-3">
+            <label className="text-sm font-medium block mb-1">Time Zone *</label>
+            <select
+                {...register("timezone")}
+                className={cn(
+                    "w-full rounded-xl border-2 transition-all duration-150 px-3 py-2 text-sm h-10",
+                    "bg-white dark:bg-slate-900",
+                    "text-slate-900 dark:text-white",
+                    "focus:outline-none focus:ring-2 focus:ring-offset-2",
+                    "focus:ring-offset-white dark:focus:ring-offset-slate-900",
+                    hasError
+                        ? "border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500/50"
+                        : "border-slate-300 dark:border-slate-700 focus:border-blue-500 focus:ring-blue-500/50"
+                )}
+            >
                 {options.map((o: any) => (
                     <option key={o.value} value={o.value}>
                         {o.label}

@@ -36,6 +36,12 @@ export {
 } from "./Card";
 export type { CardProps } from "./Card";
 
+export { Avatar } from "./Avatar";
+export type { AvatarProps } from "./Avatar";
+
+export { EmptyState } from "./EmptyState";
+export type { EmptyStateProps } from "./EmptyState";
+
 // Feedback Components
 export { Alert } from "./Alert";
 export type { AlertProps } from "./Alert";
@@ -43,8 +49,14 @@ export type { AlertProps } from "./Alert";
 export { Spinner } from "./Spinner";
 export type { SpinnerProps } from "./Spinner";
 
+export { Progress } from "./Progress";
+export type { ProgressProps } from "./Progress";
+
+export { Skeleton, SkeletonText } from "./Skeleton";
+export type { SkeletonProps } from "./Skeleton";
+
 export { Tooltip, TooltipProvider } from "./Tooltip";
 
 // Interactive Components
-// (More will be added in future phases)
+export { Tabs, TabsList, TabsTrigger, TabsContent } from "./Tabs";
 

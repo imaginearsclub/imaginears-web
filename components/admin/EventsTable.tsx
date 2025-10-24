@@ -3,6 +3,7 @@
 import { useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { toast } from "sonner";
+import { Badge } from "@/components/common";
 
 export type AdminEventRow = {
     id: string;
@@ -67,22 +68,30 @@ export default function EventsTable({
                         <td className="px-3 py-2 font-medium">{r.title}</td>
                         <td className="px-3 py-2">{r.world}</td>
                         <td className="px-3 py-2">{r.category}</td>
-                        <td className="px-3 py-2">{r.status}</td>
+                        <td className="px-3 py-2">
+                            <Badge
+                                variant={
+                                    r.status === "Published" ? "success" :
+                                    r.status === "Cancelled" ? "danger" :
+                                    "default"
+                                }
+                            >
+                                {r.status}
+                            </Badge>
+                        </td>
                         <td className="px-3 py-2">{fmt(r.startAt)}</td>
                         <td className="px-3 py-2">{fmt(r.endAt)}</td>
                         <td className="px-3 py-2 text-right">
                             <RowActions
                                 status={r.status}
                                 onEdit={() => onEdit(r.id)}
-                                onTogglePublish={
-                                    onStatusChange
-                                        ? () =>
-                                            onStatusChange(
-                                                r.id,
-                                                r.status === "Published" ? "Draft" : "Published"
-                                            )
-                                        : undefined
-                                }
+                                {...(onStatusChange && {
+                                    onTogglePublish: () =>
+                                        onStatusChange(
+                                            r.id,
+                                            r.status === "Published" ? "Draft" : "Published"
+                                        )
+                                })}
                             />
                         </td>
                     </tr>

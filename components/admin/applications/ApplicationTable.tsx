@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Checkbox } from "@/components/common/Checkbox";
+import { Checkbox, Badge } from "@/components/common";
 
 /** Keep these in sync with your Prisma enums */
 export type AppRole = "Developer" | "Imaginear" | "GuestServices";
@@ -309,36 +309,20 @@ function RowActions({
     );
 }
 
-/** ===== Small badges for role/status ===== */
+/** ===== Small badges for role/status using Badge component ===== */
 function RoleBadge({ role }: { role: AppRole }) {
-    const cls =
-        role === "Developer"
-            ? "bg-sky-50 text-sky-800 dark:bg-sky-900/30 dark:text-sky-200 border-sky-200 dark:border-sky-800"
-            : role === "Imaginear"
-                ? "bg-violet-50 text-violet-800 dark:bg-violet-900/30 dark:text-violet-200 border-violet-200 dark:border-violet-800"
-                : "bg-emerald-50 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800";
+    const variant = role === "Developer" ? "info" : role === "Imaginear" ? "primary" : "success";
     const label = role === "GuestServices" ? "Guest Services" : role;
-    return (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs ${cls}`}>
-      {label}
-    </span>
-    );
+    return <Badge variant={variant}>{label}</Badge>;
 }
 
 function StatusBadge({ status }: { status: AppStatus }) {
-    const cls =
-        status === "Approved"
-            ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800"
-            : status === "Rejected"
-                ? "bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200 border-rose-200 dark:border-rose-800"
-                : status === "InReview"
-                    ? "bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 border-amber-200 dark:border-amber-800"
-                    : "bg-slate-100 text-slate-700 dark:bg-slate-800/40 dark:text-slate-300 border-slate-200 dark:border-slate-700";
-    return (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs ${cls}`}>
-      {status === "InReview" ? "In review" : status}
-    </span>
-    );
+    const variant =
+        status === "Approved" ? "success" :
+        status === "Rejected" ? "danger" :
+        status === "InReview" ? "warning" :
+        "default";
+    return <Badge variant={variant}>{status === "InReview" ? "In review" : status}</Badge>;
 }
 /** ===== Bulk actions dropdown (Radix Portal) ===== */
 function BulkMenu({

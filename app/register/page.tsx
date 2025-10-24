@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Input, Alert, Spinner } from "@/components/common";
 
 function friendlyError(e: unknown): string {
     if (!e) return "Unknown error";
@@ -77,35 +78,52 @@ export default function RegisterPage() {
             </p>
 
             {err && (
-                <div className="mt-3 rounded-xl bg-rose-50 text-rose-700 p-3 text-sm">
+                <Alert variant="error" className="mt-3" dismissible onDismiss={() => setErr(null)}>
                     {err}
-                </div>
+                </Alert>
             )}
 
             <form className="mt-4 space-y-3" onSubmit={onSubmit}>
                 <div>
-                    <label className="text-sm font-medium">Name</label>
-                    <input className="w-full mt-1 rounded-2xl border px-4 py-3"
-                           value={name} onChange={(e)=>setN(e.target.value)} />
+                    <label className="text-sm font-medium block mb-1">Name</label>
+                    <Input
+                        value={name}
+                        onChange={(e) => setN(e.target.value)}
+                        disabled={loading}
+                        placeholder="Admin Name"
+                    />
                 </div>
                 <div>
-                    <label className="text-sm font-medium">Email</label>
-                    <input className="w-full mt-1 rounded-2xl border px-4 py-3"
-                           value={email} onChange={(e)=>setE(e.target.value)} autoComplete="username" />
+                    <label className="text-sm font-medium block mb-1">Email</label>
+                    <Input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setE(e.target.value)}
+                        autoComplete="username"
+                        disabled={loading}
+                        placeholder="admin@example.com"
+                    />
                 </div>
                 <div>
-                    <label className="text-sm font-medium">Password</label>
-                    <input type="password" className="w-full mt-1 rounded-2xl border px-4 py-3"
-                           value={password} onChange={(e)=>setP(e.target.value)} autoComplete="new-password" />
+                    <label className="text-sm font-medium block mb-1">Password</label>
+                    <Input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setP(e.target.value)}
+                        autoComplete="new-password"
+                        disabled={loading}
+                        placeholder="••••••••"
+                    />
                 </div>
-                <button className="btn btn-primary w-full" disabled={loading}>
+                <button className="btn btn-primary w-full flex items-center justify-center gap-2" disabled={loading}>
+                    {loading && <Spinner size="sm" variant="current" />}
                     {loading ? "Creating…" : "Create admin"}
                 </button>
             </form>
 
-            <p className="text-xs text-slate-500 mt-3">
-                Tip: remove this page after your first admin is created.
-            </p>
+            <Alert variant="info" className="mt-3">
+                <strong>Tip:</strong> Remove this page after your first admin is created.
+            </Alert>
         </div>
     );
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createAuthClient } from "better-auth/client";
+import { Input, Alert, Spinner } from "@/components/common";
 
 const auth = createAuthClient({
     baseURL: process.env.NEXT_PUBLIC_SITE_URL || undefined,
@@ -83,32 +84,36 @@ export default function LoginPage() {
             <h1 className="text-xl font-bold">Admin Login</h1>
 
             {err && (
-                <div className="mt-3 rounded-xl bg-rose-50 text-rose-700 p-3 text-sm">
+                <Alert variant="error" className="mt-3" dismissible onDismiss={() => setErr(null)}>
                     {err}
-                </div>
+                </Alert>
             )}
 
             <form className="mt-4 space-y-3" onSubmit={onSubmit}>
                 <div>
-                    <label className="text-sm font-medium">Email</label>
-                    <input
-                        className="w-full mt-1 rounded-2xl border px-4 py-3"
+                    <label className="text-sm font-medium block mb-1">Email</label>
+                    <Input
+                        type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         autoComplete="username"
+                        disabled={loading}
+                        placeholder="admin@example.com"
                     />
                 </div>
                 <div>
-                    <label className="text-sm font-medium">Password</label>
-                    <input
+                    <label className="text-sm font-medium block mb-1">Password</label>
+                    <Input
                         type="password"
-                        className="w-full mt-1 rounded-2xl border px-4 py-3"
                         value={password}
                         onChange={(e) => setPass(e.target.value)}
                         autoComplete="current-password"
+                        disabled={loading}
+                        placeholder="••••••••"
                     />
                 </div>
-                <button className="btn btn-primary w-full" disabled={loading}>
+                <button className="btn btn-primary w-full flex items-center justify-center gap-2" disabled={loading}>
+                    {loading && <Spinner size="sm" variant="current" />}
                     {loading ? "Signing in…" : "Sign in"}
                 </button>
             </form>
