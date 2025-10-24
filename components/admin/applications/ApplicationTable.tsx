@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Checkbox, Badge, EmptyState } from "@/components/common";
-import { FileText } from "lucide-react";
+import { Checkbox, Badge, EmptyState, ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuLabel, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent, ConfirmDialog, HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/common";
+import { FileText, Edit, FileCheck, Trash2, UserCog, CheckCircle, XCircle, Clock, Eye, Mail, Calendar } from "lucide-react";
+import { toast } from "sonner";
 
 /** Keep these in sync with your Prisma enums */
 export type AppRole = "Developer" | "Imaginear" | "GuestServices";
@@ -41,6 +42,11 @@ export default function ApplicationTable({
     const list = Array.isArray(rows) ? rows : [];
 
     const [selected, setSelected] = useState<string[]>([]);
+    const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: string; name: string }>({
+        open: false,
+        id: "",
+        name: "",
+    });
     const allSelected = selected.length > 0 && selected.length === list.length;
     const someSelected = selected.length > 0 && selected.length < list.length;
 
@@ -65,6 +71,40 @@ export default function ApplicationTable({
             }).format(d);
         } catch {
             return iso;
+        }
+    };
+
+    // Handle delete with confirmation
+    const handleDeleteClick = (id: string, name: string) => {
+        setDeleteConfirm({ open: true, id, name });
+    };
+
+    const handleDeleteConfirm = () => {
+        if (onDelete && deleteConfirm.id) {
+            onDelete(deleteConfirm.id);
+            toast.success("Application deleted", {
+                description: `${deleteConfirm.name}'s application has been removed.`,
+            });
+        }
+    };
+
+    // Handle status change with toast
+    const handleStatusChange = (id: string, status: AppStatus, name: string) => {
+        if (onChangeStatus) {
+            onChangeStatus(id, status);
+            toast.success("Status updated", {
+                description: `${name}'s application is now ${status}.`,
+            });
+        }
+    };
+
+    // Handle role change with toast
+    const handleRoleChange = (id: string, role: AppRole, name: string) => {
+        if (onChangeRole) {
+            onChangeRole(id, role);
+            toast.success("Role updated", {
+                description: `${name} is now applying for ${role}.`,
+            });
         }
     };
 
@@ -119,53 +159,174 @@ export default function ApplicationTable({
                     </thead>
                     <tbody className="text-sm">
                     {list.map((r) => (
-                        <tr key={r.id} className="border-b border-slate-100 dark:border-slate-800">
-                            <td className="px-3 py-2">
-                                <Checkbox
-                                    checked={selected.includes(r.id)}
-                                    onCheckedChange={() => toggleOne(r.id)}
-                                    aria-label={`Select ${r.name}`}
-                                />
-                            </td>
-                            <td className="px-3 py-2 font-medium">
-                                {onEdit ? (
-                                    <a
-                                        className="hover:underline"
-                                        href={`/admin/applications/${r.id}`}
-                                        onClick={(_e) => {
-                                            // if you prefer drawer-only, prevent default:
-                                            // _e.preventDefault(); onEdit(r.id);
-                                        }}
-                                    >
-                                        {r.name}
-                                    </a>
-                                ) : (
-                                    r.name
+                        <ContextMenu key={r.id}>
+                            <ContextMenuTrigger asChild>
+                                <tr className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors cursor-pointer">
+                                    <td className="px-3 py-2">
+                                        <Checkbox
+                                            checked={selected.includes(r.id)}
+                                            onCheckedChange={() => toggleOne(r.id)}
+                                            aria-label={`Select ${r.name}`}
+                                        />
+                                    </td>
+                                    <td className="px-3 py-2 font-medium">
+                                        <HoverCard>
+                                            <HoverCardTrigger asChild>
+                                                {onEdit ? (
+                                                    <a
+                                                        className="hover:underline cursor-pointer"
+                                                        href={`/admin/applications/${r.id}`}
+                                                        onClick={(_e) => {
+                                                            // if you prefer drawer-only, prevent default:
+                                                            // _e.preventDefault(); onEdit(r.id);
+                                                        }}
+                                                    >
+                                                        {r.name}
+                                                    </a>
+                                                ) : (
+                                                    <span className="cursor-pointer">{r.name}</span>
+                                                )}
+                                            </HoverCardTrigger>
+                                            <HoverCardContent className="w-80">
+                                                <div className="space-y-3">
+                                                    <div>
+                                                        <h4 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                                                            {r.name}
+                                                        </h4>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <RoleBadge role={r.role} />
+                                                            <StatusBadge status={r.status} />
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-2 text-sm">
+                                                        <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+                                                            <Mail className="w-4 h-4" />
+                                                            <a href={`mailto:${r.email}`} className="hover:underline">
+                                                                {r.email}
+                                                            </a>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+                                                            <Calendar className="w-4 h-4" />
+                                                            <span>Submitted {fmt(r.submittedAt)}</span>
+                                                        </div>
+                                                        {r.notes && (
+                                                            <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
+                                                                <p className="text-xs text-slate-600 dark:text-slate-400">
+                                                                    <strong>Notes:</strong> {r.notes}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </HoverCardContent>
+                                        </HoverCard>
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <a className="underline" href={`mailto:${r.email}`}>
+                                            {r.email}
+                                        </a>
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <RoleBadge role={r.role} />
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <StatusBadge status={r.status} />
+                                    </td>
+                                    <td className="px-3 py-2">{fmt(r.submittedAt)}</td>
+                                    <td className="px-3 py-2 text-right">
+                                        <RowActions
+                                            row={r}
+                                            {...(onEdit && { onEdit: () => onEdit(r.id) })}
+                                            {...(onOpenNotes && { onOpenNotes: () => onOpenNotes(r.id) })}
+                                            {...(onChangeStatus && { onChangeStatus })}
+                                            {...(onChangeRole && { onChangeRole })}
+                                            {...(onDelete && { onDelete: () => onDelete(r.id) })}
+                                        />
+                                    </td>
+                                </tr>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent>
+                                <ContextMenuLabel>Application Actions</ContextMenuLabel>
+                                <ContextMenuSeparator />
+                                
+                                {onEdit && (
+                                    <ContextMenuItem onSelect={() => onEdit(r.id)}>
+                                        <Edit className="w-4 h-4 mr-2" />
+                                        Edit Application
+                                    </ContextMenuItem>
                                 )}
-                            </td>
-                            <td className="px-3 py-2">
-                                <a className="underline" href={`mailto:${r.email}`}>
-                                    {r.email}
-                                </a>
-                            </td>
-                            <td className="px-3 py-2">
-                                <RoleBadge role={r.role} />
-                            </td>
-                            <td className="px-3 py-2">
-                                <StatusBadge status={r.status} />
-                            </td>
-                            <td className="px-3 py-2">{fmt(r.submittedAt)}</td>
-                            <td className="px-3 py-2 text-right">
-                                <RowActions
-                                    row={r}
-                                    {...(onEdit && { onEdit: () => onEdit(r.id) })}
-                                    {...(onOpenNotes && { onOpenNotes: () => onOpenNotes(r.id) })}
-                                    {...(onChangeStatus && { onChangeStatus })}
-                                    {...(onChangeRole && { onChangeRole })}
-                                    {...(onDelete && { onDelete: () => onDelete(r.id) })}
-                                />
-                            </td>
-                        </tr>
+                                
+                                {onOpenNotes && (
+                                    <ContextMenuItem onSelect={() => onOpenNotes(r.id)}>
+                                        <FileCheck className="w-4 h-4 mr-2" />
+                                        View Notes
+                                    </ContextMenuItem>
+                                )}
+                                
+                                {onChangeStatus && (
+                                    <>
+                                        <ContextMenuSeparator />
+                                        <ContextMenuSub>
+                                            <ContextMenuSubTrigger>
+                                                <Eye className="w-4 h-4 mr-2" />
+                                                Change Status
+                                            </ContextMenuSubTrigger>
+                                            <ContextMenuSubContent>
+                                                <ContextMenuItem onSelect={() => handleStatusChange(r.id, "New", r.name)}>
+                                                    <Clock className="w-4 h-4 mr-2" />
+                                                    New
+                                                </ContextMenuItem>
+                                                <ContextMenuItem onSelect={() => handleStatusChange(r.id, "InReview", r.name)}>
+                                                    <Eye className="w-4 h-4 mr-2" />
+                                                    In Review
+                                                </ContextMenuItem>
+                                                <ContextMenuItem onSelect={() => handleStatusChange(r.id, "Approved", r.name)}>
+                                                    <CheckCircle className="w-4 h-4 mr-2" />
+                                                    Approved
+                                                </ContextMenuItem>
+                                                <ContextMenuItem onSelect={() => handleStatusChange(r.id, "Rejected", r.name)}>
+                                                    <XCircle className="w-4 h-4 mr-2" />
+                                                    Rejected
+                                                </ContextMenuItem>
+                                            </ContextMenuSubContent>
+                                        </ContextMenuSub>
+                                    </>
+                                )}
+                                
+                                {onChangeRole && (
+                                    <ContextMenuSub>
+                                        <ContextMenuSubTrigger>
+                                            <UserCog className="w-4 h-4 mr-2" />
+                                            Change Role
+                                        </ContextMenuSubTrigger>
+                                        <ContextMenuSubContent>
+                                            <ContextMenuItem onSelect={() => handleRoleChange(r.id, "Developer", r.name)}>
+                                                Developer
+                                            </ContextMenuItem>
+                                            <ContextMenuItem onSelect={() => handleRoleChange(r.id, "Imaginear", r.name)}>
+                                                Imaginear
+                                            </ContextMenuItem>
+                                            <ContextMenuItem onSelect={() => handleRoleChange(r.id, "GuestServices", r.name)}>
+                                                Guest Services
+                                            </ContextMenuItem>
+                                        </ContextMenuSubContent>
+                                    </ContextMenuSub>
+                                )}
+                                
+                                {onDelete && (
+                                    <>
+                                        <ContextMenuSeparator />
+                                        <ContextMenuItem 
+                                            onSelect={() => handleDeleteClick(r.id, r.name)}
+                                            className="text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/20"
+                                        >
+                                            <Trash2 className="w-4 h-4 mr-2" />
+                                            Delete Application
+                                        </ContextMenuItem>
+                                    </>
+                                )}
+                            </ContextMenuContent>
+                        </ContextMenu>
                     ))}
 
                     {!list.length && (
@@ -182,6 +343,18 @@ export default function ApplicationTable({
                     </tbody>
                 </table>
             </div>
+
+            {/* Delete Confirmation Dialog */}
+            <ConfirmDialog
+                open={deleteConfirm.open}
+                onOpenChange={(open) => setDeleteConfirm({ ...deleteConfirm, open })}
+                onConfirm={handleDeleteConfirm}
+                title="Delete Application?"
+                description={`Are you sure you want to delete ${deleteConfirm.name}'s application? This action cannot be undone.`}
+                confirmText="Delete"
+                cancelText="Cancel"
+                variant="danger"
+            />
         </div>
     );
 }
