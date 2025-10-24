@@ -4,7 +4,13 @@ import { requireAdmin } from "@/lib/session";
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
-        await requireAdmin();
+        const session = await requireAdmin();
+        
+        // requireAdmin() returns null if unauthorized (doesn't throw)
+        if (!session) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        
         // Next.js 15+: params is now a Promise
         const { id } = await params;
         const e = await prisma.event.findUnique({
@@ -25,14 +31,20 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
         if (!e) return NextResponse.json({ error: "Not found" }, { status: 404 });
         return NextResponse.json(e);
     } catch (e: any) {
-        const status = e?.message === "UNAUTHORIZED" ? 401 : 500;
-        return NextResponse.json({ error: e?.message || "Error" }, { status });
+        console.error("[Admin Events GET] Error:", e);
+        return NextResponse.json({ error: "Server error" }, { status: 500 });
     }
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
-        await requireAdmin();
+        const session = await requireAdmin();
+        
+        // requireAdmin() returns null if unauthorized (doesn't throw)
+        if (!session) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        
         // Next.js 15+: params is now a Promise
         const { id } = await params;
         const body = await req.json();
@@ -54,7 +66,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
         return NextResponse.json(updated);
     } catch (e: any) {
-        const status = e?.message === "UNAUTHORIZED" ? 401 : 500;
-        return NextResponse.json({ error: e?.message || "Error" }, { status });
+        console.error("[Admin Events PATCH] Error:", e);
+        return NextResponse.json({ error: "Server error" }, { status: 500 });
     }
 }
