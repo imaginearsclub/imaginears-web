@@ -1,6 +1,9 @@
 "use client";
 
 import { type FormEvent, useState, useCallback, memo } from "react";
+import { Input, Alert, Spinner, Badge } from "@/components/common";
+import { cn } from "@/lib/utils";
+import { Mail, ArrowRight, CheckCircle, AlertCircle } from "lucide-react";
 
 // Security: Email validation regex (RFC 5322 simplified)
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
@@ -9,37 +12,42 @@ const MAX_EMAIL_LENGTH = 254; // RFC 5321 maximum
 // Feature flag: Set to true when newsletter system is ready
 const NEWSLETTER_ENABLED = process.env['NEXT_PUBLIC_NEWSLETTER_ENABLED'] === "true";
 
-// Performance: Memoized status message component
+// Security: Sanitize email to prevent XSS
+function sanitizeEmail(email: string): string {
+    return email
+        .trim()
+        .toLowerCase()
+        .replace(/[<>]/g, '') // Remove potential HTML tags
+        .slice(0, MAX_EMAIL_LENGTH);
+}
+
+// Performance: Memoized status message component using Alert
 const StatusMessage = memo(({ status }: { status: "idle" | "ok" | "err" | "loading" }) => {
     if (status === "ok") {
         return (
-            <div className="mt-4 p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 flex items-start gap-3">
-                <svg className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+            <Alert variant="success" className="mt-4">
+                <CheckCircle className="w-5 h-5" />
                 <div>
-                    <p className="text-sm font-semibold text-green-900 dark:text-green-100">Success!</p>
-                    <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                    <p className="font-semibold">Success!</p>
+                    <p className="mt-1">
                         Thanks for subscribing! Check your inbox to confirm your subscription.
                     </p>
                 </div>
-            </div>
+            </Alert>
         );
     }
 
     if (status === "err") {
         return (
-            <div className="mt-4 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 flex items-start gap-3">
-                <svg className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+            <Alert variant="error" className="mt-4">
+                <AlertCircle className="w-5 h-5" />
                 <div>
-                    <p className="text-sm font-semibold text-red-900 dark:text-red-100">Invalid Email</p>
-                    <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                    <p className="font-semibold">Invalid Email</p>
+                    <p className="mt-1">
                         Please enter a valid email address.
                     </p>
                 </div>
-            </div>
+            </Alert>
         );
     }
 
@@ -51,20 +59,32 @@ StatusMessage.displayName = 'StatusMessage';
 function Newsletter() {
     const [status, setStatus] = useState<"idle" | "ok" | "err" | "loading">("idle");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [lastSubmitTime, setLastSubmitTime] = useState(0);
 
-    // Performance & Security: Memoized submit handler with validation
+    // Performance & Security: Memoized submit handler with validation and rate limiting
     const onSubmit = useCallback(async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         
         // Security: Prevent double submission
         if (isSubmitting) return;
         
+        // Security: Rate limiting (prevent spam)
+        const now = Date.now();
+        if (now - lastSubmitTime < 3000) { // 3 seconds between submissions
+            setStatus("err");
+            return;
+        }
+        
+        setLastSubmitTime(now);
         setIsSubmitting(true);
         setStatus("loading");
         
         try {
             const fd = new FormData(e.currentTarget);
-            const email = String(fd.get("email") || "").trim();
+            const rawEmail = String(fd.get("email") || "");
+            
+            // Security: Sanitize email
+            const email = sanitizeEmail(rawEmail);
 
             // Security: Enhanced email validation
             if (!email) {
@@ -84,11 +104,10 @@ function Newsletter() {
 
             // TODO: POST to your newsletter provider or API
             // Example:
-            // const sanitizedEmail = email.replace(/[<>]/g, ''); // Security: Sanitize email
             // const response = await fetch('/api/newsletter', {
             //     method: 'POST',
             //     headers: { 'Content-Type': 'application/json' },
-            //     body: JSON.stringify({ email: sanitizedEmail }),
+            //     body: JSON.stringify({ email }),
             // });
             // if (!response.ok) throw new Error('Subscription failed');
 
@@ -98,12 +117,12 @@ function Newsletter() {
             setStatus("ok");
             e.currentTarget.reset();
         } catch (error) {
-            console.error('Newsletter subscription error:', error);
+            console.error('[Newsletter] Subscription error:', error);
             setStatus("err");
         } finally {
             setIsSubmitting(false);
         }
-    }, [isSubmitting]);
+    }, [isSubmitting, lastSubmitTime]);
 
     // Feature flag: Don't render if newsletter is disabled
     if (!NEWSLETTER_ENABLED) {
@@ -113,20 +132,32 @@ function Newsletter() {
     return (
         <section className="band-alt" aria-labelledby="newsletter-heading">
             <div className="container py-12 md:py-16">
-                <div className="card card-glass max-w-3xl mx-auto">
+                <div className={cn(
+                    "card card-glass max-w-3xl mx-auto",
+                    "p-6 md:p-8"
+                )}>
                     <div className="flex items-start gap-4">
-                        {/* Icon */}
-                        <div className="shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
-                            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                            </svg>
+                        {/* Icon with Lucide */}
+                        <div className={cn(
+                            "shrink-0 w-12 h-12 rounded-xl flex items-center justify-center shadow-lg",
+                            "bg-gradient-to-br from-blue-500 to-purple-600"
+                        )}>
+                            <Mail className="w-6 h-6 text-white" aria-hidden="true" />
                         </div>
                         
                         <div className="flex-1 min-w-0">
-                            <h2 id="newsletter-heading" className="text-2xl md:text-3xl font-bold text-body dark:text-white">
-                                Stay Updated
-                            </h2>
-                            <p className="mt-2 text-body leading-relaxed">
+                            <div className="flex items-center gap-2">
+                                <h2 
+                                    id="newsletter-heading" 
+                                    className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white"
+                                >
+                                    Stay Updated
+                                </h2>
+                                <Badge variant="primary" size="sm" className="hidden sm:inline-flex">
+                                    Free
+                                </Badge>
+                            </div>
+                            <p className="mt-2 text-slate-700 dark:text-slate-300 leading-relaxed">
                                 Get notified about new shows, special events, and seasonal overlays—delivered straight to your inbox.
                             </p>
                         </div>
@@ -136,23 +167,15 @@ function Newsletter() {
                         <div className="flex flex-col sm:flex-row gap-3">
                             <div className="flex-1">
                                 <label htmlFor="newsletter-email" className="sr-only">Email address</label>
-                                <input
+                                <Input
                                     id="newsletter-email"
                                     type="email"
                                     name="email"
-                                    required
-                                    maxLength={MAX_EMAIL_LENGTH}
                                     placeholder="you@example.com"
                                     autoComplete="email"
                                     disabled={isSubmitting}
-                                    className="w-full rounded-xl border-2 border-slate-300 dark:border-slate-600
-                                             bg-white dark:bg-slate-900 px-4 py-3 
-                                             text-slate-900 dark:text-white
-                                             placeholder:text-slate-400 dark:placeholder:text-slate-500
-                                             outline-none transition-all duration-200
-                                             focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                                             disabled:opacity-50 disabled:cursor-not-allowed
-                                             hover:border-slate-400 dark:hover:border-slate-500"
+                                    maxLength={MAX_EMAIL_LENGTH}
+                                    state={status === "err" ? "error" : "default"}
                                     aria-describedby={status === "err" ? "newsletter-error" : undefined}
                                     aria-invalid={status === "err"}
                                 />
@@ -160,30 +183,33 @@ function Newsletter() {
                             <button 
                                 type="submit" 
                                 disabled={isSubmitting}
-                                className="btn-gradient shrink-0 disabled:opacity-50 disabled:cursor-not-allowed
-                                         flex items-center justify-center gap-2 min-w-[140px]"
+                                className={cn(
+                                    "shrink-0 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold min-w-[140px]",
+                                    "bg-gradient-to-r from-blue-600 to-blue-700",
+                                    "hover:from-blue-700 hover:to-blue-800",
+                                    "text-white",
+                                    "shadow-md hover:shadow-xl hover:-translate-y-0.5",
+                                    "transition-all duration-200",
+                                    "focus:outline-none focus:ring-2 focus:ring-blue-500/50",
+                                    "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                                )}
                             >
                                 {isSubmitting ? (
                                     <>
-                                        <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                        </svg>
+                                        <Spinner size="sm" variant="current" label="Subscribing" />
                                         <span>Subscribing...</span>
                                     </>
                                 ) : (
                                     <>
                                         Subscribe
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                                        </svg>
+                                        <ArrowRight className="w-4 h-4" aria-hidden="true" />
                                     </>
                                 )}
                             </button>
                         </div>
                         
                         {/* Privacy notice */}
-                        <p className="mt-3 text-xs text-body text-sln-600 dark:text-sln-400">
+                        <p className="mt-3 text-xs text-slate-600 dark:text-slate-400">
                             We respect your privacy. Unsubscribe at any time.
                         </p>
                     </form>

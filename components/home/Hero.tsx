@@ -1,7 +1,29 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
+import { Calendar, Server, CheckCircle, ExternalLink, Copy, Check } from "lucide-react";
+import { Badge, Tooltip } from "@/components/common";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import castle from "@/public/images/hero/castle.webp";
+
+// Security: Validate external URLs
+function isValidExternalUrl(url: string): boolean {
+    try {
+        const parsed = new URL(url);
+        return parsed.protocol === "https:" || parsed.protocol === "http:";
+    } catch {
+        return false;
+    }
+}
+
+// Security: Sanitize server IP/domain for display
+function sanitizeServerIP(ip: string): string {
+    // Allow alphanumeric, dots, dashes, and subdomains
+    return ip.replace(/[^a-zA-Z0-9.\-]/g, '').slice(0, 100);
+}
 
 // Security: Freeze server info at build time
 const SERVER_INFO = Object.freeze({
@@ -24,35 +46,56 @@ const CTAButton = memo(({
     external?: boolean;
     icon: React.ReactNode;
 }) => {
+    // Security: Validate external URLs
+    if (external && !isValidExternalUrl(href)) {
+        console.error(`[Hero] Invalid external URL: ${href}`);
+        return null;
+    }
+
     const linkProps = external ? {
         target: "_blank" as const,
         rel: "noopener noreferrer nofollow",
         referrerPolicy: "strict-origin-when-cross-origin" as const,
     } : {};
 
-    const className = "group relative inline-flex items-center gap-2.5 px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 font-bold rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-0.5 overflow-hidden";
+    const buttonClass = cn(
+        "group relative inline-flex items-center gap-2.5 px-8 py-4 rounded-xl font-bold transition-all duration-300 overflow-hidden",
+        "bg-gradient-to-r from-blue-600 to-purple-600",
+        "hover:from-blue-700 hover:to-purple-700",
+        "shadow-lg hover:shadow-2xl hover:-translate-y-0.5",
+        "focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+    );
 
     const content = (
         <>
             {/* Shine effect */}
-            <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" aria-hidden="true" />
+            <span 
+                className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/25 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" 
+                aria-hidden="true" 
+            />
             <span className="relative flex items-center gap-2 text-white">
                 {icon}
                 {children}
+                {external && (
+                    <ExternalLink 
+                        className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200" 
+                        aria-hidden="true" 
+                    />
+                )}
             </span>
         </>
     );
 
     if (external) {
         return (
-            <a href={href} className={className} {...linkProps}>
+            <a href={href} className={buttonClass} {...linkProps}>
                 {content}
             </a>
         );
     }
 
     return (
-        <Link href={href} className={className}>
+        <Link href={href} className={buttonClass}>
             {content}
         </Link>
     );
@@ -60,38 +103,118 @@ const CTAButton = memo(({
 
 CTAButton.displayName = 'CTAButton';
 
-// Performance: Memoized info card component
+// Performance: Memoized info card component with optional click-to-copy
 const InfoCard = memo(({ 
     label, 
     value, 
-    icon 
+    icon,
+    tooltip,
+    copyable = false
 }: { 
     label: string; 
     value: string; 
     icon: React.ReactNode;
-}) => (
-    <div className="group bg-white/95 dark:bg-slate-800/95 backdrop-blur-md rounded-2xl p-4 border border-slate-200 dark:border-slate-700 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-0.5">
-        <div className="flex items-start gap-3">
-            <div className="shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-md">
-                {icon}
-            </div>
-            <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">{label}</p>
-                <p className="mt-1 text-lg font-bold text-slate-900 dark:text-white truncate">{value}</p>
+    tooltip?: string;
+    copyable?: boolean;
+}) => {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = async () => {
+        if (!copyable) return;
+        
+        try {
+            await navigator.clipboard.writeText(value);
+            setCopied(true);
+            toast.success(`Copied "${value}" to clipboard!`);
+            
+            // Reset copied state after 2 seconds
+            setTimeout(() => {
+                setCopied(false);
+            }, 2000);
+        } catch (err) {
+            console.error("[Hero] Failed to copy to clipboard:", err);
+            toast.error("Failed to copy to clipboard");
+        }
+    };
+
+    const card = (
+        <div 
+            className={cn(
+                "group rounded-2xl p-4 border-2 transition-all duration-300",
+                "bg-white/95 dark:bg-slate-800/95 backdrop-blur-md",
+                "border-slate-200 dark:border-slate-700",
+                "shadow-lg hover:shadow-2xl hover:-translate-y-0.5",
+                "hover:border-slate-300 dark:hover:border-slate-600",
+                copyable && [
+                    "cursor-pointer select-none",
+                    "active:scale-[0.98]",
+                    copied && "border-green-500 dark:border-green-500"
+                ]
+            )}
+            onClick={handleCopy}
+            role={copyable ? "button" : undefined}
+            aria-label={copyable ? `Copy ${value} to clipboard` : undefined}
+            tabIndex={copyable ? 0 : undefined}
+            onKeyDown={copyable ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleCopy();
+                }
+            } : undefined}
+        >
+            <div className="flex items-start gap-3">
+                <div className={cn(
+                    "shrink-0 w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 shadow-md",
+                    "bg-gradient-to-br from-blue-500 to-purple-500",
+                    "group-hover:scale-110 group-hover:rotate-3",
+                    copied && "bg-gradient-to-br from-green-500 to-emerald-500"
+                )}>
+                    {copied ? (
+                        <Check className="w-6 h-6 text-white" aria-hidden="true" />
+                    ) : (
+                        icon
+                    )}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5">
+                        <Badge variant="default" size="sm">
+                            {label}
+                        </Badge>
+                        {copyable && !copied && (
+                            <Copy className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />
+                        )}
+                    </div>
+                    <p className="text-lg font-bold text-slate-900 dark:text-white truncate">
+                        {value}
+                    </p>
+                </div>
             </div>
         </div>
-    </div>
-));
+    );
+
+    if (tooltip) {
+        return (
+            <Tooltip content={tooltip}>
+                {card}
+            </Tooltip>
+        );
+    }
+
+    return card;
+});
 
 InfoCard.displayName = 'InfoCard';
 
 function Hero() {
-    // Performance: Memoize server info
+    // Performance: Memoize and sanitize server info
+    const safeServerIP = useMemo(() => sanitizeServerIP(SERVER_INFO.ip), []);
     const serverInfo = useMemo(() => SERVER_INFO, []);
 
     return (
         <section
-            className="relative isolate overflow-hidden band-alt"
+            className={cn(
+                "relative isolate overflow-hidden band-alt"
+            )}
             data-surface="image"
             aria-labelledby="hero-heading"
         >
@@ -130,11 +253,7 @@ function Hero() {
                     <div className="mt-10 flex flex-wrap gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
                         <CTAButton 
                             href="/events"
-                            icon={
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                            }
+                            icon={<Calendar className="w-5 h-5" aria-hidden="true" />}
                         >
                             See Events
                         </CTAButton>
@@ -157,32 +276,24 @@ function Hero() {
                 <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500">
                     <InfoCard
                         label="Server IP"
-                        value={serverInfo.ip}
-                        icon={
-                            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-                            </svg>
-                        }
+                        value={safeServerIP}
+                        icon={<Server className="w-6 h-6 text-white" aria-hidden="true" />}
+                        tooltip="Click to copy server address and join in Minecraft"
+                        copyable
                     />
                     
                     <InfoCard
                         label="Version"
                         value={serverInfo.version}
-                        icon={
-                            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        }
+                        icon={<CheckCircle className="w-6 h-6 text-white" aria-hidden="true" />}
+                        tooltip="Compatible with Java Edition 1.24.x and newer versions"
                     />
                     
                     <InfoCard
                         label="Status"
                         value={`${serverInfo.status} • ${serverInfo.statusDetail}`}
-                        icon={
-                            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
-                        }
+                        icon={<CheckCircle className="w-6 h-6 text-white" aria-hidden="true" />}
+                        tooltip="Server is currently online and accepting connections"
                     />
                 </div>
             </div>

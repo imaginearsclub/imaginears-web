@@ -1,7 +1,15 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { memo } from "react";
 import ScheduleSummary, { type Weekday, type RecurrenceFreq } from "@/components/events/ScheduleSummary";
+import { Badge } from "@/components/common";
+import { cn } from "@/lib/utils";
+import { ArrowRight } from "lucide-react";
+
+// Security: Define allowed string lengths to prevent abuse
+const MAX_TITLE_LENGTH = 200;
+const MAX_DESCRIPTION_LENGTH = 500;
+const MAX_CATEGORY_LENGTH = 50;
 
 type EventCardProps = {
     id: string;
@@ -15,7 +23,23 @@ type EventCardProps = {
     shortDescription: string | null;
 };
 
-export default function EventCard({
+/**
+ * Security: Sanitize and truncate text to prevent XSS and overflow
+ */
+function sanitizeText(text: string | null, maxLength: number): string {
+    if (!text) return "";
+    // Remove any potential HTML/script tags and truncate
+    return text
+        .replace(/[<>]/g, '')
+        .slice(0, maxLength)
+        .trim();
+}
+
+/**
+ * Performance: Memoized event card component to prevent unnecessary re-renders
+ * Security: Sanitizes all user-provided text content
+ */
+const EventCard = memo(function EventCard({
     id,
     title,
     categoryName,
@@ -26,69 +50,50 @@ export default function EventCard({
     until,
     shortDescription,
 }: EventCardProps) {
-    const [isDarkMode, setIsDarkMode] = useState(false);
+    // Security: Sanitize all text inputs
+    const safeTitle = sanitizeText(title, MAX_TITLE_LENGTH);
+    const safeCategory = sanitizeText(categoryName, MAX_CATEGORY_LENGTH);
+    const safeDescription = sanitizeText(shortDescription, MAX_DESCRIPTION_LENGTH);
 
-    useEffect(() => {
-        const checkTheme = () => {
-            const isDark = document.documentElement.classList.contains("dark");
-            setIsDarkMode(isDark);
-        };
-
-        checkTheme();
-
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                if (mutation.type === "attributes" && 
-                    (mutation.attributeName === "class" || mutation.attributeName === "data-theme")) {
-                    checkTheme();
-                }
-            });
-        });
-
-        observer.observe(document.documentElement, {
-            attributes: true,
-            attributeFilter: ["class", "data-theme"]
-        });
-
-        return () => observer.disconnect();
-    }, []);
+    // Security: Validate ID format (should be UUID or numeric)
+    const safeId = id.replace(/[^a-zA-Z0-9-_]/g, '');
 
     return (
         <article
-            className="group relative rounded-2xl border p-6 shadow-md hover:shadow-2xl transition-all duration-300 hover:-translate-y-1.5"
-            style={{
-                backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.95)' : '#ffffff',
-                borderColor: isDarkMode ? 'rgba(100, 116, 139, 0.5)' : 'rgba(203, 213, 225, 0.8)',
-            }}
+            className={cn(
+                "group relative rounded-2xl border-2 p-6 shadow-md transition-all duration-300",
+                "bg-white dark:bg-slate-900",
+                "border-slate-300 dark:border-slate-700",
+                "hover:shadow-2xl hover:-translate-y-1.5",
+                "hover:border-slate-400 dark:hover:border-slate-600"
+            )}
         >
-            {/* Category badge with color coding */}
+            {/* Header with title and category badge */}
             <header className="flex items-start justify-between gap-3 mb-4">
-                <h3 
-                    className="text-lg font-bold leading-snug flex-1 min-w-0"
-                    style={{ color: isDarkMode ? '#ffffff' : '#0f172a' }}
-                >
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-snug flex-1 min-w-0">
                     <Link 
-                        href={`/events/${id}`} 
-                        className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors line-clamp-2"
-                        aria-label={`View details for ${title}`}
+                        href={`/events/${safeId}`} 
+                        className={cn(
+                            "line-clamp-2 transition-colors",
+                            "hover:text-blue-600 dark:hover:text-blue-400"
+                        )}
+                        aria-label={`View details for ${safeTitle}`}
                     >
-                        {title}
+                        {safeTitle}
                     </Link>
                 </h3>
-                <span 
-                    className="text-xs font-semibold rounded-full border px-3 py-1.5 shrink-0"
-                    style={{
-                        backgroundColor: isDarkMode ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.1)',
-                        color: isDarkMode ? '#a5b4fc' : '#4f46e5',
-                        borderColor: isDarkMode ? 'rgba(99, 102, 241, 0.3)' : 'rgba(99, 102, 241, 0.2)',
-                    }}
-                    aria-label={`Event category: ${categoryName}`}
+                
+                <Badge 
+                    variant="primary" 
+                    size="sm"
+                    className="shrink-0"
+                    aria-label={`Event category: ${safeCategory}`}
                 >
-                    {categoryName}
-                </span>
+                    {safeCategory}
+                </Badge>
             </header>
 
-            {/* Schedule information with improved spacing */}
+            {/* Schedule information */}
             <div className="mb-4">
                 <ScheduleSummary
                     recurrenceFreq={recurrenceFreq}
@@ -100,34 +105,50 @@ export default function EventCard({
                 />
             </div>
 
-            {/* Description with improved typography */}
-            {shortDescription && (
-                <p 
-                    className="text-sm line-clamp-3 leading-relaxed mb-4"
-                    style={{ color: isDarkMode ? '#cbd5e1' : '#475569' }}
-                >
-                    {shortDescription}
+            {/* Description */}
+            {safeDescription && (
+                <p className={cn(
+                    "text-sm line-clamp-3 leading-relaxed mb-4",
+                    "text-slate-600 dark:text-slate-400"
+                )}>
+                    {safeDescription}
                 </p>
             )}
 
-            {/* Call-to-action with improved hover state */}
-            <footer 
-                className="mt-auto pt-4 border-t"
-                style={{ borderColor: isDarkMode ? 'rgba(100, 116, 139, 0.4)' : 'rgba(226, 232, 240, 0.8)' }}
-            >
+            {/* Call-to-action footer */}
+            <footer className={cn(
+                "mt-auto pt-4 border-t",
+                "border-slate-200 dark:border-slate-800"
+            )}>
                 <Link
-                    href={`/events/${id}`}
-                    className="group/link inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-                    aria-label={`View full details for ${title}`}
+                    href={`/events/${safeId}`}
+                    className={cn(
+                        "group/link inline-flex items-center gap-1.5 text-sm font-semibold transition-colors",
+                        "text-blue-600 dark:text-blue-400",
+                        "hover:text-blue-700 dark:hover:text-blue-300"
+                    )}
+                    aria-label={`View full details for ${safeTitle}`}
                 >
                     View details
-                    <span className="group-hover/link:translate-x-0.5 transition-transform" aria-hidden="true">→</span>
+                    <ArrowRight 
+                        className="w-4 h-4 group-hover/link:translate-x-0.5 transition-transform" 
+                        aria-hidden="true" 
+                    />
                 </Link>
             </footer>
 
             {/* Hover effect overlay */}
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/0 to-indigo-500/0 group-hover:from-blue-500/[0.03] group-hover:to-indigo-500/[0.03] transition-all duration-300 pointer-events-none" aria-hidden="true" />
+            <div 
+                className={cn(
+                    "absolute inset-0 rounded-2xl pointer-events-none transition-all duration-300",
+                    "bg-gradient-to-br from-blue-500/0 to-indigo-500/0",
+                    "group-hover:from-blue-500/[0.03] group-hover:to-indigo-500/[0.03]"
+                )}
+                aria-hidden="true" 
+            />
         </article>
     );
-}
+});
+
+export default EventCard;
 

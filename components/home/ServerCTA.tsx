@@ -1,4 +1,7 @@
 import { memo } from "react";
+import { Badge } from "@/components/common";
+import { cn } from "@/lib/utils";
+import { Server, CheckCircle, Users, ExternalLink, Plus } from "lucide-react";
 
 // Security: Freeze server configuration at build time
 const SERVER_CONFIG = Object.freeze({
@@ -8,7 +11,23 @@ const SERVER_CONFIG = Object.freeze({
     discordUrl: "https://imaginears.club/d",
 } as const);
 
-// Performance: Memoized CTA button component
+// Security: URL validation helper
+function isValidExternalUrl(url: string): boolean {
+    try {
+        const parsed = new URL(url);
+        return parsed.protocol === 'https:' && parsed.hostname !== 'localhost';
+    } catch {
+        return false;
+    }
+}
+
+// Security: Sanitize server IP to prevent injection
+function sanitizeServerIP(ip: string): string {
+    // Only allow alphanumeric, dots, and hyphens
+    return ip.replace(/[^a-zA-Z0-9.-]/g, '');
+}
+
+// Performance: Memoized CTA button component with security validation
 const CTAButton = memo(({ 
     href, 
     label, 
@@ -22,35 +41,61 @@ const CTAButton = memo(({
     variant?: "primary" | "secondary";
     external?: boolean;
 }) => {
-    const baseClasses = "group relative inline-flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl transition-all duration-200 overflow-hidden";
-    const variantClasses = variant === "primary" 
-        ? "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-xl hover:-translate-y-0.5" 
-        : "bg-white dark:bg-slate-800 backdrop-blur-sm border-2 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm hover:shadow-md";
-    
-    const textClasses = variant === "primary"
-        ? "text-white"
-        : "text-slate-900 dark:text-white";
+    // Security: Validate external URLs
+    if (external && !isValidExternalUrl(href)) {
+        console.error(`[ServerCTA] Invalid external URL: ${href}`);
+        return null;
+    }
 
     return (
         <a
             href={href}
-            className={`${baseClasses} ${variantClasses}`}
+            className={cn(
+                "group relative inline-flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl transition-all duration-200 overflow-hidden font-bold",
+                "focus:outline-none focus:ring-2 focus:ring-blue-500/50",
+                variant === "primary" && [
+                    "bg-gradient-to-r from-blue-600 to-blue-700",
+                    "hover:from-blue-700 hover:to-blue-800",
+                    "text-white",
+                    "shadow-md hover:shadow-xl hover:-translate-y-0.5"
+                ],
+                variant === "secondary" && [
+                    "bg-white dark:bg-slate-900",
+                    "border-2 border-slate-300 dark:border-slate-700",
+                    "hover:bg-slate-50 dark:hover:bg-slate-800",
+                    "hover:border-slate-400 dark:hover:border-slate-600",
+                    "text-slate-900 dark:text-white",
+                    "shadow-sm hover:shadow-md"
+                ]
+            )}
             aria-label={label}
             // Security: Enhanced attributes for external links
             {...(external ? {
                 target: "_blank",
                 rel: "noopener noreferrer nofollow",
-                referrerPolicy: "strict-origin-when-cross-origin"
+                referrerPolicy: "strict-origin-when-cross-origin" as const
             } : {
                 rel: "noopener"
             })}
         >
             {/* Shine effect on hover */}
-            <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" aria-hidden="true" />
+            <span 
+                className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" 
+                aria-hidden="true" 
+            />
             
-            <span className={`relative flex items-center gap-2 font-bold ${textClasses}`}>
+            <span className={cn(
+                "relative flex items-center gap-2",
+                variant === "primary" ? "text-white" : "text-slate-900 dark:text-white"
+            )}>
                 {icon}
                 {label}
+                {external && (
+                    <ExternalLink 
+                        className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200" 
+                        aria-hidden="true" 
+                    />
+                )}
             </span>
         </a>
     );
@@ -58,9 +103,18 @@ const CTAButton = memo(({
 
 CTAButton.displayName = 'CTAButton';
 
+/**
+ * ServerCTA component - displays Minecraft server information and join buttons
+ * Performance: Memoized to prevent unnecessary re-renders
+ * Security: Validates and sanitizes all URLs and server information
+ */
 function ServerCTA() {
+    // Security: Sanitize server IP before use
+    const safeServerIP = sanitizeServerIP(SERVER_CONFIG.ip);
+    
     // Performance: Compute Minecraft protocol URL only once
-    const minecraftServerUrl = `minecraft://?addExternalServer=Imaginears%20Club|${SERVER_CONFIG.ip}:${SERVER_CONFIG.port}`;
+    // Security: URL encode server name and use sanitized IP
+    const minecraftServerUrl = `minecraft://?addExternalServer=${encodeURIComponent('Imaginears Club')}|${safeServerIP}:${SERVER_CONFIG.port}`;
 
     return (
         <section
@@ -78,60 +132,88 @@ function ServerCTA() {
             }} />
 
             <div className="container py-12 md:py-16 relative z-10">
-                <div className="card card-glass flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10">
+                <div className={cn(
+                    "card card-glass flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10",
+                    "p-6 md:p-8"
+                )}>
                     <div className="grow">
                         <div className="flex items-center gap-3 mb-3">
-                            {/* Minecraft grass block icon */}
-                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center shadow-md">
-                                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M4 4h16v16H4V4zm2 2v12h12V6H6zm2 2h8v8H8V8zm2 2v4h4v-4h-4z"/>
-                                </svg>
+                            {/* Minecraft server icon with Lucide */}
+                            <div className={cn(
+                                "w-10 h-10 rounded-lg flex items-center justify-center shadow-md",
+                                "bg-gradient-to-br from-green-500 to-green-700"
+                            )}>
+                                <Server className="w-6 h-6 text-white" aria-hidden="true" />
                             </div>
-                            <h2 id="server-cta-heading" className="text-2xl md:text-3xl font-bold text-body drop-shadow-sm">
+                            <h2 
+                                id="server-cta-heading" 
+                                className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white drop-shadow-sm"
+                            >
                                 Ready to Visit the Parks?
                             </h2>
                         </div>
                         
-                        <p className="text-body leading-relaxed">
+                        <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
                             Add the server IP in Minecraft Java and enter the parks; our cast members and fellow guests
                             are happy to help you get started!
                         </p>
                         
-                        {/* Server info cards */}
+                        {/* Server info cards with enhanced styling */}
                         <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div className="flex items-start gap-3 p-3 rounded-lg bg-white/90 dark:bg-black/40 backdrop-blur-sm border border-slate-300 dark:border-slate-600">
+                            {/* Server IP Card */}
+                            <div className={cn(
+                                "flex items-start gap-3 p-3 rounded-lg backdrop-blur-sm",
+                                "bg-white/90 dark:bg-black/40",
+                                "border-2 border-slate-300 dark:border-slate-600"
+                            )}>
                                 <div className="shrink-0 w-8 h-8 rounded-md bg-blue-500 dark:bg-blue-600 flex items-center justify-center">
-                                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-                                    </svg>
+                                    <Server className="w-4 h-4 text-white" aria-hidden="true" />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-xs font-bold text-slate-900 dark:text-slate-200 uppercase tracking-wide">Server IP</div>
-                                    <div className="font-bold text-slate-900 dark:text-white text-sm truncate">{SERVER_CONFIG.ip}</div>
+                                    <Badge variant="default" size="sm" className="mb-1">
+                                        Server IP
+                                    </Badge>
+                                    <div className="font-bold text-slate-900 dark:text-white text-sm truncate">
+                                        {safeServerIP}
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="flex items-start gap-3 p-3 rounded-lg bg-white/90 dark:bg-black/40 backdrop-blur-sm border border-slate-300 dark:border-slate-600">
+                            {/* Version Card */}
+                            <div className={cn(
+                                "flex items-start gap-3 p-3 rounded-lg backdrop-blur-sm",
+                                "bg-white/90 dark:bg-black/40",
+                                "border-2 border-slate-300 dark:border-slate-600"
+                            )}>
                                 <div className="shrink-0 w-8 h-8 rounded-md bg-green-500 dark:bg-green-600 flex items-center justify-center">
-                                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
+                                    <CheckCircle className="w-4 h-4 text-white" aria-hidden="true" />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-xs font-bold text-slate-900 dark:text-slate-200 uppercase tracking-wide">Version</div>
-                                    <div className="font-bold text-slate-900 dark:text-white text-sm truncate">{SERVER_CONFIG.minecraftVersion}</div>
+                                    <Badge variant="success" size="sm" className="mb-1">
+                                        Version
+                                    </Badge>
+                                    <div className="font-bold text-slate-900 dark:text-white text-sm truncate">
+                                        {SERVER_CONFIG.minecraftVersion}
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="flex items-start gap-3 p-3 rounded-lg bg-white/90 dark:bg-black/40 backdrop-blur-sm border border-slate-300 dark:border-slate-600">
+                            {/* Support Card */}
+                            <div className={cn(
+                                "flex items-start gap-3 p-3 rounded-lg backdrop-blur-sm",
+                                "bg-white/90 dark:bg-black/40",
+                                "border-2 border-slate-300 dark:border-slate-600"
+                            )}>
                                 <div className="shrink-0 w-8 h-8 rounded-md bg-purple-500 dark:bg-purple-600 flex items-center justify-center">
-                                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                    </svg>
+                                    <Users className="w-4 h-4 text-white" aria-hidden="true" />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-xs font-bold text-slate-900 dark:text-slate-200 uppercase tracking-wide">Support</div>
-                                    <div className="font-bold text-slate-900 dark:text-white text-sm">24/7 Available</div>
+                                    <Badge variant="primary" size="sm" className="mb-1">
+                                        Support
+                                    </Badge>
+                                    <div className="font-bold text-slate-900 dark:text-white text-sm">
+                                        24/7 Available
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -143,11 +225,7 @@ function ServerCTA() {
                             href={minecraftServerUrl}
                             label="Add Server"
                             variant="primary"
-                            icon={
-                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M4 4h16v16H4V4zm2 2v12h12V6H6zm2 2h8v8H8V8zm2 2v4h4v-4h-4z"/>
-                                </svg>
-                            }
+                            icon={<Plus className="w-5 h-5" aria-hidden="true" />}
                         />
                         <CTAButton
                             href={SERVER_CONFIG.discordUrl}
@@ -161,12 +239,19 @@ function ServerCTA() {
                             }
                         />
                         
-                        {/* Application link */}
+                        {/* Application link with enhanced styling */}
                         <a
                             href="/apply"
-                            className="group text-center text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 underline decoration-transparent hover:decoration-current"
+                            className={cn(
+                                "group text-center text-sm font-medium transition-colors duration-200",
+                                "text-slate-700 dark:text-slate-300",
+                                "hover:text-blue-600 dark:hover:text-blue-400",
+                                "underline decoration-transparent hover:decoration-current",
+                                "flex items-center justify-center gap-1"
+                            )}
                         >
-                            Apply to join our team →
+                            Apply to join our team
+                            <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />
                         </a>
                     </div>
                 </div>
