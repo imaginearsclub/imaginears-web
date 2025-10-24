@@ -187,6 +187,37 @@ export async function PATCH(req: Request) {
             };
         }
 
+        if (body.notifications !== undefined) {
+            const n = body.notifications || {};
+            data.notifications = {
+                discordWebhookUrl: String(n.discordWebhookUrl ?? ""), // Legacy/general webhook
+                discordApplicationsWebhookUrl: String(n.discordApplicationsWebhookUrl ?? ""),
+                discordEventsWebhookUrl: String(n.discordEventsWebhookUrl ?? ""),
+                notifyOnNewApplication: typeof n.notifyOnNewApplication === "boolean" ? n.notifyOnNewApplication : true,
+                notifyOnNewEvent: typeof n.notifyOnNewEvent === "boolean" ? n.notifyOnNewEvent : false,
+                emailNotifications: typeof n.emailNotifications === "boolean" ? n.emailNotifications : false,
+                adminEmail: String(n.adminEmail ?? ""),
+            };
+        }
+
+        if (body.maintenance !== undefined) {
+            const m = body.maintenance || {};
+            data.maintenance = {
+                enabled: typeof m.enabled === "boolean" ? m.enabled : false,
+                message: String(m.message ?? "We'll be back soon!"),
+                allowedIPs: Array.isArray(m.allowedIPs) ? m.allowedIPs : [],
+            };
+        }
+
+        if (body.security !== undefined) {
+            const s = body.security || {};
+            data.security = {
+                rateLimitEnabled: typeof s.rateLimitEnabled === "boolean" ? s.rateLimitEnabled : true,
+                maxRequestsPerMinute: Math.min(Math.max(Number(s.maxRequestsPerMinute) || 60, 10), 1000),
+                requireEmailVerification: typeof s.requireEmailVerification === "boolean" ? s.requireEmailVerification : false,
+            };
+        }
+
         const updated = await prisma.appSettings.update({ where: { id: "global" }, data });
         
         // Audit log for security
