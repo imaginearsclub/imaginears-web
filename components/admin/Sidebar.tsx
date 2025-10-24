@@ -11,8 +11,10 @@ import {
     Building2,
     X,
 } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, type ComponentType } from "react";
+import { memo, useCallback, useMemo, type ComponentType } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "@/lib/utils";
+import { Tooltip } from "@/components/common/Tooltip";
 import SignOutButton from "./SignOutButton";
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -42,33 +44,35 @@ const NavItem = memo(function NavItem({
     }, [onClick]);
 
     return (
-        <Link
-            href={href}
-            onClick={handleClick}
-            className={cn(
-                "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200",
-                active
-                    ? "bg-gradient-to-r from-blue-50 to-violet-50 dark:from-blue-950/30 dark:to-violet-950/30 text-slate-900 dark:text-white shadow-sm border border-blue-200/60 dark:border-blue-800/60 font-semibold"
-                    : "text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white"
-            )}
-            aria-current={active ? "page" : undefined}
-        >
-            {/* Active indicator */}
-            {active && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-[var(--brand-start)] to-[var(--brand-end)] rounded-r-full" />
-            )}
-            
-            <Icon
+        <Tooltip content={label} side="right">
+            <Link
+                href={href}
+                onClick={handleClick}
                 className={cn(
-                    "h-5 w-5 transition-all duration-200 flex-shrink-0",
+                    "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200",
                     active
-                        ? "text-[var(--brand-end)]"
-                        : "text-slate-500 dark:text-slate-400 group-hover:text-[var(--brand-start)] group-hover:scale-110"
+                        ? "bg-gradient-to-r from-blue-50 to-violet-50 dark:from-blue-950/30 dark:to-violet-950/30 text-slate-900 dark:text-white shadow-sm border border-blue-200/60 dark:border-blue-800/60 font-semibold"
+                        : "text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white"
                 )}
-                aria-hidden="true"
-            />
-            <span className="font-medium text-sm">{label}</span>
-        </Link>
+                aria-current={active ? "page" : undefined}
+            >
+                {/* Active indicator */}
+                {active && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-[var(--brand-start)] to-[var(--brand-end)] rounded-r-full" />
+                )}
+                
+                <Icon
+                    className={cn(
+                        "h-5 w-5 transition-all duration-200 flex-shrink-0",
+                        active
+                            ? "text-[var(--brand-end)]"
+                            : "text-slate-500 dark:text-slate-400 group-hover:text-[var(--brand-start)] group-hover:scale-110"
+                    )}
+                    aria-hidden="true"
+                />
+                <span className="font-medium text-sm">{label}</span>
+            </Link>
+        </Tooltip>
     );
 });
 
@@ -107,14 +111,16 @@ const SidebarInner = memo(function SidebarInner({
                         </div>
                     </Link>
                     {onCloseAction && (
-                        <button
-                            className="md:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            aria-label="Close menu"
-                            type="button"
-                            onClick={handleClose}
-                        >
-                            <X className="h-5 w-5 text-slate-600 dark:text-slate-400" />
-                        </button>
+                        <Tooltip content="Close menu" side="left">
+                            <button
+                                className="md:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                aria-label="Close menu"
+                                type="button"
+                                onClick={handleClose}
+                            >
+                                <X className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                            </button>
+                        </Tooltip>
                     )}
                 </div>
 
@@ -213,74 +219,38 @@ export const SidebarDrawer = memo(function SidebarDrawer({
     open: boolean;
     onCloseAction: () => void;
 }) {
-    // Lock body scroll when drawer is open (security & UX improvement)
-    useEffect(() => {
-        if (open) {
-            const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-            document.body.style.overflow = "hidden";
-            document.body.style.paddingRight = `${scrollbarWidth}px`;
-        } else {
-            document.body.style.overflow = "";
-            document.body.style.paddingRight = "";
-        }
-
-        return () => {
-            document.body.style.overflow = "";
-            document.body.style.paddingRight = "";
-        };
-    }, [open]);
-
-    // Close on Escape key (accessibility & UX)
-    useEffect(() => {
-        if (!open) return;
-
-        const handleEscape = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                onCloseAction();
-            }
-        };
-
-        document.addEventListener("keydown", handleEscape);
-        return () => document.removeEventListener("keydown", handleEscape);
-    }, [open, onCloseAction]);
-
-    // Memoize backdrop click handler
-    const handleBackdropClick = useCallback((e: React.MouseEvent) => {
-        if (e.target === e.currentTarget) {
-            onCloseAction();
-        }
-    }, [onCloseAction]);
-
-    // Prevent interaction when closed
-    if (!open) return null;
-
     return (
-        <div
-            className="fixed inset-0 z-40 md:hidden animate-in fade-in duration-200"
-            onClick={handleBackdropClick}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Navigation menu"
-        >
-            {/* Backdrop */}
-            <div 
-                className="absolute inset-0 bg-black/50 backdrop-blur-sm" 
-                aria-hidden="true"
-            />
-            
-            {/* Drawer Panel */}
-            <div
-                className={cn(
-                    "absolute top-0 bottom-0 left-0 w-[18rem] max-w-[85%]",
-                    "bg-white dark:bg-slate-900",
-                    "shadow-2xl",
-                    "animate-in slide-in-from-left duration-300",
-                    "overflow-y-auto"
-                )}
-                onClick={(e) => e.stopPropagation()}
-            >
-                <SidebarInner onCloseAction={onCloseAction} />
-            </div>
-        </div>
+        <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && onCloseAction()}>
+            <Dialog.Portal>
+                {/* Backdrop Overlay */}
+                <Dialog.Overlay
+                    className={cn(
+                        "fixed inset-0 z-40 md:hidden",
+                        "bg-black/50 backdrop-blur-sm",
+                        "data-[state=open]:animate-in data-[state=closed]:animate-out",
+                        "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+                    )}
+                />
+                
+                {/* Drawer Panel */}
+                <Dialog.Content
+                    className={cn(
+                        "fixed top-0 bottom-0 left-0 z-50 md:hidden",
+                        "w-[18rem] max-w-[85%]",
+                        "bg-white dark:bg-slate-900",
+                        "shadow-2xl",
+                        "overflow-y-auto",
+                        "data-[state=open]:animate-in data-[state=closed]:animate-out",
+                        "data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left",
+                        "data-[state=closed]:duration-200 data-[state=open]:duration-300"
+                    )}
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                    aria-describedby={undefined}
+                >
+                    <Dialog.Title className="sr-only">Navigation menu</Dialog.Title>
+                    <SidebarInner onCloseAction={onCloseAction} />
+                </Dialog.Content>
+            </Dialog.Portal>
+        </Dialog.Root>
     );
 });
