@@ -12,6 +12,7 @@ import {
     X,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, type ComponentType } from "react";
+import { cn } from "@/lib/utils";
 import SignOutButton from "./SignOutButton";
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -44,12 +45,12 @@ const NavItem = memo(function NavItem({
         <Link
             href={href}
             onClick={handleClick}
-            className={[
+            className={cn(
                 "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200",
                 active
                     ? "bg-gradient-to-r from-blue-50 to-violet-50 dark:from-blue-950/30 dark:to-violet-950/30 text-slate-900 dark:text-white shadow-sm border border-blue-200/60 dark:border-blue-800/60 font-semibold"
-                    : "text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white",
-            ].join(" ")}
+                    : "text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white"
+            )}
             aria-current={active ? "page" : undefined}
         >
             {/* Active indicator */}
@@ -58,12 +59,12 @@ const NavItem = memo(function NavItem({
             )}
             
             <Icon
-                className={[
+                className={cn(
                     "h-5 w-5 transition-all duration-200 flex-shrink-0",
                     active
                         ? "text-[var(--brand-end)]"
-                        : "text-slate-500 dark:text-slate-400 group-hover:text-[var(--brand-start)] group-hover:scale-110",
-                ].join(" ")}
+                        : "text-slate-500 dark:text-slate-400 group-hover:text-[var(--brand-start)] group-hover:scale-110"
+                )}
                 aria-hidden="true"
             />
             <span className="font-medium text-sm">{label}</span>
@@ -269,13 +270,13 @@ export const SidebarDrawer = memo(function SidebarDrawer({
             
             {/* Drawer Panel */}
             <div
-                className={[
+                className={cn(
                     "absolute top-0 bottom-0 left-0 w-[18rem] max-w-[85%]",
                     "bg-white dark:bg-slate-900",
                     "shadow-2xl",
                     "animate-in slide-in-from-left duration-300",
-                    "overflow-y-auto",
-                ].join(" ")}
+                    "overflow-y-auto"
+                )}
                 onClick={(e) => e.stopPropagation()}
             >
                 <SidebarInner onCloseAction={onCloseAction} />
