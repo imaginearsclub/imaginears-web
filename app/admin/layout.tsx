@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { headers as nextHeaders } from "next/headers";
 import AdminChrome from "@/components/admin/AdminChrome";
 import { redirect } from "next/navigation";
+import { TooltipProvider } from "@/components/common/Tooltip";
 
 export const runtime = "nodejs";
 
@@ -57,8 +58,10 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     }
 
     return (
-        <AdminChrome>
-            {children}
-        </AdminChrome>
+        <TooltipProvider delayDuration={300} skipDelayDuration={100}>
+            <AdminChrome>
+                {children}
+            </AdminChrome>
+        </TooltipProvider>
     );
 }
