@@ -14,7 +14,9 @@ model User {
   email         String?      @unique
   emailVerified Boolean?     @default(false)
   image         String?
-  role          UserRole     @default(ADMIN)
+  minecraftName String?      // Minecraft username for display
+  role          String       @default("USER") // Can be system role (UserRole) or custom role slug
+  permissions   Json?        // Custom permissions override { "events:write": true, "applications:read": true }
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   accounts      Account[]
@@ -22,7 +24,14 @@ model User {
   teammembers   TeamMember[]
   members       Member[]
   invitations   Invitation[]
+  
+  // Relations for tracking changes
+  createdEvents Event[] @relation("EventCreatedBy")
+  updatedEvents Event[] @relation("EventUpdatedBy")
+  createdApplications Application[] @relation("ApplicationCreatedBy")
+  updatedApplications Application[] @relation("ApplicationUpdatedBy")
 
+  @@index([role])
   @@map("user")
 }
 
@@ -98,6 +107,12 @@ model Event {
   timesJson     Json?
 
   recurrenceUntil DateTime? // last day to schedule (optional)
+  
+  // Track who created and last updated this event
+  createdById String?
+  createdBy   User?   @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById String?
+  updatedBy   User?   @relation("EventUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([startAt])
@@ -105,6 +120,8 @@ model Event {
   @@index([recurrenceFreq])
   @@index([status, startAt])
   @@index([category, status])
+  @@index([createdById])
+  @@index([updatedById])
 }
 
 model AppSettings {
@@ -129,6 +146,15 @@ model AppSettings {
 
   // Feature toggles
   features Json? // { showEventsOnHome: true, showApplicationsOnHome: true }
+
+  // Notifications
+  notifications Json? // { discordWebhookUrl, discordApplicationsWebhookUrl, discordEventsWebhookUrl, notifyOnNewApplication, notifyOnNewEvent, emailNotifications, adminEmail }
+
+  // Maintenance mode
+  maintenance Json? // { enabled, message, allowedIPs[] }
+
+  // Security settings
+  security Json? // { rateLimitEnabled, maxRequestsPerMinute, requireEmailVerification }
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -175,11 +201,19 @@ model Application {
 
   // Free-form metadata
   notes String? @db.Text
+  
+  // Track who created and last updated this application
+  createdById String?
+  createdBy   User?   @relation("ApplicationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById String?
+  updatedBy   User?   @relation("ApplicationUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
   // Performance indexes
   @@index([status, createdAt])
   @@index([email])
   @@index([role, status])
+  @@index([createdById])
+  @@index([updatedById])
 }
 
 enum AppRole {
@@ -195,9 +229,28 @@ enum AppStatus {
   Rejected
 }
 
+// Custom roles that can be created by admins
+model CustomRole {
+  id          String   @id @default(cuid())
+  slug        String   @unique // URL-friendly identifier (e.g., "event-manager")
+  name        String   // Display name (e.g., "Event Manager")
+  description String?  @db.Text
+  permissions Json     // Array of permission strings ["events:write", "events:read"]
+  isSystem    Boolean  @default(false) // System roles (OWNER, ADMIN, etc.) cannot be deleted
+  color       String?  // Hex color for UI badges
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([slug])
+  @@index([isSystem])
+}
+
 enum UserRole {
-  ADMIN
-  STAFF
+  OWNER      // Full system access, can manage everything
+  ADMIN      // Can manage most features, users, and settings
+  MODERATOR  // Can manage events, applications, and players
+  STAFF      // Can view and assist, limited editing
+  USER       // Basic authenticated access
 }
 
 enum EventStatus {
