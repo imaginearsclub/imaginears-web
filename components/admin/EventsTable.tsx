@@ -23,8 +23,9 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuPortal,
+    Tooltip,
 } from "@/components/common";
-import { CalendarRange, Edit, Eye, EyeOff, MapPin, Tag, Clock, ArrowUpDown } from "lucide-react";
+import { CalendarRange, Edit, Eye, EyeOff, MapPin, Tag, Clock, ArrowUpDown, MoreVertical } from "lucide-react";
 import { useTableSort } from "@/hooks/useTableSort";
 import { useTableFilter } from "@/hooks/useTableFilter";
 import { cn } from "@/lib/utils";
@@ -365,15 +366,28 @@ function RowActions({
 
     return (
         <DropdownMenu open={open} onOpenChange={setOpen}>
-            <DropdownMenuTrigger asChild>
-                <button
-                    type="button"
-                    className="btn btn-ghost btn-xs"
-                    aria-label="Open row actions"
-                >
-                    ⋯
-                </button>
-            </DropdownMenuTrigger>
+            <Tooltip content="Event actions" side="left">
+                <DropdownMenuTrigger asChild>
+                    <button
+                        type="button"
+                        aria-label="Open row actions"
+                        className={cn(
+                            "inline-flex items-center justify-center w-8 h-8 rounded-lg",
+                            "border border-slate-300 dark:border-slate-700",
+                            "bg-white dark:bg-slate-800",
+                            "text-slate-700 dark:text-slate-300",
+                            "hover:bg-slate-100 dark:hover:bg-slate-700",
+                            "hover:border-slate-400 dark:hover:border-slate-600",
+                            "transition-all duration-200",
+                            "focus:outline-none focus:ring-2 focus:ring-blue-500/50",
+                            "active:scale-95",
+                            "data-[state=open]:bg-slate-100 data-[state=open]:dark:bg-slate-700"
+                        )}
+                    >
+                        <MoreVertical className="w-4 h-4" aria-hidden="true" />
+                    </button>
+                </DropdownMenuTrigger>
+            </Tooltip>
 
             {/* Portal ensures it renders outside any overflow/stacking contexts */}
             <DropdownMenuPortal>
