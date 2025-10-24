@@ -100,8 +100,10 @@ export default async function EventPublicPage({ params }: { params: Promise<{ id
                             rehypePlugins={safeRehypePlugins as any}
                             components={{
                                 a: (props) => <a {...props} className="underline" target="_blank" rel="noopener noreferrer nofollow" />,
-                                code: ({ inline, className, children, ...rest }) =>
-                                    inline ? (
+                                code: (props) => {
+                                    const { children, className, ...rest } = props;
+                                    const inline = (props as any).inline;
+                                    return inline ? (
                                         <code className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800" {...rest}>
                                             {children}
                                         </code>
@@ -111,7 +113,8 @@ export default async function EventPublicPage({ params }: { params: Promise<{ id
                         {children}
                       </code>
                     </pre>
-                                    ),
+                                    );
+                                },
                                 table: (p) => (
                                     <div className="overflow-x-auto">
                                         <table {...p} />
