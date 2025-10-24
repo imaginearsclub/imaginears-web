@@ -3,6 +3,9 @@
 import { useDeferredValue, useMemo, useState, useCallback, memo, useRef, useEffect } from "react";
 import Link from "next/link";
 import { formatInZone, SITE_TZ, isSameInstant } from "@/app/utils/timezone";
+import { Input, Badge, EmptyState } from "@/components/common";
+import { cn } from "@/lib/utils";
+import { Search, ChevronDown } from "lucide-react";
 
 type EventItem = {
     id: string;
@@ -78,25 +81,36 @@ const CustomDropdown = memo(({ value, options, onChange, placeholder, ariaLabel 
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="appearance-none w-full sm:w-auto rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium pl-4 pr-10 py-2.5 outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200 cursor-pointer shadow-sm hover:shadow text-left"
+                className={cn(
+                    "appearance-none w-full sm:w-auto rounded-xl border-2 font-medium pl-4 pr-10 py-2.5 outline-none text-left transition-all duration-200",
+                    "bg-white dark:bg-slate-900",
+                    "border-slate-300 dark:border-slate-700",
+                    "text-slate-700 dark:text-slate-300",
+                    "hover:bg-slate-50 dark:hover:bg-slate-800",
+                    "hover:border-slate-400 dark:hover:border-slate-600",
+                    "focus:ring-2 focus:ring-blue-500/50",
+                    "shadow-sm hover:shadow"
+                )}
                 aria-label={ariaLabel}
                 aria-haspopup="listbox"
                 aria-expanded={isOpen}
             >
                 {selectedOption?.label || placeholder}
             </button>
-            <svg 
-                className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-            >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
+            <ChevronDown 
+                className={cn(
+                    "absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none transition-transform duration-200",
+                    isOpen && "rotate-180"
+                )}
+            />
             
             {isOpen && (
                 <div 
-                    className="absolute z-50 mt-2 w-full sm:min-w-[200px] rounded-xl border border-slate-200 bg-white shadow-xl overflow-hidden"
+                    className={cn(
+                        "absolute z-50 mt-2 w-full sm:min-w-[200px] rounded-xl overflow-hidden shadow-xl",
+                        "border-2 border-slate-300 dark:border-slate-700",
+                        "bg-white dark:bg-slate-900"
+                    )}
                     role="listbox"
                 >
                     <div className="max-h-60 overflow-y-auto py-1">
@@ -105,11 +119,12 @@ const CustomDropdown = memo(({ value, options, onChange, placeholder, ariaLabel 
                                 key={option.value}
                                 type="button"
                                 onClick={() => handleSelect(option.value)}
-                                className={`w-full text-left px-4 py-2.5 text-sm transition-colors duration-150 ${
+                                className={cn(
+                                    "w-full text-left px-4 py-2.5 text-sm transition-colors duration-150",
                                     option.value === value
-                                        ? 'bg-blue-50 text-blue-700 font-semibold'
-                                        : 'text-slate-700 hover:bg-slate-50'
-                                }`}
+                                        ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-semibold'
+                                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                )}
                                 role="option"
                                 aria-selected={option.value === value}
                             >
@@ -138,24 +153,32 @@ const EventCard = memo(({
     formattedEnd: string | null;
 }) => (
     <article 
-        className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5"
+        className={cn(
+            "rounded-2xl border-2 p-5 shadow-sm transition-all duration-200",
+            "border-slate-300 dark:border-slate-700",
+            "bg-white dark:bg-slate-900",
+            "hover:shadow-lg hover:-translate-y-0.5",
+            "hover:border-slate-400 dark:hover:border-slate-600"
+        )}
     >
         <div className="flex items-center gap-2 text-xs mb-3">
-            <span className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+            <Badge variant="primary" size="sm">
                 {categoryLabel}
-            </span>
-            <span className="text-slate-600">{event.world}</span>
+            </Badge>
+            <Badge variant="default" size="sm">
+                {event.world}
+            </Badge>
         </div>
 
-        <h3 className="text-lg font-bold text-slate-900 line-clamp-2 mb-2">
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white line-clamp-2 mb-2">
             {event.title}
         </h3>
         
-        <p className="text-sm text-slate-600 mt-1 line-clamp-3 leading-relaxed">
+        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 line-clamp-3 leading-relaxed">
             {event.shortDescription ?? "Join us for a magical experience!"}
         </p>
 
-        <div className="mt-3 text-xs text-slate-600 font-medium">
+        <div className="mt-3 text-xs text-slate-600 dark:text-slate-400 font-medium">
             {formattedStart}
             {formattedEnd && ` — ${formattedEnd}`}
             <span className="text-[10px] ml-1">({SITE_TZ})</span>
@@ -163,7 +186,11 @@ const EventCard = memo(({
 
         <Link 
             href={`/events/${event.id}`} 
-            className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+            className={cn(
+                "mt-4 inline-flex items-center gap-1 text-sm font-semibold transition-colors",
+                "text-blue-600 dark:text-blue-400",
+                "hover:text-blue-700 dark:hover:text-blue-300"
+            )}
         >
             View details
             <span aria-hidden="true">→</span>
@@ -307,22 +334,24 @@ export default function EventsPublicFilter({ events }: { events: EventItem[] }) 
     ], [worlds]);
 
     return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className={cn(
+            "rounded-2xl border-2 p-6 shadow-sm",
+            "border-slate-300 dark:border-slate-700",
+            "bg-white dark:bg-slate-900"
+        )}>
             {/* Filter Controls */}
             <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
                 <div className="flex-1 relative">
                     <label htmlFor="event-search" className="sr-only">Search events</label>
-                    <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    <input
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                    <Input
                         id="event-search"
                         type="search"
                         value={q}
                         onChange={handleSearchChange}
                         placeholder="Search events…"
                         maxLength={MAX_SEARCH_LENGTH}
-                        className="w-full rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 placeholder:text-slate-400 pl-11 pr-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200 shadow-sm hover:shadow"
+                        className="pl-11"
                         aria-label="Search events by name, world, or category"
                     />
                 </div>
@@ -345,21 +374,19 @@ export default function EventsPublicFilter({ events }: { events: EventItem[] }) 
             </div>
 
             {/* Results count */}
-            <div className="mt-4 text-sm text-slate-600">
-                Showing {formattedEvents.length} of {events.length} events
+            <div className="mt-4 text-sm text-slate-600 dark:text-slate-400 font-medium">
+                Showing <strong className="text-slate-900 dark:text-white">{formattedEvents.length}</strong> of <strong className="text-slate-900 dark:text-white">{events.length}</strong> events
             </div>
 
             {/* Event Grid */}
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {formattedEvents.length === 0 && (
-                    <div className="col-span-full rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-12 text-center">
-                        <div className="mx-auto max-w-sm">
-                            <svg className="mx-auto h-12 w-12 text-slate-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                            <p className="text-slate-700 font-semibold mb-2">No events found</p>
-                            <p className="text-sm text-slate-600">Try adjusting your filters to see more results.</p>
-                        </div>
+                    <div className="col-span-full">
+                        <EmptyState
+                            icon={<Search className="w-12 h-12" />}
+                            title="No events found"
+                            description="Try adjusting your filters to see more results."
+                        />
                     </div>
                 )}
 
