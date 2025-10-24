@@ -1,13 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useForm, FormProvider, Controller, useFormContext } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
 import Turnstile from "react-turnstile";
 import { toast } from "sonner";
-import { Input, Alert, Checkbox } from "@/components/common";
+import { 
+    Input, 
+    Alert, 
+    Checkbox, 
+    Badge, 
+    Separator, 
+    Spinner, 
+    Progress as ProgressBar 
+} from "@/components/common";
 import { cn } from "@/lib/utils";
+import { 
+    Sparkles, 
+    User, 
+    Briefcase, 
+    CheckCircle, 
+    ArrowRight, 
+    ArrowLeft, 
+    Shield 
+} from "lucide-react";
 import {
     StepSafeSchema,
     type StepSafeInput,
@@ -18,7 +35,12 @@ import {
     type FinalApplicationInput,
 } from "@/lib/validation/application";
 
-const LANGS = ["Java", "JavaScript", "TypeScript", "Python", "Go", "C#", "Rust"];
+// Security: Freeze language list
+const LANGS = Object.freeze(["Java", "JavaScript", "TypeScript", "Python", "Go", "C#", "Rust"]);
+
+// Security: Rate limiting for form submissions
+const RATE_LIMIT_MS = 5000; // 5 seconds between submissions
+let lastSubmitTime = 0;
 
 function getLocalTZ() {
     try {
@@ -94,14 +116,23 @@ export default function ApplyPage() {
     const [step, setStep] = useState(0);
     const maxStep = 3;
 
-    function next() {
+    // Performance: Memoize navigation functions
+    const next = useCallback(() => {
         setStep((s) => Math.min(maxStep, s + 1));
-    }
-    function back() {
+    }, [maxStep]);
+    
+    const back = useCallback(() => {
         setStep((s) => Math.max(0, s - 1));
-    }
+    }, []);
 
     async function onSubmit(data: StepSafeInput) {
+        // Security: Rate limiting
+        const now = Date.now();
+        if (now - lastSubmitTime < RATE_LIMIT_MS) {
+            toast.error("Please wait a moment before submitting again");
+            return;
+        }
+        lastSubmitTime = now;
         // Honeypot check
         if (honeypotRef.current && honeypotRef.current.value.trim().length > 0) {
             // Quietly drop (security: don't reveal honeypot to bots)
@@ -165,12 +196,57 @@ export default function ApplyPage() {
 
     return (
         <div className="max-w-3xl mx-auto px-4 py-8">
-            <h1 className="text-3xl font-bold">✨ Join the Imaginears Team</h1>
-            <p className="mt-2 text-slate-600 dark:text-slate-300">
-                Help us craft magical memories and dream up new adventures for guests around the world.
-            </p>
+            {/* Header */}
+            <div className="mb-6">
+                <div className="flex items-center gap-3 mb-2">
+                    <div className={cn(
+                        "flex items-center justify-center w-12 h-12 rounded-xl",
+                        "bg-gradient-to-br from-blue-500 to-purple-500",
+                        "shadow-lg"
+                    )}>
+                        <Sparkles className="w-6 h-6 text-white" aria-hidden="true" />
+                    </div>
+                    <div>
+                        <h1 className={cn(
+                            "text-3xl md:text-4xl font-bold",
+                            "text-slate-900 dark:text-white"
+                        )}>
+                            Join the Imaginears Team
+                        </h1>
+                        <Badge variant="primary" size="sm" className="mt-1">
+                            Now Hiring
+                        </Badge>
+                    </div>
+                </div>
+                <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
+                    Help us craft magical memories and dream up new adventures for guests around the world.
+                </p>
+                
+                {/* Privacy Disclaimer */}
+                <Alert variant="info" className="mt-4">
+                    <div className="flex items-start gap-3">
+                        <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" aria-hidden="true" />
+                        <div className="flex-1">
+                            <p className="font-semibold text-slate-900 dark:text-white mb-1">
+                                Your Privacy is Protected
+                            </p>
+                            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                                All information you provide is kept strictly confidential and will only be used for 
+                                application review purposes. We never share your personal details with third parties 
+                                and store your data securely in compliance with privacy regulations.
+                            </p>
+                        </div>
+                    </div>
+                </Alert>
+            </div>
 
-            <div className="mt-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 p-4 sm:p-6">
+            <Separator className="my-6" />
+
+            <div className={cn(
+                "rounded-2xl border-2 p-4 sm:p-6 shadow-lg",
+                "border-slate-300 dark:border-slate-700",
+                "bg-white dark:bg-slate-900"
+            )}>
                 <FormProvider {...methods}>
                     <form onSubmit={handleSubmit(onSubmit)} noValidate>
                         {/* Honeypot (hidden from sighted users) */}
@@ -185,17 +261,32 @@ export default function ApplyPage() {
 
                         {errorList}
 
-                        <div className="mb-4 flex items-center justify-between">
-                            <Progress step={step} maxStep={maxStep} />
-                            <span className="text-sm text-slate-500 dark:text-slate-400">
-                Step {step + 1} of {maxStep + 1}
-              </span>
+                        {/* Progress Bar */}
+                        <div className="mb-6">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    Step {step + 1} of {maxStep + 1}
+                                </span>
+                                <Badge variant="default" size="sm">
+                                    {Math.round(((step + 1) / (maxStep + 1)) * 100)}% Complete
+                                </Badge>
+                            </div>
+                            <ProgressBar 
+                                value={((step + 1) / (maxStep + 1)) * 100} 
+                                className="h-2"
+                            />
                         </div>
+
+                        <Separator className="mb-6" />
 
                         <AnimatePresence mode="wait">
                             {step === 0 && (
                                 <motion.div key="step0" {...stepAnim} className="space-y-4">
-                                    <SectionTitle title="About You" subtitle="Tell us who you are." />
+                                    <SectionTitle 
+                                        title="About You" 
+                                        subtitle="Tell us who you are."
+                                        icon={<User className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
+                                    />
                                     <FieldText name="name" label="Full Name *" placeholder="Your name" />
                                     <FieldEmail name="email" label="Email *" placeholder="name@example.com" />
                                     <FieldText name="mcUsername" label="Minecraft Username *" placeholder="Your in-game name" />
@@ -219,7 +310,11 @@ export default function ApplyPage() {
 
                             {step === 1 && (
                                 <motion.div key="step1" {...stepAnim} className="space-y-4">
-                                    <SectionTitle title="Experience" subtitle="A few quick questions." />
+                                    <SectionTitle 
+                                        title="Experience" 
+                                        subtitle="A few quick questions."
+                                        icon={<Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
+                                    />
                                     <FieldTimezone />
                                     <FieldSwitch name="canDiscord" label="Can you use Discord?" />
                                     {canDiscord && <FieldText name="discordUser" label="Discord Username" placeholder="name#0001 or @name" />}
@@ -240,7 +335,11 @@ export default function ApplyPage() {
 
                             {step === 2 && (
                                 <motion.div key="step2" {...stepAnim} className="space-y-4">
-                                    <SectionTitle title="Your Role" subtitle="Pick the path that fits you best." />
+                                    <SectionTitle 
+                                        title="Your Role" 
+                                        subtitle="Pick the path that fits you best."
+                                        icon={<Briefcase className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
+                                    />
                                     <FieldSelect
                                         name="role"
                                         label="Which position are you applying for? *"
@@ -259,7 +358,9 @@ export default function ApplyPage() {
                                                 name="devLanguages"
                                                 render={({ field }) => (
                                                     <div>
-                                                        <label className="text-sm font-medium">Languages *</label>
+                                                        <label className="text-sm font-medium text-slate-900 dark:text-white block mb-2">
+                                                            Languages *
+                                                        </label>
                                                         <div className="mt-2 flex flex-wrap gap-2">
                                                             {LANGS.map((lang) => {
                                                                 const checked = field.value?.includes(lang);
@@ -326,7 +427,11 @@ export default function ApplyPage() {
 
                             {step === 3 && (
                                 <motion.div key="step3" {...stepAnim} className="space-y-4">
-                                    <SectionTitle title="Review & Verify" subtitle="One last step before you submit." />
+                                    <SectionTitle 
+                                        title="Review & Verify" 
+                                        subtitle="One last step before you submit."
+                                        icon={<Shield className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
+                                    />
                                     {/* Cloudflare Turnstile */}
                                     <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
                                         <Turnstile
@@ -347,34 +452,72 @@ export default function ApplyPage() {
                             )}
                         </AnimatePresence>
 
-                        <div className="mt-6 flex items-center justify-between">
+                        <Separator className="my-6" />
+
+                        {/* Navigation Buttons */}
+                        <div className="flex items-center justify-between gap-4">
                             <button
                                 type="button"
-                                className="btn btn-muted"
                                 onClick={back}
                                 disabled={step === 0 || isSubmitting}
+                                className={cn(
+                                    "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-200",
+                                    "bg-slate-100 dark:bg-slate-800",
+                                    "text-slate-900 dark:text-white",
+                                    "hover:bg-slate-200 dark:hover:bg-slate-700",
+                                    "disabled:opacity-50 disabled:cursor-not-allowed",
+                                    "border-2 border-slate-300 dark:border-slate-700"
+                                )}
                             >
+                                <ArrowLeft className="w-4 h-4" aria-hidden="true" />
                                 Back
                             </button>
 
                             {step < maxStep ? (
                                 <button
                                     type="button"
-                                    className="btn btn-primary"
                                     onClick={async () => {
                                         const ok = await validateStep(methods, step);
                                         if (ok) next();
                                     }}
+                                    className={cn(
+                                        "inline-flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all duration-200",
+                                        "bg-blue-600 dark:bg-blue-500",
+                                        "text-white",
+                                        "hover:bg-blue-700 dark:hover:bg-blue-600",
+                                        "disabled:opacity-50 disabled:cursor-not-allowed",
+                                        "border-2 border-transparent",
+                                        "shadow-md hover:shadow-lg"
+                                    )}
                                 >
                                     Continue
+                                    <ArrowRight className="w-4 h-4" aria-hidden="true" />
                                 </button>
                             ) : (
                                 <button
                                     type="submit"
-                                    className={`btn btn-primary ${isSubmitting ? "is-loading" : ""}`}
                                     disabled={isSubmitting || !tsToken}
+                                    className={cn(
+                                        "inline-flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all duration-200",
+                                        "bg-gradient-to-r from-blue-600 to-purple-600",
+                                        "hover:from-blue-700 hover:to-purple-700",
+                                        "text-white",
+                                        "disabled:opacity-50 disabled:cursor-not-allowed",
+                                        "border-2 border-transparent",
+                                        "shadow-md hover:shadow-lg"
+                                    )}
                                 >
-                                    Submit Application
+                                    {isSubmitting ? (
+                                        <>
+                                            <Spinner size="sm" variant="current" />
+                                            Submitting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircle className="w-4 h-4" aria-hidden="true" />
+                                            Submit Application
+                                        </>
+                                    )}
                                 </button>
                             )}
                         </div>
@@ -387,11 +530,27 @@ export default function ApplyPage() {
 
 /* ---------- UI helpers ---------- */
 
-function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+function SectionTitle({ title, subtitle, icon }: { title: string; subtitle?: string; icon?: React.ReactNode }) {
     return (
-        <div>
-            <h2 className="text-lg font-semibold">{title}</h2>
-            {subtitle && <p className="text-sm text-slate-600 dark:text-slate-400">{subtitle}</p>}
+        <div className="mb-4">
+            <div className="flex items-center gap-2 mb-1">
+                {icon && (
+                    <div className={cn(
+                        "flex items-center justify-center w-8 h-8 rounded-lg",
+                        "bg-blue-100 dark:bg-blue-900/30"
+                    )}>
+                        {icon}
+                    </div>
+                )}
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                    {title}
+                </h2>
+            </div>
+            {subtitle && (
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                    {subtitle}
+                </p>
+            )}
         </div>
     );
 }
@@ -410,7 +569,9 @@ function FieldText(props: { name: keyof StepSafeInput; label: string; placeholde
     const hasError = !!(errors as any)[props.name];
     return (
         <div>
-            <label className="text-sm font-medium block mb-1">{props.label}</label>
+            <label className="text-sm font-medium text-slate-900 dark:text-white block mb-2">
+                {props.label}
+            </label>
             <Input
                 {...register(props.name)}
                 placeholder={props.placeholder}
@@ -426,7 +587,9 @@ function FieldEmail(props: { name: keyof StepSafeInput; label: string; placehold
     const hasError = !!(errors as any)[props.name];
     return (
         <div>
-            <label className="text-sm font-medium block mb-1">{props.label}</label>
+            <label className="text-sm font-medium text-slate-900 dark:text-white block mb-2">
+                {props.label}
+            </label>
             <Input
                 type="email"
                 {...register(props.name)}
@@ -443,7 +606,9 @@ function FieldUrl(props: { name: keyof StepSafeInput; label: string; placeholder
     const hasError = !!(errors as any)[props.name];
     return (
         <div>
-            <label className="text-sm font-medium block mb-1">{props.label}</label>
+            <label className="text-sm font-medium text-slate-900 dark:text-white block mb-2">
+                {props.label}
+            </label>
             <Input
                 type="url"
                 {...register(props.name)}
@@ -460,7 +625,9 @@ function FieldTextarea(props: { name: keyof StepSafeInput; label: string; rows?:
     const hasError = !!(errors as any)[props.name];
     return (
         <div>
-            <label className="text-sm font-medium block mb-1">{props.label}</label>
+            <label className="text-sm font-medium text-slate-900 dark:text-white block mb-2">
+                {props.label}
+            </label>
             <textarea
                 {...register(props.name)}
                 rows={props.rows ?? 4}
@@ -490,7 +657,9 @@ function FieldSelect(props: {
     const hasError = !!(errors as any)[props.name];
     return (
         <div>
-            <label className="text-sm font-medium block mb-1">{props.label}</label>
+            <label className="text-sm font-medium text-slate-900 dark:text-white block mb-2">
+                {props.label}
+            </label>
             <select
                 {...register(props.name)}
                 className={cn(
@@ -516,14 +685,24 @@ function FieldSelect(props: {
 }
 
 function FieldCheckbox(props: { name: keyof StepSafeInput; label: string }) {
-    const { register, watch } = useFormContext<StepSafeInput>();
-    const value = watch(props.name);
+    const { control } = useFormContext<StepSafeInput>();
     return (
-        <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
-            <Checkbox {...register(props.name)} checked={!!value} />
-            <span>{props.label}</span>
-            <FieldError name={props.name} />
-        </label>
+        <Controller
+            name={props.name}
+            control={control}
+            render={({ field }) => (
+                <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox 
+                        checked={!!field.value}
+                        onCheckedChange={(checked) => field.onChange(checked)}
+                        name={field.name}
+                        onBlur={field.onBlur}
+                    />
+                    <span className="text-slate-900 dark:text-white">{props.label}</span>
+                    <FieldError name={props.name} />
+                </label>
+            )}
+        />
     );
 }
 
@@ -531,7 +710,9 @@ function FieldSwitch(props: { name: keyof StepSafeInput; label: string }) {
     const { register } = useFormContext<StepSafeInput>();
     return (
         <div className="flex items-center gap-3">
-            <label className="text-sm font-medium">{props.label}</label>
+            <label className="text-sm font-medium text-slate-900 dark:text-white">
+                {props.label}
+            </label>
             <input type="checkbox" className="h-5 w-5" {...register(props.name)} />
             <FieldError name={props.name} />
         </div>
@@ -546,7 +727,9 @@ function FieldTimezone() {
         [{ value: "America/New_York", label: "America/New_York" }];
     return (
         <div>
-            <label className="text-sm font-medium block mb-1">Time Zone *</label>
+            <label className="text-sm font-medium text-slate-900 dark:text-white block mb-2">
+                Time Zone *
+            </label>
             <select
                 {...register("timezone")}
                 className={cn(
@@ -596,15 +779,4 @@ async function validateStep(methods: any, step: number) {
         }
     }
     return true;
-}
-
-function Progress({ step, maxStep }: { step: number; maxStep: number }) {
-    const pct = Math.round(((step + 1) / (maxStep + 1)) * 100);
-    return (
-        <div className="w-full mr-4">
-            <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                <div className="h-2 bg-gradient-to-r from-indigo-500 to-sky-500" style={{ width: `${pct}%` }} />
-            </div>
-        </div>
-    );
 }
