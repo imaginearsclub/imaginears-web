@@ -10,12 +10,38 @@ export async function middleware(req: NextRequest) {
     if (req.method === "OPTIONS") return NextResponse.next();
 
     if (pathname.startsWith("/admin")) {
-        // Lightweight session presence check using cookies only.
-        // This avoids importing Prisma/Better-Auth into the Edge runtime.
+        // Session validation using Better-Auth session check
+        // We validate the session server-side to ensure it's not expired/invalid
         const cookies = req.cookies.getAll();
-        const hasLikelySession = cookies.some((c) => /session/i.test(c.name) && /auth|better|next/i.test(c.name));
+        const hasSessionCookie = cookies.some((c) => 
+            (c.name.includes("session") || c.name.includes("better-auth")) && c.value
+        );
 
-        if (!hasLikelySession) {
+        // If no session cookie at all, redirect immediately
+        if (!hasSessionCookie) {
+            return redirectToLogin(req, pathname, searchParams);
+        }
+
+        // Validate the session by calling Better-Auth
+        // This ensures the session is actually valid, not just present
+        try {
+            const origin = req.nextUrl.origin;
+            const sessionCheckUrl = `${origin}/api/auth/session-check`;
+            
+            const sessionCheck = await fetch(sessionCheckUrl, {
+                headers: {
+                    cookie: req.headers.get("cookie") ?? "",
+                },
+                cache: "no-store",
+            });
+
+            // If session is invalid, redirect to login
+            if (!sessionCheck.ok) {
+                return redirectToLogin(req, pathname, searchParams);
+            }
+        } catch (error) {
+            // On error, fail closed and redirect to login
+            console.error("[Middleware] Session validation error:", error);
             return redirectToLogin(req, pathname, searchParams);
         }
 
