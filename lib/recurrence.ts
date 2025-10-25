@@ -111,7 +111,8 @@ export function expandEventOccurrences(
         ev.recurrenceUntil && isBefore(until, ev.recurrenceUntil) ? until : ev.recurrenceUntil || until;
 
     if (ev.recurrenceFreq === "NONE") {
-        if (!isBefore(ev.startAt, from) && !isAfter(ev.startAt, windowEnd)) {
+        // Show event if it ends after 'from' (includes ongoing events) and starts before 'windowEnd'
+        if (!isBefore(ev.endAt, from) && !isAfter(ev.startAt, windowEnd)) {
             out.push({
                 eventId: ev.id,
                 title: ev.title,
@@ -168,14 +169,13 @@ export function expandEventOccurrences(
             if (!isValid(localStart)) continue;
             
             const utcStart = fromZonedTime(localStart, tz);
-            
-            // Skip occurrences outside the requested window
-            if (isBefore(utcStart, from) || isAfter(utcStart, windowEnd)) continue;
-            
             const utcEnd = new Date(utcStart.getTime() + durationMs);
             
             // Validate end date is valid
             if (!isValid(utcEnd)) continue;
+            
+            // Skip occurrences outside the requested window (include ongoing: end > from)
+            if (isBefore(utcEnd, from) || isAfter(utcStart, windowEnd)) continue;
             
             out.push({
                 eventId: ev.id,
