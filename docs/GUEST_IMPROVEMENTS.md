@@ -188,9 +188,57 @@ const getCountdownInfo = (startAt, endAt, now) => {
 };
 ```
 
+### 5. Breadcrumb Navigation ✅
+**Status**: Complete
+**Priority**: Low
+
+**Features**:
+- ✅ Breadcrumb navigation on all major pages
+- ✅ Home icon for quick navigation to homepage
+- ✅ Structured data (JSON-LD) for SEO
+- ✅ Semantic HTML with proper ARIA labels
+- ✅ Responsive design with proper spacing
+- ✅ Current page highlighted (no link)
+- ✅ Hover states for better UX
+
+**Pages with Breadcrumbs**:
+- **Events Listing** - Home > Events
+- **Event Detail** - Home > Events > [Event Name]
+- **Apply** - Home > Apply
+
+**User Benefits**:
+- Users always know where they are in the site
+- Easy one-click navigation to parent pages
+- Better understanding of site structure
+- Improved wayfinding and navigation
+
+**SEO Benefits**:
+- Rich snippets in Google search results
+- Better site hierarchy understanding for search engines
+- Improved crawlability
+- Enhanced search result appearance
+
+**Technical Implementation**:
+```typescript
+// Breadcrumb with structured data
+<Breadcrumb
+    items={[
+        { label: "Events", href: "/events" },
+        { label: eventTitle }, // Current page (no href)
+    ]}
+/>
+
+// Generates SEO-friendly JSON-LD
+{
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [...]
+}
+```
+
 ## 🎯 Planned Improvements
 
-### 5. Full FAQ Page
+### 6. Full FAQ Page
 **Status**: Pending
 **Priority**: Medium
 
@@ -371,6 +419,13 @@ To measure the impact of these improvements:
   - Icons for visual feedback (Clock, Flame, CheckCircle)
   - Human-readable time format
   - ARIA live regions for accessibility
+
+- ✅ **Breadcrumb Navigation** implemented
+  - Breadcrumbs on all major pages (Events, Event Detail, Apply)
+  - Home icon for quick navigation
+  - Structured data (JSON-LD) for SEO
+  - Rich snippets in search results
+  - Semantic HTML with ARIA labels
 
 ---
 

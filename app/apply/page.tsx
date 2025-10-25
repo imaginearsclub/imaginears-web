@@ -13,7 +13,8 @@ import {
     Badge, 
     Separator, 
     Spinner, 
-    Progress as ProgressBar 
+    Progress as ProgressBar,
+    Breadcrumb
 } from "@/components/common";
 import { cn } from "@/lib/utils";
 import { 
@@ -196,6 +197,13 @@ export default function ApplyPage() {
 
     return (
         <div className="max-w-3xl mx-auto px-4 py-8">
+            {/* Breadcrumb Navigation */}
+            <Breadcrumb
+                items={[
+                    { label: "Apply" },
+                ]}
+            />
+
             {/* Header */}
             <div className="mb-6">
                 <div className="flex items-center gap-3 mb-2">

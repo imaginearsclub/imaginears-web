@@ -7,7 +7,7 @@ import { toZonedTime } from "date-fns-tz";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { safeRehypePlugins } from "@/lib/markdown";
-import { Badge, EmptyState, Separator } from "@/components/common";
+import { Badge, EmptyState, Separator, Breadcrumb } from "@/components/common";
 import { cn } from "@/lib/utils";
 import { Calendar, Clock, MapPin } from "lucide-react";
 import ScheduleSummary from "@/components/events/ScheduleSummary";
@@ -221,6 +221,14 @@ export default async function EventPublicPage({ params }: { params: Promise<{ id
 
     return (
         <div className="mx-auto max-w-4xl p-4 sm:p-6">
+            {/* Breadcrumb Navigation */}
+            <Breadcrumb
+                items={[
+                    { label: "Events", href: "/events" },
+                    { label: ev.title },
+                ]}
+            />
+
             <header className="mb-6">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
                     <h1 className={cn(

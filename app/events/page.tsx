@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import EventsPublicFilter from "@/components/public/EventsPublicFilter";
-import { Skeleton } from "@/components/common";
+import { Skeleton, Breadcrumb } from "@/components/common";
 import { Calendar } from "lucide-react";
 
 // ISR configuration for optimal performance
@@ -141,6 +141,13 @@ export default async function EventsListingPage() {
     return (
         <section className="band">
             <div className="container py-10">
+                {/* Breadcrumb Navigation */}
+                <Breadcrumb
+                    items={[
+                        { label: "Events" },
+                    ]}
+                />
+
                 {/* Page Header */}
                 <div className="flex items-center gap-3 mb-4">
                     <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30">

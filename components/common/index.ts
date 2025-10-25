@@ -29,6 +29,9 @@ export {
 export { Badge } from "./Badge";
 export type { BadgeProps } from "./Badge";
 
+export { Breadcrumb } from "./Breadcrumb";
+export type { BreadcrumbItem } from "./Breadcrumb";
+
 export { 
   Card,
   CardHeader,
