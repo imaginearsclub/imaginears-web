@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Search, ChevronDown, Command } from "lucide-react";
 import AddToCalendarButton from "@/components/events/AddToCalendarButton";
 import ShareButton from "@/components/events/ShareButton";
+import CountdownBadge from "@/components/events/CountdownBadge";
 
 type EventItem = {
     id: string;
@@ -169,6 +170,11 @@ const EventCard = memo(({
                 "flex flex-col"
             )}
         >
+            {/* Countdown badge */}
+            <div className="mb-3">
+                <CountdownBadge startAt={startDate} endAt={endDate} size="sm" showIcon />
+            </div>
+
             <div className="flex items-center gap-2 text-xs mb-3">
                 <Badge variant="primary" size="sm">
                     {categoryLabel}
