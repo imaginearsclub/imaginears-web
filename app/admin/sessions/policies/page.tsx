@@ -1,27 +1,14 @@
 import { redirect } from "next/navigation";
-import { getServerSession } from "@/lib/session";
-import { prisma } from "@/lib/prisma";
+import { requirePermission } from "@/lib/session";
 import { SessionPoliciesClient } from "./components/SessionPoliciesClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function SessionPoliciesPage() {
-  // Require admin authentication
-  const session = await getServerSession();
-  if (!session?.user?.id) {
+  // Require session policy configuration permission
+  const session = await requirePermission("sessions:configure_policies");
+  if (!session) {
     redirect("/login");
-  }
-
-  // Check if user has admin/owner role
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { role: true },
-  });
-
-  const isAdminOrOwner = ["OWNER", "ADMIN"].includes(user?.role || "");
-  
-  if (!isAdminOrOwner) {
-    redirect("/admin/dashboard");
   }
 
   // Fetch current policies (in production, these would come from a policies table)
