@@ -1,0 +1,177 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/common';
+import { Activity, LogIn, LogOut, Shield, AlertTriangle } from 'lucide-react';
+
+interface TimelineEvent {
+  id: string;
+  type: 'login' | 'logout' | 'suspicious' | 'revoked' | 'activity';
+  user: string;
+  timestamp: Date;
+  details: string;
+  location?: string;
+  device?: string;
+}
+
+export function SessionTimeline() {
+  const [events, setEvents] = useState<TimelineEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchEvents();
+    const interval = setInterval(fetchEvents, 10000); // Refresh every 10s
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchEvents = async () => {
+    try {
+      // In production, fetch from API
+      // const response = await fetch('/api/admin/sessions/timeline');
+      // const data = await response.json();
+      // setEvents(data);
+      
+      // Mock data for now
+      setEvents([
+        {
+          id: '1',
+          type: 'login',
+          user: 'john@example.com',
+          timestamp: new Date(Date.now() - 5 * 60 * 1000),
+          details: 'Successful login',
+          location: 'San Francisco, US',
+          device: 'Chrome on macOS'
+        },
+        {
+          id: '2',
+          type: 'suspicious',
+          user: 'jane@example.com',
+          timestamp: new Date(Date.now() - 15 * 60 * 1000),
+          details: 'Rapid location change detected',
+          location: 'London, UK → Tokyo, JP',
+          device: 'Firefox on Windows'
+        },
+        {
+          id: '3',
+          type: 'logout',
+          user: 'bob@example.com',
+          timestamp: new Date(Date.now() - 30 * 60 * 1000),
+          details: 'User logged out',
+          location: 'New York, US',
+          device: 'Safari on iOS'
+        },
+      ]);
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Failed to fetch timeline:', error);
+      setLoading(false);
+    }
+  };
+
+  const getEventIcon = (type: TimelineEvent['type']) => {
+    switch (type) {
+      case 'login': return LogIn;
+      case 'logout': return LogOut;
+      case 'suspicious': return AlertTriangle;
+      case 'revoked': return Shield;
+      default: return Activity;
+    }
+  };
+
+  const getEventColor = (type: TimelineEvent['type']) => {
+    switch (type) {
+      case 'login': return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30';
+      case 'logout': return 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800';
+      case 'suspicious': return 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30';
+      case 'revoked': return 'text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30';
+      default: return 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30';
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">Live Activity Timeline</CardTitle>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-xs text-slate-600 dark:text-slate-400">Live</span>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {events.map((event, index) => {
+              const Icon = getEventIcon(event.type);
+              const colorClass = getEventColor(event.type);
+              const isLast = index === events.length - 1;
+
+              return (
+                <div key={event.id} className="relative">
+                  {!isLast && (
+                    <div className="absolute left-5 top-12 bottom-0 w-0.5 bg-slate-200 dark:bg-slate-700" />
+                  )}
+                  
+                  <div className="flex items-start gap-4">
+                    <div className={`p-2 rounded-full ${colorClass} shrink-0`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="font-medium text-slate-900 dark:text-white">
+                            {event.details}
+                          </div>
+                          <div className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
+                            {event.user}
+                          </div>
+                          {event.location && (
+                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                              📍 {event.location}
+                            </div>
+                          )}
+                          {event.device && (
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                              💻 {event.device}
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                          {formatTimeAgo(event.timestamp)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {events.length === 0 && (
+              <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                No recent events
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function formatTimeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
+
