@@ -6,6 +6,7 @@ import { createAuthClient } from "better-auth/client";
 import { Input, Alert, Spinner, Separator, Badge } from "@/components/common";
 import { cn } from "@/lib/utils";
 import { LogIn, Mail, Lock, Shield } from "lucide-react";
+import { TwoFactorVerification } from "@/app/login/components/TwoFactorVerification";
 
 const auth = createAuthClient(
     process.env['NEXT_PUBLIC_SITE_URL'] 
@@ -43,6 +44,9 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [err, setErr] = useState<string | null>(null);
     const [touched, setTouched] = useState({ email: false, password: false });
+    
+    // 2FA state
+    const [show2FA, setShow2FA] = useState(false);
     
     // Security: Rate limiting
     const [loginAttempts, setLoginAttempts] = useState(0);
@@ -115,6 +119,42 @@ export default function LoginPage() {
             setLoading(false);
         }
     }
+    
+    // Handle 2FA verification
+    async function handle2FAVerify(code: string): Promise<boolean> {
+        try {
+            const sanitizedEmail = email.trim().toLowerCase();
+            
+            const res = await fetch("/api/auth/verify-2fa", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email: sanitizedEmail,
+                    password,
+                    code,
+                }),
+            });
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({ message: "Verification failed" }));
+                console.error("[2FA] Verification failed:", data.message);
+                return false;
+            }
+
+            // Success - redirect to callback URL
+            router.push(callbackUrl);
+            return true;
+        } catch (error) {
+            console.error("[2FA] Verification error:", error);
+            return false;
+        }
+    }
+    
+    // Handle back from 2FA
+    function handleBackFrom2FA() {
+        setShow2FA(false);
+        setLoading(false);
+    }
 
     async function onDiscord() {
         setErr(null);
@@ -133,7 +173,17 @@ export default function LoginPage() {
 
     return (
         <div className="mx-auto max-w-5xl p-8 rounded-xl border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl my-12">
-            {/* Header */}
+            {/* Show 2FA verification if required */}
+            {show2FA ? (
+                <TwoFactorVerification
+                    email={email}
+                    onVerify={handle2FAVerify}
+                    onBack={handleBackFrom2FA}
+                    loading={loading}
+                />
+            ) : (
+                <>
+                    {/* Header */}
             <div className="flex items-center gap-3 mb-2">
                 <div className={cn(
                     "flex items-center justify-center w-10 h-10 rounded-lg",
@@ -269,6 +319,8 @@ export default function LoginPage() {
                         </svg>
                         Continue with Discord
                     </button>
+                </>
+            )}
                 </>
             )}
         </div>
