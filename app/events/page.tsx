@@ -3,11 +3,10 @@ import { prisma } from "@/lib/prisma";
 import EventsPublicFilter from "@/components/public/EventsPublicFilter";
 import { Skeleton, Breadcrumb } from "@/components/common";
 import { Calendar } from "lucide-react";
+import { getUserTimezone } from "@/app/utils/timezone";
 
-// ISR configuration for optimal performance
-export const revalidate = 300; // 5 minutes cache
-export const dynamic = "force-static"; // Prefer static generation
-export const fetchCache = "default-cache";
+// Dynamic rendering to support user-specific timezones
+export const dynamic = "force-dynamic";
 
 // Security: Limit results to prevent DOS
 const MAX_EVENTS = 500;
@@ -28,6 +27,11 @@ type PublicEventData = {
     status: string;
     category: string;
     shortDescription: string | null;
+    recurrenceFreq: string;
+    byWeekdayJson: unknown;
+    timesJson: unknown;
+    timezone: string | null;
+    recurrenceUntil: Date | null;
 };
 
 /**
@@ -56,6 +60,11 @@ async function getPublicEvents(): Promise<PublicEventData[]> {
                 status: true,
                 category: true,
                 shortDescription: true,
+                recurrenceFreq: true,
+                byWeekdayJson: true,
+                timesJson: true,
+                timezone: true,
+                recurrenceUntil: true,
             },
         });
 
@@ -133,10 +142,13 @@ function EventsPageSkeleton() {
 }
 
 /**
- * Events listing page with ISR and security features
+ * Events listing page with user timezone support
  */
 export default async function EventsListingPage() {
-    const events = await getPublicEvents();
+    const [events, userTimezone] = await Promise.all([
+        getPublicEvents(),
+        getUserTimezone(),
+    ]);
 
     return (
         <section className="band">
@@ -168,7 +180,7 @@ export default async function EventsListingPage() {
                 </p>
 
                 <Suspense fallback={<EventsPageSkeleton />}>
-                    <EventsPublicFilter events={events as any} />
+                    <EventsPublicFilter events={events as any} userTimezone={userTimezone} />
                 </Suspense>
             </div>
         </section>

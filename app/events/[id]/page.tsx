@@ -14,11 +14,11 @@ import ScheduleSummary from "@/components/events/ScheduleSummary";
 import AddToCalendarButton from "@/components/events/AddToCalendarButton";
 import ShareButton from "@/components/events/ShareButton";
 import CountdownBadge from "@/components/events/CountdownBadge";
+import { getUserTimezone } from "@/app/utils/timezone";
 
-// Configuration
+// Configuration - Dynamic rendering to support user timezones
 export const runtime = "nodejs";
-export const dynamic = "force-static"; // Static generation for public events
-export const revalidate = 600; // ISR: Revalidate every 10 minutes
+export const dynamic = "force-dynamic";
 
 // Security: Constants for validation
 const MAX_ID_LENGTH = 50;
@@ -168,35 +168,38 @@ export default async function EventPublicPage({ params }: { params: Promise<{ id
         return notFound();
     }
 
-    // Performance: Select only needed fields
-    const ev = await prisma.event.findUnique({
-        where: { id },
-        select: {
-            id: true,
-            title: true,
-            world: true,
-            category: true,
-            details: true,
-            shortDescription: true,
-            startAt: true,
-            endAt: true,
-            status: true,
-            timezone: true,
-            recurrenceFreq: true,
-            byWeekdayJson: true,
-            timesJson: true,
-            recurrenceUntil: true,
-            updatedAt: true,
-        },
-    });
+    // Performance: Fetch event and user timezone in parallel
+    const [ev, userTimezone] = await Promise.all([
+        prisma.event.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                title: true,
+                world: true,
+                category: true,
+                details: true,
+                shortDescription: true,
+                startAt: true,
+                endAt: true,
+                status: true,
+                timezone: true,
+                recurrenceFreq: true,
+                byWeekdayJson: true,
+                timesJson: true,
+                recurrenceUntil: true,
+                updatedAt: true,
+            },
+        }),
+        getUserTimezone(),
+    ]);
 
     // Security: Only show published events
     if (!ev || ev.status !== EventStatus.Published) {
         return notFound();
     }
 
-    // Security: Sanitize timezone
-    const tz = sanitizeTimezone(ev.timezone);
+    // Use user's timezone preference instead of event's timezone
+    const tz = sanitizeTimezone(userTimezone);
     const times = asStringArray(ev.timesJson);
     const weekdays = asWeekdayArray(ev.byWeekdayJson);
 
