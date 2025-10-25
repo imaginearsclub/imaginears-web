@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/minecraft-client"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("MINECRAFT_DATABASE_URL")
+}
+
+/// Player information (UUIDs and usernames)
+model LuckPermsPlayer {
+  uuid         String                    @id @db.VarChar(36)
+  username     String                    @db.VarChar(16)
+  primaryGroup String                    @map("primary_group") @db.VarChar(36)
+  permissions  LuckPermsUserPermission[]
+
+  @@index([username], map: "luckperms_players_username")
+  @@map("luckperms_players")
+}
+
+/// User-specific permissions
+model LuckPermsUserPermission {
+  id         Int              @id @default(autoincrement())
+  uuid       String           @db.VarChar(36)
+  permission String           @db.VarChar(200)
+  value      Boolean
+  server     String           @db.VarChar(36)
+  world      String           @db.VarChar(36)
+  expiry     Int
+  contexts   String           @db.VarChar(200)
+  player     LuckPermsPlayer? @relation(fields: [uuid], references: [uuid])
+
+  @@index([permission], map: "luckperms_user_permissions_permission")
+  @@index([uuid], map: "luckperms_user_permissions_uuid")
+  @@map("luckperms_user_permissions")
+}
+
+/// Group definitions
+model LuckPermsGroup {
+  name String @id @db.VarChar(36)
+
+  @@map("luckperms_groups")
+}
+
+/// Group permissions
+model LuckPermsGroupPermission {
+  id         Int     @id @default(autoincrement())
+  name       String  @db.VarChar(36)
+  permission String  @db.VarChar(200)
+  value      Boolean
+  server     String  @db.VarChar(36)
+  world      String  @db.VarChar(36)
+  expiry     Int
+  contexts   String  @db.VarChar(200)
+
+  @@index([name], map: "luckperms_group_permissions_name")
+  @@index([permission], map: "luckperms_group_permissions_permission")
+  @@map("luckperms_group_permissions")
+}
+
+/// Action log (audit trail)
+model LuckPermsAction {
+  id        Int     @id @default(autoincrement())
+  time      BigInt
+  actorUuid String  @map("actor_uuid") @db.VarChar(36)
+  actorName String? @map("actor_name") @db.VarChar(100)
+  type      String  @db.Char(1)
+  actedUuid String  @map("acted_uuid") @db.VarChar(36)
+  actedName String  @map("acted_name") @db.VarChar(36)
+  action    String? @db.VarChar(300)
+
+  @@map("luckperms_actions")
+}
+
+model luckperms_messenger {
+  id   Int      @id @default(autoincrement())
+  time DateTime @default(now()) @db.Timestamp(0)
+  msg  String   @db.Text
+}
+
+model luckperms_tracks {
+  name   String @id @db.VarChar(36)
+  groups String @db.Text
+}

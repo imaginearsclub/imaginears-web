@@ -15,8 +15,15 @@ model User {
   emailVerified Boolean?     @default(false)
   image         String?
   minecraftName String?      // Minecraft username for display
+  timezone      String?      @default("America/New_York") // User's preferred timezone (IANA timezone)
   role          String       @default("USER") // Can be system role (UserRole) or custom role slug
   permissions   Json?        // Custom permissions override { "events:write": true, "applications:read": true }
+  
+  // Two-Factor Authentication
+  twoFactorEnabled Boolean?   @default(false)
+  twoFactorSecret  String?    @db.Text // Encrypted TOTP secret
+  backupCodes      Json?      // Array of hashed backup codes
+  
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   accounts      Account[]
@@ -30,6 +37,7 @@ model User {
   updatedEvents Event[] @relation("EventUpdatedBy")
   createdApplications Application[] @relation("ApplicationCreatedBy")
   updatedApplications Application[] @relation("ApplicationUpdatedBy")
+  apiKeys ApiKey[] // API keys created by this user
 
   @@index([role])
   @@map("user")
@@ -70,9 +78,62 @@ model Session {
   userAgent             String?  @db.Text
   activeOrganizationId  String?  @db.Text
   activeTeamId          String?  @db.Text
+  
+  // Enhanced session tracking
+  deviceName            String?  @db.VarChar(255) // User-friendly device name (e.g., "John's iPhone")
+  deviceType            String?  @db.VarChar(50)  // mobile, desktop, tablet
+  browser               String?  @db.VarChar(100) // Chrome, Firefox, Safari, etc.
+  os                    String?  @db.VarChar(100) // Windows, macOS, iOS, Android, etc.
+  country               String?  @db.VarChar(100) // Country name from IP
+  city                  String?  @db.VarChar(255) // City name from IP
+  
+  // Security & Trust
+  trustLevel            Int      @default(0)      // 0=new, 1=recognized, 2=trusted
+  isSuspicious          Boolean  @default(false)  // Flagged for unusual activity
+  lastActivityAt        DateTime @default(now())  // Last API call or page view
+  
+  // Remember me
+  isRememberMe          Boolean  @default(false)  // Extended session duration
+  
+  // Session metadata
+  loginMethod           String?  @db.VarChar(50)  // password, oauth, 2fa
+  requiredStepUp        Boolean  @default(false)  // Requires 2FA for sensitive actions
+  
+  activities            SessionActivity[]
 
   @@index([userId], map: "Session_userId_fkey")
+  @@index([lastActivityAt])
+  @@index([isSuspicious])
   @@map("session")
+}
+
+// Track detailed session activity
+model SessionActivity {
+  id          String   @id @default(cuid())
+  sessionId   String
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  // Activity details
+  action      String   @db.VarChar(100) // login, logout, page_view, api_call, password_change, etc.
+  endpoint    String?  @db.VarChar(500) // URL or API endpoint
+  method      String?  @db.VarChar(10)  // GET, POST, etc.
+  
+  // Context
+  ipAddress   String?  @db.Text
+  userAgent   String?  @db.Text
+  statusCode  Int?                      // HTTP status code
+  duration    Int?                      // Request duration in ms
+  
+  // Flags
+  isError     Boolean  @default(false)
+  isSuspicious Boolean @default(false)
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([sessionId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([isSuspicious])
 }
 
 model VerificationToken {
@@ -243,6 +304,53 @@ model CustomRole {
 
   @@index([slug])
   @@index([isSystem])
+}
+
+// API Keys for external/programmatic access
+model ApiKey {
+  id          String   @id @default(cuid())
+  name        String   // Friendly name for the key (e.g., "Mobile App", "Analytics Service")
+  key         String   @unique // The actual API key (hashed)
+  keyPrefix   String   // First 8 chars of key for identification (e.g., "sk_live_12345678...")
+  
+  // Permissions & Scopes
+  scopes      Json     // Array of allowed scopes: ["events:read", "applications:read", etc.]
+  isActive    Boolean  @default(true)
+  
+  // Rate Limiting
+  rateLimit   Int      @default(100) // Requests per minute
+  
+  // Ownership & Tracking
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  
+  // Usage tracking
+  lastUsedAt  DateTime?
+  usageCount  Int      @default(0)
+  
+  // Metadata
+  description String?  @db.Text
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([key])
+  @@index([keyPrefix])
+  @@index([createdById])
+  @@index([isActive])
+}
+
+// Rate limiting tracking
+model RateLimit {
+  id         String   @id @default(cuid())
+  identifier String   // API key or IP address
+  endpoint   String   // Which endpoint was called
+  count      Int      @default(1)
+  windowStart DateTime @default(now())
+  
+  @@unique([identifier, endpoint, windowStart])
+  @@index([identifier, windowStart])
+  @@index([windowStart]) // For cleanup
 }
 
 enum UserRole {
