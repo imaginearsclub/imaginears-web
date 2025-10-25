@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { UserAvatar } from "@/app/profile/components/UserAvatar";
 import { ProfileContent } from "@/app/profile/components/ProfileContent";
 import { getPlayerPermissionsDb } from "@/lib/luckperms";
+import { enhanceExistingSession } from "@/lib/enhance-session";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,11 @@ export default async function ProfilePage() {
   const session = await getServerSession();
   if (!session?.user?.id) {
     redirect("/login");
+  }
+
+  // Enhance current session with tracking data (if not already enhanced)
+  if (session?.session?.token) {
+    await enhanceExistingSession(session.session.token);
   }
 
   // Fetch user data
@@ -43,18 +49,27 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
-  // Fetch active sessions
+  // Fetch active sessions with enhanced data
   const sessions = await prisma.session.findMany({
     where: { userId: session.user.id },
     select: {
       id: true,
       token: true,
-      ipAddress: true,
-      userAgent: true,
+      deviceName: true,
+      deviceType: true,
+      browser: true,
+      os: true,
+      country: true,
+      city: true,
+      trustLevel: true,
+      isSuspicious: true,
+      lastActivityAt: true,
+      isRememberMe: true,
+      loginMethod: true,
       createdAt: true,
       expiresAt: true,
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { lastActivityAt: "desc" }, // Changed to show most recently active first
   });
 
   // Fetch applications
