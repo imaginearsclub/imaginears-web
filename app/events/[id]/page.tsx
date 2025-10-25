@@ -13,6 +13,7 @@ import { Calendar, Clock, MapPin } from "lucide-react";
 import ScheduleSummary from "@/components/events/ScheduleSummary";
 import AddToCalendarButton from "@/components/events/AddToCalendarButton";
 import ShareButton from "@/components/events/ShareButton";
+import CountdownBadge from "@/components/events/CountdownBadge";
 
 // Configuration
 export const runtime = "nodejs";
@@ -253,6 +254,12 @@ export default async function EventPublicPage({ params }: { params: Promise<{ id
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <CountdownBadge 
+                        startAt={calendarStartTime} 
+                        endAt={calendarEndTime} 
+                        size="md" 
+                        showIcon 
+                    />
                     <ScheduleSummary
                         recurrenceFreq={ev.recurrenceFreq as any}
                         byWeekday={weekdays as any}
