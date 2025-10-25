@@ -7,6 +7,7 @@ import ServerCTA from "@/components/home/ServerCTA";
 import Newsletter from "@/components/home/Newsletter";
 import FAQ from "@/components/home/FAQ";
 import EventTeaser from "@/components/public/EventTeaser";
+import ServerStatus from "@/components/home/ServerStatus";
 import { Skeleton } from "@/components/common";
 
 // Force Node.js runtime to ensure compatibility with server-only modules (e.g., Prisma) used by children.
@@ -93,6 +94,14 @@ export default function Home() {
       
       {/* Progressive enhancement - Load features in order of importance */}
       <Highlights />
+      
+      {/* Server Status Widget */}
+      <section className="band">
+        <div className="container py-8">
+          <ServerStatus />
+        </div>
+      </section>
+      
       <SocialProof />
       
       {/* Performance: Suspense boundary for dynamic content to prevent blocking */}
