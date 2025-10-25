@@ -6,6 +6,57 @@ A comprehensive staff management system for creating and managing Cast Member (s
 
 ---
 
+## 🔐 Permission Requirements
+
+### Access Control
+
+This feature implements **RBAC permission checks** for staff management operations.
+
+#### Required Permissions
+
+| Operation | Permission | OWNER | ADMIN | MODERATOR | STAFF | USER |
+|-----------|-----------|-------|-------|-----------|-------|------|
+| **View Staff Page** | `users:read` | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Create Staff** | `users:create` | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Update Staff** | `users:update` | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Delete Staff** | `users:delete` | ✅ | ✅ | ❌ | ❌ | ❌ |
+
+#### Default Access
+
+- **👑 OWNER** - Full staff management access
+- **🛡️ ADMIN** - Full staff management access
+- **⚖️ MODERATOR** - Read-only access (can view staff list)
+- **👔 STAFF** - No access to staff management
+- **👤 USER** - No access to staff management
+
+#### Custom Roles
+
+Custom roles can be granted staff management permissions:
+- Navigate: **Admin → User Roles → Configure Roles**
+- Check "Users" category
+- Select specific operations (create, read, update, delete)
+
+**Example Use Cases:**
+- **HR Team:** Grant `users:create` + `users:update` only (cannot delete)
+- **Audit Team:** Grant `users:read` only (view-only access)
+- **Department Managers:** Grant `users:create` + `users:read` (can add but not delete)
+
+### Security Features
+
+✅ **Operation-level checks** - Each action validates specific permission  
+✅ **Self-protection** - Cannot delete your own account (even with permission)  
+✅ **Owner protection** - Cannot delete last owner account  
+✅ **Role hierarchy** - Permissions respect role levels  
+✅ **Audit logging** - All operations logged for security  
+
+---
+
+**See Also:**
+- [RBAC Permission Enforcement](../rbac-permissions/RBAC_PERMISSION_ENFORCEMENT.md) - Complete guide
+- [Bulk User Management](./BULK_USER_MANAGEMENT.md) - For managing multiple users at once
+
+---
+
 ## Features
 
 ### ✅ Staff Account Creation
@@ -22,10 +73,18 @@ A comprehensive staff management system for creating and managing Cast Member (s
 - Display Minecraft usernames in staff list
 
 ### ✅ Role Management
-- **Owner**: Complete system control
-- **Admin**: Full administrative access
-- **Moderator**: Manage players and moderate content
-- **Staff**: Basic staff member with limited permissions
+
+Each role has specific permissions defined by the RBAC system:
+
+- **👑 Owner**: Complete system control (all 35 permissions)
+- **🛡️ Admin**: Full administrative access (34 permissions, cannot bulk change roles)
+- **⚖️ Moderator**: Manage players and moderate content (13 permissions, read-mostly)
+- **👔 Staff**: Basic staff member with limited permissions (9 permissions)
+- **👤 User**: Regular user permissions (2 permissions, own data only)
+
+**See [RBAC System](../rbac-permissions/RBAC_SYSTEM.md) for complete permission breakdown.**
+
+**Custom Roles:** You can create custom roles with any combination of the 35 available permissions via **Admin → User Roles → Configure Roles**.
 
 ### ✅ Staff Dashboard
 - View all staff members with their details
@@ -260,11 +319,27 @@ Get all players in a specific LuckPerms group.
 - Optional API validation (Mojang or LuckPerms)
 - Fails open if validation API is down
 
-### Role-Based Access Control
-- Only admins can access staff management page
-- Role hierarchy prevents abuse
-- Cannot delete last owner account
-- Cannot delete your own account
+### Role-Based Access Control (RBAC)
+
+The system implements **granular RBAC permissions**:
+
+- **Page Access:** Requires `users:read` permission minimum
+- **Create Operations:** Requires `users:create` permission
+- **Update Operations:** Requires `users:update` permission  
+- **Delete Operations:** Requires `users:delete` permission
+- **Role hierarchy** prevents privilege abuse
+- **Cannot delete last owner** account (system protection)
+- **Cannot delete yourself** (even with permission)
+- **Custom roles supported** - Grant specific permissions as needed
+
+**Permission Enforcement:**
+- ✅ Server-side validation on every request
+- ✅ Type-safe with TypeScript
+- ✅ Clear error messages (shows which permission missing)
+- ✅ Audit logging enabled
+- ✅ Fails closed (denies on error)
+
+**For advanced user management**, see [Bulk User Management](./BULK_USER_MANAGEMENT.md) for operations on multiple users at once.
 
 ### Audit Trail
 - Track created events per staff member
@@ -297,19 +372,29 @@ Access staff management quickly via the Command Palette (⌘K):
 
 ---
 
+## Recent Enhancements ✅
+
+### Implemented Features (October 2025)
+- ✅ **Bulk User Management** - Manage multiple users at once ([see docs](./BULK_USER_MANAGEMENT.md))
+- ✅ **Two-factor authentication (2FA)** - TOTP-based 2FA ([see docs](../authentication/TWO_FACTOR_AUTH.md))
+- ✅ **Granular RBAC Permissions** - 35 permissions for fine-grained access control
+- ✅ **Custom Role Creation** - Create roles with specific permission combinations
+- ✅ **Discord Integration** - Link Discord accounts ([see docs](../authentication/CONNECTED_ACCOUNTS.md))
+- ✅ **Advanced Session Management** - Monitor and control user sessions ([see docs](../session-management/))
+
 ## Future Enhancements
 
 ### Potential Features
-- [ ] Bulk import staff from CSV
+- [ ] Bulk import staff from CSV with preview
 - [ ] Send email invitations with magic links
-- [ ] Two-factor authentication (2FA)
 - [ ] Permission inheritance from MC groups
 - [ ] Automatic role sync on MC server join
-- [ ] Staff activity timeline
-- [ ] Discord integration (link Discord accounts)
-- [ ] Staff performance metrics
+- [ ] Staff activity timeline (detailed view)
+- [ ] Staff performance metrics and KPIs
 - [ ] Temporary staff accounts (auto-expire)
-- [ ] Staff onboarding checklist
+- [ ] Staff onboarding checklist and workflow
+- [ ] Department/team grouping
+- [ ] Shift scheduling integration
 
 ### LuckPerms Advanced
 - [ ] Real-time permission sync
@@ -381,6 +466,17 @@ model Account {
 - Mojang API (MC validation)
 - LuckPerms (Optional integration)
 
-**Last Updated:** October 2025  
+**Last Updated:** October 25, 2025  
 **Maintainer:** Development Team
+
+---
+
+## Related Documentation
+
+- **[Bulk User Management](./BULK_USER_MANAGEMENT.md)** - Manage multiple users at once
+- **[RBAC Permission System](../rbac-permissions/RBAC_SYSTEM.md)** - Complete permission guide
+- **[Role Configuration UI](../rbac-permissions/ROLE_CONFIGURE_UI_UPDATE.md)** - How to configure roles
+- **[Two-Factor Auth](../authentication/TWO_FACTOR_AUTH.md)** - 2FA implementation
+- **[Connected Accounts](../authentication/CONNECTED_ACCOUNTS.md)** - OAuth & Discord linking
+- **[Session Management](../session-management/)** - Advanced session features
 
