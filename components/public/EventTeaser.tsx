@@ -97,6 +97,7 @@ const getUpcomingEvents = unstable_cache(
                     timesJson: true,
                     recurrenceUntil: true,
                     startAt: true,
+                    endAt: true,
                 },
             });
             return events;
@@ -158,6 +159,9 @@ export default async function EventTeaser({ title = "Events", limit = 6 }: Props
                             timezone={tz}
                             until={e.recurrenceUntil ?? null}
                             shortDescription={e.shortDescription}
+                            startAt={e.startAt}
+                            endAt={e.endAt}
+                            world={e.world}
                         />
                     );
                 })}

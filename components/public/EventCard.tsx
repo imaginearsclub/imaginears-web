@@ -5,6 +5,8 @@ import ScheduleSummary, { type Weekday, type RecurrenceFreq } from "@/components
 import { Badge } from "@/components/common";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
+import AddToCalendarButton from "@/components/events/AddToCalendarButton";
+import ShareButton from "@/components/events/ShareButton";
 
 // Security: Define allowed string lengths to prevent abuse
 const MAX_TITLE_LENGTH = 200;
@@ -21,6 +23,9 @@ type EventCardProps = {
     timezone: string;
     until: Date | null;
     shortDescription: string | null;
+    startAt: Date;
+    endAt: Date;
+    world?: string;
 };
 
 /**
@@ -49,6 +54,9 @@ const EventCard = memo(function EventCard({
     timezone,
     until,
     shortDescription,
+    startAt,
+    endAt,
+    world,
 }: EventCardProps) {
     // Security: Sanitize all text inputs
     const safeTitle = sanitizeText(title, MAX_TITLE_LENGTH);
@@ -117,9 +125,32 @@ const EventCard = memo(function EventCard({
 
             {/* Call-to-action footer */}
             <footer className={cn(
-                "mt-auto pt-4 border-t",
+                "mt-auto pt-4 border-t space-y-3",
                 "border-slate-200 dark:border-slate-800"
             )}>
+                {/* Action buttons */}
+                <div className="flex flex-wrap items-center gap-2">
+                    <AddToCalendarButton
+                        event={{
+                            id: safeId,
+                            title: safeTitle,
+                            ...(safeDescription && { description: safeDescription }),
+                            location: world ? `${world} @ Imaginears Club` : "Imaginears Club",
+                            startTime: startAt,
+                            endTime: endAt,
+                        }}
+                        size="sm"
+                        variant="default"
+                    />
+                    <ShareButton
+                        title={safeTitle}
+                        {...(safeDescription && { description: safeDescription })}
+                        size="sm"
+                        variant="outline"
+                    />
+                </div>
+                
+                {/* View details link */}
                 <Link
                     href={`/events/${safeId}`}
                     className={cn(

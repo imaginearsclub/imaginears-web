@@ -5,7 +5,9 @@ import Link from "next/link";
 import { formatInZone, SITE_TZ, isSameInstant } from "@/app/utils/timezone";
 import { Input, Badge, EmptyState } from "@/components/common";
 import { cn } from "@/lib/utils";
-import { Search, ChevronDown } from "lucide-react";
+import { Search, ChevronDown, Command } from "lucide-react";
+import AddToCalendarButton from "@/components/events/AddToCalendarButton";
+import ShareButton from "@/components/events/ShareButton";
 
 type EventItem = {
     id: string;
@@ -151,52 +153,81 @@ const EventCard = memo(({
     categoryLabel: string;
     formattedStart: string;
     formattedEnd: string | null;
-}) => (
-    <article 
-        className={cn(
-            "rounded-2xl border-2 p-5 shadow-sm transition-all duration-200",
-            "border-slate-300 dark:border-slate-700",
-            "bg-white dark:bg-slate-900",
-            "hover:shadow-lg hover:-translate-y-0.5",
-            "hover:border-slate-400 dark:hover:border-slate-600"
-        )}
-    >
-        <div className="flex items-center gap-2 text-xs mb-3">
-            <Badge variant="primary" size="sm">
-                {categoryLabel}
-            </Badge>
-            <Badge variant="default" size="sm">
-                {event.world}
-            </Badge>
-        </div>
-
-        <h3 className="text-lg font-bold text-slate-900 dark:text-white line-clamp-2 mb-2">
-            {event.title}
-        </h3>
-        
-        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 line-clamp-3 leading-relaxed">
-            {event.shortDescription ?? "Join us for a magical experience!"}
-        </p>
-
-        <div className="mt-3 text-xs text-slate-600 dark:text-slate-400 font-medium">
-            {formattedStart}
-            {formattedEnd && ` — ${formattedEnd}`}
-            <span className="text-[10px] ml-1">({SITE_TZ})</span>
-        </div>
-
-        <Link 
-            href={`/events/${event.id}`} 
+}) => {
+    // Parse dates for calendar button
+    const startDate = new Date(event.startAt);
+    const endDate = new Date(event.endAt);
+    
+    return (
+        <article 
             className={cn(
-                "mt-4 inline-flex items-center gap-1 text-sm font-semibold transition-colors",
-                "text-blue-600 dark:text-blue-400",
-                "hover:text-blue-700 dark:hover:text-blue-300"
+                "rounded-2xl border-2 p-5 shadow-sm transition-all duration-200",
+                "border-slate-300 dark:border-slate-700",
+                "bg-white dark:bg-slate-900",
+                "hover:shadow-lg hover:-translate-y-0.5",
+                "hover:border-slate-400 dark:hover:border-slate-600",
+                "flex flex-col"
             )}
         >
-            View details
-            <span aria-hidden="true">→</span>
-        </Link>
-    </article>
-));
+            <div className="flex items-center gap-2 text-xs mb-3">
+                <Badge variant="primary" size="sm">
+                    {categoryLabel}
+                </Badge>
+                <Badge variant="default" size="sm">
+                    {event.world}
+                </Badge>
+            </div>
+
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white line-clamp-2 mb-2">
+                {event.title}
+            </h3>
+            
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 line-clamp-3 leading-relaxed mb-3">
+                {event.shortDescription ?? "Join us for a magical experience!"}
+            </p>
+
+            <div className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-4">
+                {formattedStart}
+                {formattedEnd && ` — ${formattedEnd}`}
+                <span className="text-[10px] ml-1">({SITE_TZ})</span>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap items-center gap-2 mb-3 mt-auto">
+                <AddToCalendarButton
+                    event={{
+                        id: event.id,
+                        title: event.title,
+                        ...(event.shortDescription && { description: event.shortDescription }),
+                        location: `${event.world} @ Imaginears Club`,
+                        startTime: startDate,
+                        endTime: endDate,
+                    }}
+                    size="sm"
+                    variant="default"
+                />
+                <ShareButton
+                    title={event.title}
+                    {...(event.shortDescription && { description: event.shortDescription })}
+                    size="sm"
+                    variant="outline"
+                />
+            </div>
+
+            <Link 
+                href={`/events/${event.id}`} 
+                className={cn(
+                    "inline-flex items-center gap-1 text-sm font-semibold transition-colors",
+                    "text-blue-600 dark:text-blue-400",
+                    "hover:text-blue-700 dark:hover:text-blue-300"
+                )}
+            >
+                View details
+                <span aria-hidden="true">→</span>
+            </Link>
+        </article>
+    );
+});
 
 EventCard.displayName = 'EventCard';
 
@@ -218,6 +249,24 @@ export default function EventsPublicFilter({ events }: { events: EventItem[] }) 
     const qDeferred = useDeferredValue(q);
     const [cat, setCat] = useState<"All" | keyof typeof CATEGORY_LABEL>("All");
     const [world, setWorld] = useState<"All" | string>("All");
+    
+    // Ref for search input (for keyboard shortcut)
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
+    // Keyboard shortcut: Cmd/Ctrl+K to focus search
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            // Check for Cmd+K (Mac) or Ctrl+K (Windows/Linux)
+            if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+                event.preventDefault();
+                searchInputRef.current?.focus();
+                searchInputRef.current?.select();
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     // Performance: Memoize category validation
     const CATEGORY_KEYS = useMemo(
@@ -345,15 +394,33 @@ export default function EventsPublicFilter({ events }: { events: EventItem[] }) 
                     <label htmlFor="event-search" className="sr-only">Search events</label>
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500 pointer-events-none" />
                     <Input
+                        ref={searchInputRef}
                         id="event-search"
                         type="search"
                         value={q}
                         onChange={handleSearchChange}
                         placeholder="Search events…"
                         maxLength={MAX_SEARCH_LENGTH}
-                        className="pl-11"
+                        className="pl-11 pr-16"
                         aria-label="Search events by name, world, or category"
                     />
+                    {/* Keyboard shortcut hint */}
+                    <kbd 
+                        className={cn(
+                            "absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none",
+                            "hidden sm:flex items-center gap-1",
+                            "px-2 py-1 text-xs font-semibold rounded-md border",
+                            "bg-slate-100 dark:bg-slate-800",
+                            "text-slate-600 dark:text-slate-400",
+                            "border-slate-300 dark:border-slate-700",
+                            "transition-opacity duration-200",
+                            q ? "opacity-0" : "opacity-100"
+                        )}
+                        aria-hidden="true"
+                    >
+                        <Command className="w-3 h-3" />
+                        K
+                    </kbd>
                 </div>
                 
                 <div className="flex flex-col sm:flex-row gap-3">
