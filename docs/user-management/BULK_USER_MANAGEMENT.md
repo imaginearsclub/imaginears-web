@@ -4,6 +4,81 @@
 
 A comprehensive bulk user management system that allows administrators to efficiently manage multiple users at once. This feature saves significant time when dealing with large user bases.
 
+---
+
+## 🔐 Permission Requirements
+
+### Access Control
+
+This feature implements **granular RBAC permission checks** for enhanced security. Each operation requires a specific permission to execute.
+
+#### Page Access
+- **Required Permission:** `users:bulk_operations`
+- **Without this permission:** Users cannot access `/admin/users/bulk` page
+
+#### Operation-Specific Permissions
+
+Each bulk operation requires its own specific permission:
+
+| Operation | Permission Required | OWNER | ADMIN | MODERATOR | STAFF | USER |
+|-----------|---------------------|-------|-------|-----------|-------|------|
+| 🔴 **Suspend Users** | `users:bulk_suspend` | ✅ | ✅ | ❌ | ❌ | ❌ |
+| 🟢 **Activate Users** | `users:bulk_activate` | ✅ | ✅ | ❌ | ❌ | ❌ |
+| 🛡️ **Change Roles** | `users:bulk_change_roles` | ✅ | **❌** | ❌ | ❌ | ❌ |
+| 🔑 **Reset Passwords** | `users:bulk_reset_passwords` | ✅ | ✅ | ❌ | ❌ | ❌ |
+| 📧 **Send Email** | `users:bulk_send_email` | ✅ | ✅ | ❌ | ❌ | ❌ |
+
+**⚠️ Important:** ADMIN role **cannot** bulk change roles (only OWNER can escalate privileges)
+
+#### Custom Roles
+Custom roles can be granted specific bulk permissions:
+- Navigate: **Admin → User Roles → Configure Roles**
+- Check "Bulk Operations" category
+- Select specific operations to allow
+
+**Example Use Cases:**
+- **Support Team Role:** Grant `bulk_reset_passwords` + `bulk_send_email` only
+- **HR Team Role:** Grant `bulk_activate` + `bulk_send_email` only
+- **Security Team Role:** Grant `bulk_suspend` only
+
+### Permission Enforcement
+
+✅ **Server-side checks** - Each API request validates permissions  
+✅ **Operation-level** - Different permission for each operation  
+✅ **Type-safe** - TypeScript ensures correct permission names  
+✅ **Clear errors** - Shows which permission is missing  
+✅ **Audit logging** - All permission denials logged  
+
+### API Permission Flow
+
+```
+1. User clicks "Suspend Users"
+2. POST /api/admin/users/bulk { operation: "suspend", ... }
+3. Server checks: Does user have "users:bulk_suspend"?
+   ├─ ✅ Yes → Execute operation
+   └─ ❌ No  → Return 403 Forbidden
+```
+
+### Error Responses
+
+**403 Forbidden** when permission missing:
+```json
+{
+  "error": "Forbidden: Missing permission 'users:bulk_suspend'"
+}
+```
+
+The error message clearly states which permission is required.
+
+---
+
+**See Also:**
+- [RBAC Permission Enforcement](../rbac-permissions/RBAC_PERMISSION_ENFORCEMENT.md) - Complete security guide
+- [Permission Flow Visual](../rbac-permissions/PERMISSION_FLOW_VISUAL.md) - Visual diagrams
+- [Role Configuration UI](../rbac-permissions/ROLE_CONFIGURE_UI_UPDATE.md) - How to grant permissions
+
+---
+
 ## 🚀 Features Implemented
 
 ### 1. **Bulk Operations** ⚙️
