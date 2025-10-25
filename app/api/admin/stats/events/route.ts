@@ -52,12 +52,12 @@ export async function GET(req: Request){
             // This is much more efficient for large datasets
             const rows = await prisma.$queryRaw<Array<{date: string; count: bigint}>>`
                 SELECT 
-                    DATE("createdAt") as date,
-                    COUNT(*)::bigint as count
-                FROM "Event"
-                WHERE "createdAt" >= ${start}
-                    AND "createdAt" <= ${end}
-                GROUP BY DATE("createdAt")
+                    DATE(createdAt) as date,
+                    COUNT(*) as count
+                FROM Event
+                WHERE createdAt >= ${start}
+                    AND createdAt <= ${end}
+                GROUP BY DATE(createdAt)
                 ORDER BY date ASC
             `;
 
