@@ -4,6 +4,60 @@
 
 The admin sessions page has been significantly enhanced with advanced monitoring, threat detection, and user management capabilities. This document outlines the new features and how to use them.
 
+---
+
+## 🔐 Permission Requirements
+
+### Access Control
+
+This feature implements **granular RBAC permission checks** to ensure only authorized users can monitor and manage sessions.
+
+#### Required Permissions
+
+| Feature | Permission | OWNER | ADMIN | MODERATOR | STAFF | USER |
+|---------|-----------|-------|-------|-----------|-------|------|
+| **View Admin Sessions Page** | `sessions:view_all` | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **View Session Analytics** | `sessions:view_analytics` | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Revoke Any Session** | `sessions:revoke_any` | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Configure Policies** | `sessions:configure_policies` | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **View Health Monitoring** | `sessions:view_health` | ✅ | ✅ | ❌ | ❌ | ❌ |
+
+#### Default Access
+
+- **👑 OWNER** - Full access to all session features
+- **🛡️ ADMIN** - Full access to viewing and managing sessions
+- **⚖️ MODERATOR** - Read-only access (can view but not revoke)
+- **👔 STAFF** - No access to admin session features
+- **👤 USER** - Can only view and manage own sessions
+
+#### Custom Roles
+
+Custom roles can be granted specific session management permissions:
+- Navigate: **Admin → User Roles → Configure Roles**
+- Check "Session Management" category
+- Select specific permissions to grant
+
+**Example Use Cases:**
+- **Security Team:** Grant all session permissions for full monitoring
+- **Support Team:** Grant `view_all` + `revoke_any` for user support
+- **Audit Team:** Grant `view_all` + `view_analytics` (read-only)
+
+### Permission Enforcement
+
+✅ **Page-level checks** - Must have `sessions:view_all` to access page  
+✅ **API-level checks** - Each endpoint validates required permissions  
+✅ **Operation-specific** - Different permissions for view vs. revoke  
+✅ **Clear errors** - Shows which permission is missing (403 Forbidden)  
+✅ **Audit logging** - All access attempts logged for security  
+
+---
+
+**See Also:**
+- [RBAC Permission Enforcement](../rbac-permissions/RBAC_PERMISSION_ENFORCEMENT.md) - Complete guide
+- [Permission Flow Visual](../rbac-permissions/PERMISSION_FLOW_VISUAL.md) - Visual diagrams
+
+---
+
 ## 🚀 Key Features
 
 ### 1. **Interactive User Session Management**
