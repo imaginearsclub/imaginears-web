@@ -13,6 +13,13 @@ export const runtime = "nodejs";
 //  - set active organization to that org (if the API is available)
 
 export async function POST() {
+    // Security: Strict development-only enforcement
+    // This endpoint should NEVER be accessible in production
+    if (process.env.NODE_ENV === "production") {
+        console.error("[Bootstrap Admin] Attempted access in production environment");
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
     const h = await nextHeaders();
     const hdrs = new Headers(h as unknown as Headers);
 
@@ -20,10 +27,6 @@ export async function POST() {
     const session = await auth.api.getSession({ headers: hdrs });
     if (!session?.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    if (process.env.NODE_ENV === "production") {
-        return NextResponse.json({ error: "Disabled in production" }, { status: 403 });
     }
 
     const userId = session.user.id;
