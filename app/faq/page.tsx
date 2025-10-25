@@ -373,11 +373,13 @@ export default function FAQPage() {
                     </p>
                     <div className="flex flex-wrap justify-center gap-3">
                         <a
-                            href="#"
+                            href="https://imaginears.club/d"
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className={cn(
-                                "px-6 py-3 rounded-lg font-semibold transition-all duration-200",
-                                "bg-blue-500 text-white shadow-md",
-                                "hover:bg-blue-600 hover:shadow-lg"
+                                "px-6 py-3 rounded-lg font-semibold transition-all duration-200 shadow-md",
+                                "bg-[#5865F2] hover:bg-[#4752C4] hover:shadow-lg",
+                                "!text-white"
                             )}
                         >
                             Join Discord
