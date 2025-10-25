@@ -17,7 +17,8 @@ import {
   Users,
   Key,
   Server,
-  Shield
+  Shield,
+  Activity
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -25,6 +26,7 @@ import { toast } from "sonner";
 const CATEGORY_ICONS = {
   events: Calendar,
   applications: FileText,
+  sessions: Activity,
   users: Users,
   "api-keys": Key,
   server: Server,
