@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from '@/lib/session';
+import { requirePermission } from '@/lib/session';
 import { 
   getUserRiskHistory, 
   getRiskStatistics,
@@ -15,11 +15,11 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: Request) {
   try {
-    const session = await getServerSession();
+    const session = await requirePermission("sessions:view_own");
     if (!session?.user?.id) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+        { error: 'Forbidden: Missing permission \'sessions:view_own\'' },
+        { status: 403 }
       );
     }
 

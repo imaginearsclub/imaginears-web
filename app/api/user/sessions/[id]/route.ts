@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { revokeSession, updateSessionName } from "@/lib/session-manager";
 
@@ -14,10 +14,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession();
+    const session = await requirePermission("sessions:view_own");
     
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Forbidden: Missing permission 'sessions:view_own'" },
+        { status: 403 }
+      );
     }
 
     // Await params (Next.js 15+)
@@ -56,14 +59,17 @@ export async function PATCH(
  * Revoke a specific session
  */
 export async function DELETE(
-  req: Request,
+  _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession();
+    const session = await requirePermission("sessions:revoke_own");
     
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Forbidden: Missing permission 'sessions:revoke_own'" },
+        { status: 403 }
+      );
     }
 
     // Await params (Next.js 15+)

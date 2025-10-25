@@ -291,12 +291,31 @@ const SidebarInner = memo(function SidebarInner({
                         label="Applications" 
                         onClick={handleClose} 
                     />
-                    <NavItem 
+                    <NavItemWithSubmenu 
                         href="/admin/sessions" 
                         icon={Activity} 
-                        label="Sessions" 
-                        onClick={handleClose} 
-                    />
+                        label="Sessions"
+                        onClick={handleClose}
+                    >
+                        <SubmenuItem 
+                            href="/admin/sessions" 
+                            icon={Activity} 
+                            label="Overview"
+                            onClick={handleClose}
+                        />
+                        <SubmenuItem 
+                            href="/admin/sessions/policies" 
+                            icon={Shield} 
+                            label="Policies"
+                            onClick={handleClose}
+                        />
+                        <SubmenuItem 
+                            href="/admin/sessions/health" 
+                            icon={Activity} 
+                            label="Health"
+                            onClick={handleClose}
+                        />
+                    </NavItemWithSubmenu>
                     
                     {/* Management Section */}
                     <div className="pt-3">
@@ -328,6 +347,12 @@ const SidebarInner = memo(function SidebarInner({
                                 onClick={handleClose}
                             />
                         </NavItemWithSubmenu>
+                        <NavItem 
+                            href="/admin/users/bulk" 
+                            icon={Users} 
+                            label="Bulk Operations" 
+                            onClick={handleClose} 
+                        />
                     </div>
 
                     {/* System Section */}

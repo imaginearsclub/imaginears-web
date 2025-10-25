@@ -30,6 +30,21 @@ export type Permission =
   | "users:write"
   | "users:delete"
   | "users:manage_roles"
+  // Bulk User Operations
+  | "users:bulk_operations"
+  | "users:bulk_suspend"
+  | "users:bulk_activate"
+  | "users:bulk_change_roles"
+  | "users:bulk_reset_passwords"
+  | "users:bulk_send_email"
+  // Sessions
+  | "sessions:view_own"
+  | "sessions:view_all"
+  | "sessions:view_analytics"
+  | "sessions:revoke_own"
+  | "sessions:revoke_any"
+  | "sessions:configure_policies"
+  | "sessions:view_health"
   // Settings
   | "settings:read"
   | "settings:write"
@@ -68,6 +83,21 @@ export const ROLE_PERMISSIONS: any = {
     "users:write",
     "users:delete",
     "users:manage_roles",
+    // Bulk Operations (all)
+    "users:bulk_operations",
+    "users:bulk_suspend",
+    "users:bulk_activate",
+    "users:bulk_change_roles",
+    "users:bulk_reset_passwords",
+    "users:bulk_send_email",
+    // Sessions (all)
+    "sessions:view_own",
+    "sessions:view_all",
+    "sessions:view_analytics",
+    "sessions:revoke_own",
+    "sessions:revoke_any",
+    "sessions:configure_policies",
+    "sessions:view_health",
     // Settings
     "settings:read",
     "settings:write",
@@ -99,6 +129,21 @@ export const ROLE_PERMISSIONS: any = {
     // Users
     "users:read",
     "users:write",
+    // Bulk Operations (most, not role changes)
+    "users:bulk_operations",
+    "users:bulk_suspend",
+    "users:bulk_activate",
+    "users:bulk_reset_passwords",
+    "users:bulk_send_email",
+    // Note: users:bulk_change_roles excluded (prevent self-promotion)
+    // Sessions (all except configure policies)
+    "sessions:view_own",
+    "sessions:view_all",
+    "sessions:view_analytics",
+    "sessions:revoke_own",
+    "sessions:revoke_any",
+    "sessions:view_health",
+    // Note: sessions:configure_policies excluded (critical security)
     // Settings
     "settings:read",
     "settings:write",
@@ -124,6 +169,12 @@ export const ROLE_PERMISSIONS: any = {
     "players:write",
     // Users
     "users:read",
+    // Sessions (view only, no bulk operations)
+    "sessions:view_own",
+    "sessions:view_all",
+    "sessions:view_analytics",
+    "sessions:revoke_own",
+    // Note: No bulk operations or policy configuration
     // Settings
     "settings:read",
     // Dashboard
@@ -143,6 +194,9 @@ export const ROLE_PERMISSIONS: any = {
     "players:read",
     // Users
     "users:read",
+    // Sessions (own only)
+    "sessions:view_own",
+    "sessions:revoke_own",
     // Settings
     "settings:read",
     // Dashboard
@@ -151,6 +205,9 @@ export const ROLE_PERMISSIONS: any = {
 
   // USER: Basic authenticated access
   USER: [
+    // Sessions (own only)
+    "sessions:view_own",
+    "sessions:revoke_own",
     // Dashboard
     "dashboard:view",
   ],

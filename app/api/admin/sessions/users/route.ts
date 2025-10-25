@@ -1,27 +1,18 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    // Require admin authentication
-    const session = await getServerSession();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Check if user has admin/owner role
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true },
-    });
-
-    const isAdminOrOwner = ["OWNER", "ADMIN"].includes(user?.role || "");
-    
-    if (!isAdminOrOwner) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // Require session viewing permission
+    const session = await requirePermission("sessions:view_all");
+    if (!session) {
+      return NextResponse.json(
+        { error: "Forbidden: Missing permission 'sessions:view_all'" },
+        { status: 403 }
+      );
     }
 
     const now = new Date();

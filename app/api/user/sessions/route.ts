@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { revokeAllSessions, getUserSessionAnalytics } from "@/lib/session-manager";
+import { revokeAllSessions } from "@/lib/session-manager";
 
 export const runtime = "nodejs";
 
@@ -11,10 +11,13 @@ export const runtime = "nodejs";
  */
 export async function GET() {
   try {
-    const session = await getServerSession();
+    const session = await requirePermission("sessions:view_own");
     
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Forbidden: Missing permission 'sessions:view_own'" },
+        { status: 403 }
+      );
     }
 
     const sessions = await prisma.session.findMany({
@@ -52,10 +55,13 @@ export async function GET() {
  */
 export async function DELETE() {
   try {
-    const session = await getServerSession();
+    const session = await requirePermission("sessions:revoke_own");
     
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Forbidden: Missing permission 'sessions:revoke_own'" },
+        { status: 403 }
+      );
     }
 
     const result = await revokeAllSessions(session.user.id, session.session?.token);
