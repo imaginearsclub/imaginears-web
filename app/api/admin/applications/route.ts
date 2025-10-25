@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
-import { PrismaClient, AppStatus } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { AppStatus } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/session";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
     try {
+        // Require admin authentication
+        const session = await requireAdmin();
+        
+        if (!session) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status") as AppStatus | null; // "New" | "InReview" | ...
         const q = searchParams.get("q")?.trim() || "";
@@ -43,9 +49,12 @@ export async function GET(req: Request) {
 
         const nextCursor = items.length === take ? items[items.length - 1]?.id ?? null : null;
 
+        // Audit log
+        console.log(`[AUDIT] Applications list accessed by admin user ${session?.user?.id || 'unknown'} at ${new Date().toISOString()}`);
+
         return NextResponse.json({ items, nextCursor });
     } catch (e) {
-        console.error(e);
+        console.error("[Admin Applications GET] Error:", e);
         return NextResponse.json({ error: "Failed to load applications" }, { status: 500 });
     }
 }
