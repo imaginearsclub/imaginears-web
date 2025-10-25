@@ -25,6 +25,11 @@ type Kpi = {
     totalEvents: number; 
     activeApplications: number; 
     apiUptime: string;
+    trends: {
+        players: string;
+        events: string;
+        applications: string;
+    };
     server: {
         address: string;
         online: boolean;
@@ -100,22 +105,25 @@ export default function DashboardPage() {
                 title: "Total Players", 
                 value: kpis?.totalPlayers ?? "—", 
                 icon: <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />,
-                trend: "+12%",
-                bgColor: "bg-blue-50 dark:bg-blue-950/30"
+                trend: kpis?.trends?.players ?? "—",
+                bgColor: "bg-blue-50 dark:bg-blue-950/30",
+                ariaLabel: "Total players registered"
             },
             { 
                 title: "Total Events", 
                 value: kpis?.totalEvents ?? "—", 
                 icon: <CalendarRange className="h-5 w-5 text-violet-600 dark:text-violet-400" />,
-                trend: "+8%",
-                bgColor: "bg-violet-50 dark:bg-violet-950/30"
+                trend: kpis?.trends?.events ?? "—",
+                bgColor: "bg-violet-50 dark:bg-violet-950/30",
+                ariaLabel: "Total events created"
             },
             { 
                 title: "Active Applications", 
                 value: kpis?.activeApplications ?? "—", 
                 icon: <FileText className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />,
-                trend: "+23%",
-                bgColor: "bg-emerald-50 dark:bg-emerald-950/30"
+                trend: kpis?.trends?.applications ?? "—",
+                bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
+                ariaLabel: "Active application submissions"
             },
         ],
         [kpis]
@@ -160,15 +168,24 @@ export default function DashboardPage() {
                     <>
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                             {cards.map((card) => (
-                                <Card key={card.title} className="hover:shadow-lg transition-shadow">
+                                <Card 
+                                    key={card.title} 
+                                    className="hover:shadow-lg transition-shadow"
+                                    aria-label={card.ariaLabel}
+                                >
                                     <CardContent className="flex flex-col gap-3 p-6">
                                         <div className="flex items-center justify-between">
-                                            <div className={`p-2 rounded-lg ${card.bgColor}`}>
+                                            <div className={`p-2 rounded-lg ${card.bgColor}`} aria-hidden="true">
                                                 {card.icon}
                                             </div>
-                                            <Badge variant="default" className="text-xs">
-                                                {card.trend}
-                                            </Badge>
+                                            <span 
+                                                className="text-xs"
+                                                aria-label={`7-day trend: ${card.trend}`}
+                                            >
+                                                <Badge variant="default">
+                                                    {card.trend}
+                                                </Badge>
+                                            </span>
                                         </div>
                                         <div>
                                             <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{card.title}</p>
