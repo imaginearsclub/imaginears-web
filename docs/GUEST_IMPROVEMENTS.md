@@ -144,9 +144,53 @@ openGraph: {
 }
 ```
 
+### 4. Event Countdown Timers ✅
+**Status**: Complete
+**Priority**: Low-Medium
+
+**Features**:
+- ✅ Dynamic countdown badges on all event cards
+- ✅ Countdown on event detail pages
+- ✅ Auto-updating every minute (no page refresh needed)
+- ✅ Multiple states with color coding:
+  - 🔵 **Upcoming** - Events starting in more than 1 hour (default/blue)
+  - 🟡 **Starting Soon** - Events starting in less than 1 hour (warning/amber)
+  - 🟢 **Happening Now** - Events currently ongoing (success/green)
+  - ⚪ **Recently Ended** - Events that ended within 1 hour (info/sky)
+- ✅ Icons for visual feedback (Clock, Flame, CheckCircle)
+- ✅ Human-readable format ("in 2 hours", "in 30 minutes")
+- ✅ Accessibility: ARIA live regions for screen readers
+
+**User Benefits**:
+- Guests know exactly when events start
+- Creates urgency for events starting soon
+- Visual excitement for ongoing events
+- Easy to see which events are active right now
+- No need to calculate time differences manually
+
+**Technical Implementation**:
+```typescript
+// Auto-updating countdown with useEffect
+useEffect(() => {
+    setNow(Date.now());
+    const interval = setInterval(() => {
+        setNow(Date.now());
+    }, 60000); // Update every minute
+    return () => clearInterval(interval);
+}, []);
+
+// Smart status detection
+const getCountdownInfo = (startAt, endAt, now) => {
+    if (msUntilEnd < 0) return { status: "ended", label: "Ended" };
+    if (msUntilStart <= 0) return { status: "happening-now", label: "Happening now!" };
+    if (msUntilStart <= 3600000) return { status: "starting-soon", label: "Starts in X" };
+    return { status: "upcoming", label: "Starts in X" };
+};
+```
+
 ## 🎯 Planned Improvements
 
-### 4. Full FAQ Page
+### 5. Full FAQ Page
 **Status**: Pending
 **Priority**: Medium
 
@@ -319,6 +363,14 @@ To measure the impact of these improvements:
   - Security: URL encoding and sanitization
   - Better social preview cards
   - Mobile responsive with proper button sizing
+
+- ✅ **Event Countdown Timers** implemented
+  - Dynamic countdown badges on all event cards and detail pages
+  - Auto-updates every minute (client-side)
+  - Color-coded by urgency (upcoming, soon, happening, ended)
+  - Icons for visual feedback (Clock, Flame, CheckCircle)
+  - Human-readable time format
+  - ARIA live regions for accessibility
 
 ---
 
