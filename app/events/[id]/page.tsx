@@ -11,6 +11,8 @@ import { Badge, EmptyState, Separator } from "@/components/common";
 import { cn } from "@/lib/utils";
 import { Calendar, Clock, MapPin } from "lucide-react";
 import ScheduleSummary from "@/components/events/ScheduleSummary";
+import AddToCalendarButton from "@/components/events/AddToCalendarButton";
+import ShareButton from "@/components/events/ShareButton";
 
 // Configuration
 export const runtime = "nodejs";
@@ -103,12 +105,27 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
                 title: safeTitle,
                 description: safeDescription,
                 type: "website",
+                siteName: "Imaginears Club",
+                locale: "en_US",
             },
             twitter: {
-                card: "summary",
+                card: "summary_large_image",
                 title: safeTitle,
                 description: safeDescription,
+                site: "@ImaginearsClub",
             },
+            // Additional metadata for better SEO
+            keywords: [
+                "Imaginears",
+                "Minecraft event",
+                ev.category,
+                ev.world,
+                "Disney-inspired",
+                "Theme park",
+            ],
+            authors: [{ name: "Imaginears Club" }],
+            creator: "Imaginears Club",
+            publisher: "Imaginears Club",
         };
     } catch (error) {
         console.error("[Metadata] Error generating metadata:", error);
@@ -196,15 +213,44 @@ export default async function EventPublicPage({ params }: { params: Promise<{ id
         ).slice(0, MAX_UPCOMING_ITEMS)
         : [];
 
+    // Get the next upcoming occurrence for the calendar button
+    const nextOccurrence = upcoming.length > 0 ? upcoming[0] : null;
+    const calendarStartTime = nextOccurrence ? nextOccurrence.start : ev.startAt;
+    const calendarEndTime = nextOccurrence ? nextOccurrence.end : ev.endAt;
+
     return (
         <div className="mx-auto max-w-4xl p-4 sm:p-6">
             <header className="mb-6">
-                <h1 className={cn(
-                    "text-3xl md:text-4xl font-bold",
-                    "text-slate-900 dark:text-white"
-                )}>
-                    {ev.title}
-                </h1>
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
+                    <h1 className={cn(
+                        "text-3xl md:text-4xl font-bold",
+                        "text-slate-900 dark:text-white"
+                    )}>
+                        {ev.title}
+                    </h1>
+                    
+                    {/* Action buttons */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <AddToCalendarButton
+                            event={{
+                                id: ev.id,
+                                title: ev.title,
+                                ...(ev.shortDescription && { description: ev.shortDescription }),
+                                location: `${ev.world} @ Imaginears Club`,
+                                startTime: calendarStartTime,
+                                endTime: calendarEndTime,
+                            }}
+                            size="md"
+                            variant="default"
+                        />
+                        <ShareButton
+                            title={ev.title}
+                            {...(ev.shortDescription && { description: ev.shortDescription })}
+                            size="md"
+                            variant="outline"
+                        />
+                    </div>
+                </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                     <ScheduleSummary
