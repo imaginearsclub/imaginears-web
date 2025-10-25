@@ -50,6 +50,7 @@ export interface ApiExample {
 export const API_CATEGORIES = [
   { id: "events", name: "Events", icon: "Calendar", description: "Event management endpoints" },
   { id: "applications", name: "Applications", icon: "FileText", description: "Staff application endpoints" },
+  { id: "sessions", name: "Sessions", icon: "Activity", description: "Session management and security" },
   { id: "users", name: "Users", icon: "Users", description: "User management endpoints" },
   { id: "api-keys", name: "API Keys", icon: "Key", description: "API key management" },
   { id: "server", name: "Server", icon: "Server", description: "Server status and metrics" },
@@ -477,6 +478,392 @@ console.log('API Key:', data.apiKey.key);`,
         language: "curl",
         code: `curl -X DELETE https://imaginears.club/api/admin/api-keys/key_123 \\
   -H "Cookie: YOUR_SESSION_COOKIE"`,
+      },
+    ],
+  },
+
+  // ========== SESSIONS ==========
+  {
+    id: "sessions-list-own",
+    method: "GET",
+    path: "/api/user/sessions",
+    title: "List User Sessions",
+    description: "Get all active sessions for the current authenticated user. Includes device information, location data, and security metrics.",
+    category: "sessions",
+    authentication: "session",
+    parameters: [],
+    responses: [
+      {
+        status: 200,
+        description: "Success",
+        example: {
+          sessions: [
+            {
+              id: "sess_123",
+              deviceName: "Chrome on Windows",
+              deviceType: "desktop",
+              browser: "Chrome",
+              os: "Windows 10",
+              ipAddress: "192.168.1.100",
+              city: "New York",
+              country: "United States",
+              isp: "Comcast",
+              isSuspicious: false,
+              trustLevel: 2,
+              lastActivityAt: "2025-01-15T14:30:00Z",
+              createdAt: "2025-01-15T10:00:00Z",
+              expiresAt: "2025-02-15T10:00:00Z",
+              isCurrent: true,
+            },
+          ],
+        },
+      },
+      {
+        status: 401,
+        description: "Unauthorized - Authentication required",
+        example: { error: "Unauthorized" },
+      },
+    ],
+    examples: [
+      {
+        title: "cURL",
+        language: "curl",
+        code: `curl -H "Cookie: YOUR_SESSION_COOKIE" \\
+  https://imaginears.club/api/user/sessions`,
+      },
+      {
+        title: "JavaScript",
+        language: "javascript",
+        code: `const response = await fetch('https://imaginears.club/api/user/sessions', {
+  credentials: 'include'
+});
+const data = await response.json();
+console.log('Active sessions:', data.sessions.length);`,
+      },
+    ],
+  },
+
+  {
+    id: "sessions-get-one",
+    method: "GET",
+    path: "/api/user/sessions/{id}",
+    title: "Get Session Details",
+    description: "Get detailed information about a specific session including activity history.",
+    category: "sessions",
+    authentication: "session",
+    parameters: [
+      {
+        name: "id",
+        in: "path",
+        type: "string",
+        required: true,
+        description: "Session ID",
+      },
+    ],
+    responses: [
+      {
+        status: 200,
+        description: "Success",
+        example: {
+          session: {
+            id: "sess_123",
+            deviceName: "Chrome on Windows",
+            ipAddress: "192.168.1.100",
+            city: "New York",
+            country: "United States",
+            isSuspicious: false,
+            trustLevel: 2,
+            createdAt: "2025-01-15T10:00:00Z",
+            lastActivityAt: "2025-01-15T14:30:00Z",
+          },
+          activities: [
+            {
+              id: "act_456",
+              action: "page_view",
+              endpoint: "/profile",
+              userAgent: "Mozilla/5.0...",
+              createdAt: "2025-01-15T14:30:00Z",
+            },
+          ],
+        },
+      },
+      {
+        status: 403,
+        description: "Forbidden - Session belongs to another user",
+        example: { error: "Forbidden" },
+      },
+      {
+        status: 404,
+        description: "Session not found",
+        example: { error: "Session not found" },
+      },
+    ],
+    examples: [
+      {
+        title: "cURL",
+        language: "curl",
+        code: `curl -H "Cookie: YOUR_SESSION_COOKIE" \\
+  https://imaginears.club/api/user/sessions/sess_123`,
+      },
+    ],
+  },
+
+  {
+    id: "sessions-revoke",
+    method: "DELETE",
+    path: "/api/user/sessions/{id}",
+    title: "Revoke Session",
+    description: "Revoke a specific session. The user will be logged out from that device.",
+    category: "sessions",
+    authentication: "session",
+    parameters: [
+      {
+        name: "id",
+        in: "path",
+        type: "string",
+        required: true,
+        description: "Session ID",
+      },
+    ],
+    responses: [
+      {
+        status: 200,
+        description: "Session revoked successfully",
+        example: { message: "Session revoked successfully" },
+      },
+      {
+        status: 403,
+        description: "Cannot revoke current session using this endpoint",
+        example: { error: "Use /api/logout to revoke current session" },
+      },
+      {
+        status: 404,
+        description: "Session not found",
+        example: { error: "Session not found" },
+      },
+    ],
+    examples: [
+      {
+        title: "cURL",
+        language: "curl",
+        code: `curl -X DELETE \\
+  -H "Cookie: YOUR_SESSION_COOKIE" \\
+  https://imaginears.club/api/user/sessions/sess_123`,
+      },
+      {
+        title: "JavaScript",
+        language: "javascript",
+        code: `const response = await fetch('https://imaginears.club/api/user/sessions/sess_123', {
+  method: 'DELETE',
+  credentials: 'include'
+});
+if (response.ok) {
+  console.log('Session revoked');
+}`,
+      },
+    ],
+  },
+
+  {
+    id: "sessions-export",
+    method: "POST",
+    path: "/api/user/sessions/export",
+    title: "Export Session Data",
+    description: "Export session history and activity logs in various formats (CSV, JSON, PDF, XLSX) for a specified date range.",
+    category: "sessions",
+    authentication: "session",
+    requestBody: {
+      type: "application/json",
+      schema: {
+        format: "string (required) - csv, json, pdf, or xlsx",
+        startDate: "ISO 8601 date string (optional)",
+        endDate: "ISO 8601 date string (optional)",
+      },
+      example: {
+        format: "csv",
+        startDate: "2025-01-01T00:00:00Z",
+        endDate: "2025-01-31T23:59:59Z",
+      },
+    },
+    responses: [
+      {
+        status: 200,
+        description: "File download initiated",
+        example: "Binary file data (CSV/JSON/PDF/XLSX)",
+      },
+      {
+        status: 400,
+        description: "Invalid format or date range",
+        example: { error: "Invalid format specified" },
+      },
+    ],
+    examples: [
+      {
+        title: "cURL - Export as CSV",
+        language: "curl",
+        code: `curl -X POST \\
+  -H "Cookie: YOUR_SESSION_COOKIE" \\
+  -H "Content-Type: application/json" \\
+  -d '{"format":"csv","startDate":"2025-01-01T00:00:00Z"}' \\
+  -o sessions.csv \\
+  https://imaginears.club/api/user/sessions/export`,
+      },
+      {
+        title: "JavaScript",
+        language: "javascript",
+        code: `const response = await fetch('https://imaginears.club/api/user/sessions/export', {
+  method: 'POST',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    format: 'csv',
+    startDate: '2025-01-01T00:00:00Z',
+    endDate: '2025-01-31T23:59:59Z'
+  })
+});
+const blob = await response.blob();
+// Download the file
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = 'sessions.csv';
+a.click();`,
+      },
+    ],
+  },
+
+  {
+    id: "sessions-risk-assessment",
+    method: "GET",
+    path: "/api/user/sessions/risk",
+    title: "Get Risk Assessment",
+    description: "Get AI-powered risk assessment for current user's sessions including risk score, threat analysis, and recommendations.",
+    category: "sessions",
+    authentication: "session",
+    parameters: [],
+    responses: [
+      {
+        status: 200,
+        description: "Success",
+        example: {
+          overallRisk: 15,
+          riskLevel: "low",
+          suspiciousSessions: 0,
+          threatCategories: {
+            impossibleTravel: 0,
+            vpnDetection: 0,
+            deviceSpoofing: 0,
+            bruteForce: 0,
+            sessionHijacking: 0,
+          },
+          recommendations: [
+            "All sessions appear secure",
+            "Consider enabling 2FA for additional security",
+          ],
+        },
+      },
+    ],
+    examples: [
+      {
+        title: "cURL",
+        language: "curl",
+        code: `curl -H "Cookie: YOUR_SESSION_COOKIE" \\
+  https://imaginears.club/api/user/sessions/risk`,
+      },
+    ],
+  },
+
+  {
+    id: "sessions-monitoring",
+    method: "GET",
+    path: "/api/user/sessions/monitoring",
+    title: "Real-time Session Monitoring",
+    description: "Get real-time monitoring data for active sessions including recent activity, anomalies, and live metrics.",
+    category: "sessions",
+    authentication: "session",
+    parameters: [],
+    responses: [
+      {
+        status: 200,
+        description: "Success",
+        example: {
+          activeSessions: 2,
+          recentActivity: [
+            {
+              sessionId: "sess_123",
+              action: "page_view",
+              endpoint: "/profile",
+              timestamp: "2025-01-15T14:30:00Z",
+            },
+          ],
+          anomalies: [],
+          metrics: {
+            avgSessionDuration: 45,
+            lastActivity: "2025-01-15T14:30:00Z",
+          },
+        },
+      },
+    ],
+    examples: [
+      {
+        title: "cURL",
+        language: "curl",
+        code: `curl -H "Cookie: YOUR_SESSION_COOKIE" \\
+  https://imaginears.club/api/user/sessions/monitoring`,
+      },
+    ],
+  },
+
+  {
+    id: "admin-sessions-users",
+    method: "GET",
+    path: "/api/admin/sessions/users",
+    title: "List Users with Session Stats",
+    description: "Get all users with active sessions and their statistics. Admin authentication required.",
+    category: "sessions",
+    authentication: "admin",
+    parameters: [],
+    responses: [
+      {
+        status: 200,
+        description: "Success",
+        example: {
+          users: [
+            {
+              id: "user_123",
+              name: "John Doe",
+              email: "john@example.com",
+              role: "USER",
+              activeSessions: 2,
+              suspiciousSessions: 0,
+              riskScore: 15,
+              lastLogin: "2025-01-15T10:00:00Z",
+            },
+          ],
+          total: 1,
+        },
+      },
+      {
+        status: 403,
+        description: "Forbidden - Admin access required",
+        example: { error: "Forbidden" },
+      },
+    ],
+    examples: [
+      {
+        title: "cURL",
+        language: "curl",
+        code: `curl -H "Cookie: YOUR_ADMIN_SESSION_COOKIE" \\
+  https://imaginears.club/api/admin/sessions/users`,
+      },
+      {
+        title: "JavaScript",
+        language: "javascript",
+        code: `const response = await fetch('https://imaginears.club/api/admin/sessions/users', {
+  credentials: 'include'
+});
+const data = await response.json();
+console.log(\`\${data.total} users with active sessions\`);`,
       },
     ],
   },
