@@ -1,19 +1,47 @@
 # Profile Page - User Self-Service Management
 
-## ✅ STATUS: COMPLETED & WORKING
+## ✅ STATUS: COMPLETED & ENHANCED (October 2025)
 
-A comprehensive profile management system that allows all staff members to manage their own account information, link Minecraft accounts, change passwords, and manage active sessions.
+A comprehensive profile management system with **advanced security features**, session monitoring, 2FA, connected accounts, and API key management. Allows all users to manage their account information, security settings, and integrations.
+
+---
+
+## 🔐 Permission Requirements
+
+### Access Control
+
+The profile page is accessible to **all authenticated users** with varying features based on permissions.
+
+#### Default Access
+
+| Feature | Permission | All Users | Notes |
+|---------|-----------|-----------|-------|
+| **View Profile** | N/A | ✅ | All authenticated users |
+| **Edit Profile** | N/A | ✅ | Own data only |
+| **Manage Sessions** | `sessions:view_own` | ✅ | View own sessions |
+| **Revoke Sessions** | `sessions:revoke_own` | ✅ | Revoke own sessions |
+| **View Session Risk** | `sessions:view_own` | ✅ | See own risk scores |
+| **Export Session Data** | `sessions:view_own` | ✅ | Export own data |
+| **Manage API Keys** | Default | ✅ | Own API keys only |
+
+**Note:** All users can access the profile page and manage their own data. Admin-level features require elevated permissions (see [Staff Management](./STAFF_MANAGEMENT.md)).
 
 ---
 
 ## Overview
 
-The profile page provides staff members with self-service tools to:
-- **Update personal information** (name, email)
+The profile page provides comprehensive self-service tools to:
+- **Update personal information** (name, email, timezone)
 - **Link Minecraft accounts** with LuckPerms validation
 - **Change passwords** securely
-- **Manage active sessions** across devices
-- **View LuckPerms permissions** (if Minecraft account is linked)
+- **Enable Two-Factor Authentication (2FA)** for enhanced security
+- **Connect external accounts** (Discord, Google)
+- **Manage active sessions** with advanced monitoring
+- **View session security & risk scores** in real-time
+- **Export session history** for audit/compliance
+- **Manage API keys** for programmatic access
+- **Monitor device fingerprints** and trust levels
+- **View LuckPerms permissions** (if Minecraft account linked)
 
 ---
 
@@ -41,14 +69,37 @@ The profile page provides staff members with self-service tools to:
 - ✅ Toggle password visibility
 - ✅ Form reset after successful change
 
-### 4. Session Management
-- ✅ View all active sessions
-- ✅ Device type detection (Desktop/Mobile/Tablet)
+### 4. Advanced Session Management 🔒
+**Enhanced with enterprise-grade security features:**
+
+#### Basic Session Features
+- ✅ View all active sessions across devices
+- ✅ Device type detection (Desktop/Mobile/Tablet/Bot)
 - ✅ Browser and OS identification
-- ✅ IP address display
+- ✅ IP address display with geolocation (country, city)
 - ✅ Session creation and expiration dates
 - ✅ Revoke individual sessions
+- ✅ Bulk revoke all other sessions
 - ✅ Current session protection (cannot revoke current session)
+
+#### Advanced Security Features 🛡️
+- ✅ **Device Fingerprinting** - Unique device identification (canvas, audio, WebGL)
+- ✅ **Risk Scoring** - Real-time AI-powered risk assessment (0-100 scale)
+- ✅ **Trust Levels** - Session classification (New, Recognized, Trusted)
+- ✅ **Threat Detection** - VPN detection, impossible travel, brute force
+- ✅ **Session Timeline** - Visual activity timeline
+- ✅ **Real-time Monitoring** - Live session activity with anomaly detection
+- ✅ **Session Comparison** - Detect potential takeovers
+- ✅ **Export Capability** - Download session history (CSV/JSON/PDF/XLSX)
+- ✅ **Suspicious Activity Alerts** - Automatic flagging of unusual behavior
+- ✅ **IP Geolocation** - Track session locations on map
+
+#### Session Analytics 📊
+- ✅ Session duration tracking
+- ✅ Activity patterns analysis
+- ✅ Login frequency metrics
+- ✅ Device usage statistics
+- ✅ Geographic distribution
 
 ### 5. Admin/Staff Access (Role-Based)
 - ✅ **Quick dashboard access** for OWNER/ADMIN/MODERATOR/STAFF roles
@@ -58,14 +109,54 @@ The profile page provides staff members with self-service tools to:
 - ✅ Only visible to users with staff permissions
 - ✅ Direct link to `/admin/dashboard`
 
-### 6. Account Stats Overview
-- ✅ Role display
-- ✅ Email verification status
-- ✅ Minecraft link status
-- ✅ Active session count
-- ✅ Member since date
+### 6. Two-Factor Authentication (2FA) 🔐
+**TOTP-based authentication for enhanced security:**
+- ✅ Enable/disable 2FA
+- ✅ QR code generation for authenticator apps
+- ✅ Backup codes generation (10 one-time codes)
+- ✅ Recovery codes management
+- ✅ Verification before enabling
+- ✅ 6-digit OTP support
+- ✅ Works with Google Authenticator, Authy, 1Password, etc.
 
-### 7. Minecraft Avatar Integration
+**See [Two-Factor Auth Documentation](../authentication/TWO_FACTOR_AUTH.md) for complete guide.**
+
+### 7. Connected Accounts 🔗
+**Link external accounts for easier sign-in:**
+- ✅ **Discord** - Link Discord account for social login
+- ✅ **Google** - Link Google account for OAuth
+- ✅ Account linking/unlinking
+- ✅ View linked account status
+- ✅ Primary account protection
+- ✅ Multiple provider support
+
+**See [Connected Accounts Documentation](../authentication/CONNECTED_ACCOUNTS.md) for complete guide.**
+
+### 8. API Key Management 🔑
+**Generate API keys for programmatic access:**
+- ✅ Create API keys with custom names
+- ✅ Set expiration dates
+- ✅ Configure rate limits
+- ✅ Define scopes/permissions
+- ✅ View usage statistics
+- ✅ Revoke keys anytime
+- ✅ Key rotation support
+- ✅ Last used tracking
+
+**See [API Keys Documentation](../integrations/API_KEYS.md) for complete guide.**
+
+### 9. Account Stats Overview
+- ✅ Role display with permission count
+- ✅ Email verification status
+- ✅ 2FA enabled status
+- ✅ Minecraft link status
+- ✅ Connected accounts count
+- ✅ Active session count
+- ✅ Total API keys
+- ✅ Member since date
+- ✅ Account security score
+
+### 10. Minecraft Avatar Integration
 - ✅ **Displays Minecraft skin avatar** if account is linked
 - ✅ Uses Crafatar API for high-quality 3D avatars
 - ✅ Shows user's actual in-game skin with overlay
@@ -81,10 +172,18 @@ The profile page provides staff members with self-service tools to:
 app/profile/
 ├── page.tsx                              # Main profile page (server component)
 └── components/
-    ├── ProfileForm.tsx                   # Profile information editor
-    ├── PasswordChangeForm.tsx            # Password change form
-    ├── MinecraftLinkForm.tsx             # Minecraft account linking
-    └── SessionsList.tsx                  # Active sessions manager
+    ├── ProfileContent.tsx                # Main client wrapper
+    ├── sections/
+    │   ├── ProfileSection.tsx            # Profile information editor
+    │   ├── SecuritySection.tsx           # Security features (2FA, sessions)
+    │   ├── MinecraftSection.tsx          # Minecraft account linking
+    │   ├── ConnectedAccountsSection.tsx  # OAuth accounts
+    │   └── ApiKeysSection.tsx            # API key management
+    ├── DeviceFingerprint.tsx             # Device fingerprinting component
+    ├── SessionRiskDashboard.tsx          # Risk scoring visualization
+    ├── RealtimeSessionMonitor.tsx        # Live session monitoring
+    ├── SessionConflictDetector.tsx       # Takeover detection
+    └── SessionExportTools.tsx            # Export session data
 
 components/admin/
 ├── Sidebar.tsx                           # Updated with "My Profile" link
@@ -404,44 +503,94 @@ Solution: Ensure both password fields contain the same value
 
 ---
 
+## Recent Enhancements ✅
+
+### Implemented Features (October 2025)
+
+#### Security Features (Complete)
+- ✅ **Two-factor authentication (2FA)** - TOTP-based with backup codes
+- ✅ **Advanced session management** - Real-time monitoring, risk scoring
+- ✅ **Device fingerprinting** - Unique device identification
+- ✅ **Threat detection** - VPN, impossible travel, brute force detection
+- ✅ **Session export** - Audit trail export (CSV/JSON/PDF/XLSX)
+- ✅ **Login history** - Complete activity timeline
+
+#### Integration Features (Complete)
+- ✅ **Discord account linking** - OAuth integration
+- ✅ **Google account linking** - OAuth integration
+- ✅ **API key management** - Full API access control
+- ✅ **Connected accounts** - Multiple provider support
+
+#### Profile Features (Complete)
+- ✅ **Timezone preference** - User-specific timezone
+- ✅ **Session analytics** - Activity patterns and metrics
+- ✅ **Risk scoring** - AI-powered security assessment
+- ✅ **Real-time monitoring** - Live session activity
+
 ## Future Enhancements
 
-### Phase 1: Enhanced Profile
-- [ ] Profile picture upload
+### Phase 1: Additional Features
+- [ ] Profile picture upload (custom avatars)
 - [ ] Custom bio/description
-- [ ] Timezone preference
-- [ ] Notification preferences
+- [ ] Notification preferences (email, push)
+- [ ] Email notification management
 
-### Phase 2: Security
-- [ ] Two-factor authentication (2FA)
-- [ ] Login history log
-- [ ] Security question setup
-- [ ] Account recovery options
-
-### Phase 3: Integrations
-- [ ] Discord account linking
+### Phase 2: Social Features
 - [ ] Steam account linking
-- [ ] Social media connections
-- [ ] API key management
+- [ ] Additional OAuth providers (GitHub, Twitter)
+- [ ] Social media profile connections
+- [ ] Friend/colleague connections
 
-### Phase 4: Analytics
-- [ ] Activity dashboard
+### Phase 3: Analytics
+- [ ] Personal activity dashboard
 - [ ] Contribution statistics
 - [ ] Event participation history
-- [ ] Staff performance metrics
+- [ ] Performance metrics (for staff)
+- [ ] Usage analytics
+
+### Phase 4: Advanced Security
+- [ ] Security questions setup
+- [ ] Account recovery options (additional)
+- [ ] Biometric authentication (WebAuthn)
+- [ ] Hardware key support (YubiKey)
+- [ ] Security audit log (detailed)
 
 ---
 
 ## Success! 🎉
 
-Your profile management system is now complete! Staff members can:
+Your profile management system is **feature-complete** with enterprise-grade security! Users can:
 - ✅ Manage their own information
 - ✅ Link Minecraft accounts with LuckPerms validation
 - ✅ Change passwords securely
-- ✅ Manage active sessions
+- ✅ **Enable Two-Factor Authentication (2FA)**
+- ✅ **Connect external accounts** (Discord, Google)
+- ✅ **Manage API keys** for programmatic access
+- ✅ **Monitor sessions** with advanced security features
+- ✅ **View risk scores** and threat detection
+- ✅ **Export session data** for compliance
+- ✅ **Track device fingerprints** and trust levels
 
 **Try it now:**
-1. Log in to the admin dashboard
+1. Log in to the dashboard
 2. Click "My Profile" in the sidebar
-3. Explore all the features!
+3. Explore the enhanced security features!
+
+---
+
+## Related Documentation
+
+- **[Two-Factor Authentication](../authentication/TWO_FACTOR_AUTH.md)** - Complete 2FA guide
+- **[Connected Accounts](../authentication/CONNECTED_ACCOUNTS.md)** - OAuth integration guide
+- **[API Keys Management](../integrations/API_KEYS.md)** - API access documentation
+- **[Advanced Session Management](../session-management/ADVANCED_SESSION_MANAGEMENT.md)** - Session security features
+- **[Session Management Summary](../session-management/SESSION_MANAGEMENT_SUMMARY.md)** - Implementation details
+- **[RBAC Permission System](../rbac-permissions/RBAC_SYSTEM.md)** - Permission model
+- **[Staff Management](./STAFF_MANAGEMENT.md)** - Admin staff management
+
+---
+
+**Last Updated:** October 25, 2025  
+**Status:** ✅ Complete with Advanced Features  
+**Security Level:** 🔒🔒🔒🔒🔒 (5/5 - Enterprise Grade)
 
