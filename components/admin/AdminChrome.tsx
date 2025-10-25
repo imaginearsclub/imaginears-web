@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Menu, Home, CalendarRange, FileText, Users, Settings, Plus, Search, Moon, Sun, Palette, LogOut, Code } from "lucide-react";
+import { Menu, Home, CalendarRange, FileText, Users, Settings, Plus, Search, Moon, Sun, Palette, LogOut, Code, UserCog, User } from "lucide-react";
 import { SidebarDesktop, SidebarDrawer } from "@/components/admin/Sidebar";
 import { CommandPalette, Badge } from "@/components/common";
 import type { CommandItem } from "@/components/common";
@@ -52,6 +52,15 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
             keywords: ["users", "members"],
         },
         {
+            id: "staff",
+            label: "Cast Members",
+            description: "Manage staff accounts and Minecraft usernames",
+            icon: <UserCog className="w-4 h-4" />,
+            group: "Navigation",
+            onSelect: () => router.push("/admin/staff"),
+            keywords: ["staff", "employees", "team", "minecraft", "cast"],
+        },
+        {
             id: "organizations",
             label: "Organizations",
             description: "Manage organizations and teams",
@@ -59,6 +68,15 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
             group: "Navigation",
             onSelect: () => router.push("/admin/organizations"),
             keywords: ["orgs", "teams"],
+        },
+        {
+            id: "profile",
+            label: "My Profile",
+            description: "Manage your account and personal settings",
+            icon: <User className="w-4 h-4" />,
+            group: "Settings",
+            onSelect: () => router.push("/profile"),
+            keywords: ["account", "personal", "minecraft", "password"],
         },
         {
             id: "settings",

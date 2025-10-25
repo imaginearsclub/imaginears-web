@@ -25,7 +25,7 @@ export function Breadcrumb({ items, className }: BreadcrumbProps) {
         ...items,
     ];
 
-    // Generate structured data for SEO
+    // Generate structured data for SEO (without origin to avoid hydration mismatch)
     const structuredData = {
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
@@ -33,7 +33,7 @@ export function Breadcrumb({ items, className }: BreadcrumbProps) {
             "@type": "ListItem",
             "position": index + 1,
             "name": item.label,
-            ...(item.href && { "item": `${typeof window !== 'undefined' ? window.location.origin : ''}${item.href}` }),
+            ...(item.href && { "item": item.href }),
         })),
     };
 

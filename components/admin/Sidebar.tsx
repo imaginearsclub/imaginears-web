@@ -12,11 +12,15 @@ import {
     Sliders,
     X,
     ChevronDown,
+    UserCog,
+    User,
+    BookOpen,
+    Activity,
 } from "lucide-react";
 import { memo, useCallback, useMemo, useState, type ComponentType } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "@/lib/utils";
-import { Tooltip, Badge, Separator } from "@/components/common";
+import { Tooltip, TooltipProvider, Badge, Separator } from "@/components/common";
 import SignOutButton from "./SignOutButton";
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -227,6 +231,7 @@ const SidebarInner = memo(function SidebarInner({
     }, [onCloseAction]);
 
     return (
+        <TooltipProvider>
         <aside className="flex h-full w-full flex-col justify-between p-5">
             {/* Top section */}
             <div className="space-y-2">
@@ -286,6 +291,12 @@ const SidebarInner = memo(function SidebarInner({
                         label="Applications" 
                         onClick={handleClose} 
                     />
+                    <NavItem 
+                        href="/admin/sessions" 
+                        icon={Activity} 
+                        label="Sessions" 
+                        onClick={handleClose} 
+                    />
                     
                     {/* Management Section */}
                     <div className="pt-3">
@@ -296,6 +307,12 @@ const SidebarInner = memo(function SidebarInner({
                             href="/admin/players" 
                             icon={Users} 
                             label="Players" 
+                            onClick={handleClose} 
+                        />
+                        <NavItem 
+                            href="/admin/staff" 
+                            icon={UserCog} 
+                            label="Cast Members" 
                             onClick={handleClose} 
                         />
                         <NavItemWithSubmenu
@@ -320,6 +337,18 @@ const SidebarInner = memo(function SidebarInner({
                             System
                         </div>
                         <NavItem 
+                            href="/profile" 
+                            icon={User} 
+                            label="My Profile" 
+                            onClick={handleClose} 
+                        />
+                        <NavItem 
+                            href="/admin/api-docs" 
+                            icon={BookOpen} 
+                            label="API Documentation" 
+                            onClick={handleClose} 
+                        />
+                        <NavItem 
                             href="/admin/settings" 
                             icon={Settings} 
                             label="Settings" 
@@ -343,6 +372,7 @@ const SidebarInner = memo(function SidebarInner({
                 </div>
             </div>
         </aside>
+        </TooltipProvider>
     );
 });
 

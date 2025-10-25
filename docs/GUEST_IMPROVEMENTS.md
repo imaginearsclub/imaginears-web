@@ -314,24 +314,112 @@ const filteredFAQs = faqs.filter(faq =>
 - Improved accessibility
 - Better for SEO
 
+### 7. Guest Favorites ✅
+**Status**: Complete
+**Priority**: High
+
+**Features**:
+- ✅ Favorite/unfavorite events without login (localStorage)
+- ✅ Heart icon button on all event cards
+- ✅ Favorites filter toggle on events page
+- ✅ Live count of favorited events
+- ✅ Animated heart fill effect
+- ✅ Cross-component sync via custom events
+- ✅ Max 50 favorites limit for security
+
+**User Benefits**:
+- Personalize event experience without account
+- Quick filter to see only favorite events
+- Heart icon shows clearly if event is favorited
+- Favorites persist across sessions
+
+**Technical Implementation**:
+```typescript
+// localStorage utility
+export function toggleFavorite(eventId: string): boolean {
+    const isCurrentlyFavorite = isFavorite(eventId);
+    if (isCurrentlyFavorite) {
+        removeFavorite(eventId);
+    } else {
+        addFavorite(eventId);
+    }
+    // Dispatch event for cross-component updates
+    window.dispatchEvent(new CustomEvent("favoritesChanged"));
+}
+```
+
+### 8. Live Server Status Widget ✅
+**Status**: Complete
+**Priority**: Medium
+
+**Features**:
+- ✅ Real-time player count display
+- ✅ Server online/offline status indicator
+- ✅ Minecraft version display
+- ✅ Server latency (ping) display
+- ✅ Uptime percentage tracking
+- ✅ Auto-refresh every 60 seconds
+- ✅ Beautiful gradient card design
+- ✅ Loading skeleton state
+
+**User Benefits**:
+- See if server is online before trying to connect
+- Know how many players are currently online
+- Check server performance (latency)
+- Transparency builds trust
+
+**Technical Implementation**:
+```typescript
+// Public API endpoint
+GET /api/server-status
+// Returns: online status, players, version, latency, uptime
+
+// Component auto-refreshes
+useEffect(() => {
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 60000);
+    return () => clearInterval(interval);
+}, []);
+```
+
+### 9. Calendar View for Events ✅
+**Status**: Complete
+**Priority**: Medium
+
+**Features**:
+- ✅ Month view calendar with grid layout
+- ✅ Events marked on calendar dates
+- ✅ Previous/Next month navigation
+- ✅ "Today" quick jump button
+- ✅ Click event dots to view details
+- ✅ Shows up to 2 events per day + count
+- ✅ Today highlighted with special styling
+- ✅ List/Calendar view toggle
+- ✅ Responsive design
+
+**User Benefits**:
+- Visual way to see event schedule
+- Easy to see which days have events
+- Quick navigation through months
+- Alternative to list view for planning
+- Better monthly overview
+
+**Technical Implementation**:
+```typescript
+// Calendar grid generation
+const daysInMonth = Array.from({ length: lastDay.getDate() }, (_, i) => i + 1);
+const firstDayOfWeek = firstDay.getDay(); // Add padding
+
+// Event marking
+eventsByDate.set(dateKey, [...existing, event]);
+
+// View toggle
+<button onClick={() => setViewMode("calendar")}>
+    <Calendar /> Calendar
+</button>
+```
+
 ## 🔮 Future Ideas (Not Prioritized)
-
-### Calendar View for Events
-- Month view calendar with events marked
-- Click date to see events that day
-- Export entire month to calendar
-
-### Guest Favorites (localStorage)
-- Allow guests to "favorite" events (no auth required)
-- Store in localStorage
-- Show favorites on homepage
-- Reminder notifications
-
-### Live Server Status Widget
-- Real-time player count
-- Server status (online/offline)
-- Average response time
-- Historical uptime graph
 
 ### Community Gallery
 - Screenshots/videos from events
@@ -456,6 +544,29 @@ To measure the impact of these improvements:
   - Category filters with count badges
   - Accordion UI for expandable answers
   - Beautiful responsive design
+
+- ✅ **Guest Favorites System** implemented
+  - localStorage-based favorites (no login required)
+  - Heart button on all event cards
+  - Favorites filter on events page
+  - Animated interactions
+  - Cross-component event synchronization
+
+- ✅ **Live Server Status Widget** implemented
+  - Real-time player count and server status
+  - Displays version, latency, uptime
+  - Auto-refreshes every minute
+  - Beautiful gradient card on homepage
+  - Loading states and error handling
+
+- ✅ **Calendar View for Events** implemented
+  - Month grid calendar with event markers
+  - Previous/Next month navigation
+  - List/Calendar view toggle
+  - Events clickable from calendar
+  - Responsive month layout
+  - **Fixed**: Daily/recurring events now properly expand and show on calendar
+  - **Fixed**: Recurring events now correctly stop at their end date (no longer extend past endAt)
 
 ---
 

@@ -8,6 +8,7 @@ import { ArrowRight } from "lucide-react";
 import AddToCalendarButton from "@/components/events/AddToCalendarButton";
 import ShareButton from "@/components/events/ShareButton";
 import CountdownBadge from "@/components/events/CountdownBadge";
+import FavoriteButton from "@/components/events/FavoriteButton";
 
 // Security: Define allowed string lengths to prevent abuse
 const MAX_TITLE_LENGTH = 200;
@@ -97,14 +98,21 @@ const EventCard = memo(function EventCard({
                     </Link>
                 </h3>
                 
-                <Badge 
-                    variant="primary" 
-                    size="sm"
-                    className="shrink-0"
-                    aria-label={`Event category: ${safeCategory}`}
-                >
-                    {safeCategory}
-                </Badge>
+                <div className="flex items-center gap-2 shrink-0">
+                    <FavoriteButton 
+                        eventId={safeId} 
+                        eventTitle={safeTitle}
+                        size="sm"
+                        variant="ghost"
+                    />
+                    <Badge 
+                        variant="primary" 
+                        size="sm"
+                        aria-label={`Event category: ${safeCategory}`}
+                    >
+                        {safeCategory}
+                    </Badge>
+                </div>
             </header>
 
             {/* Schedule information */}

@@ -107,8 +107,15 @@ export function expandEventOccurrences(
     const safeLimit = Math.min(Math.max(1, Math.trunc(limit ?? 200)), 1000);
     const durationMs = new Date(ev.endAt).getTime() - new Date(ev.startAt).getTime();
 
-    const windowEnd =
-        ev.recurrenceUntil && isBefore(until, ev.recurrenceUntil) ? until : ev.recurrenceUntil || until;
+    // Calculate the effective end window: earliest of until, recurrenceUntil, or endAt
+    // This ensures recurring events don't extend past their actual end date
+    let windowEnd = until;
+    if (ev.recurrenceUntil && isBefore(ev.recurrenceUntil, windowEnd)) {
+        windowEnd = ev.recurrenceUntil;
+    }
+    if (isBefore(ev.endAt, windowEnd)) {
+        windowEnd = ev.endAt;
+    }
 
     if (ev.recurrenceFreq === "NONE") {
         // Show event if it ends after 'from' (includes ongoing events) and starts before 'windowEnd'

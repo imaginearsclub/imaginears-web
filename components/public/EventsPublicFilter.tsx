@@ -2,13 +2,16 @@
 
 import { useDeferredValue, useMemo, useState, useCallback, memo, useRef, useEffect } from "react";
 import Link from "next/link";
-import { formatInZone, SITE_TZ, isSameInstant } from "@/app/utils/timezone";
+import { formatInZone, SITE_TZ, isSameInstant } from "@/app/utils/timezone-client";
 import { Input, Badge, EmptyState } from "@/components/common";
 import { cn } from "@/lib/utils";
-import { Search, ChevronDown, Command } from "lucide-react";
+import { Search, ChevronDown, Command, Heart, Calendar, LayoutGrid } from "lucide-react";
+import { getFavorites } from "@/lib/favorites";
 import AddToCalendarButton from "@/components/events/AddToCalendarButton";
 import ShareButton from "@/components/events/ShareButton";
 import CountdownBadge from "@/components/events/CountdownBadge";
+import FavoriteButton from "@/components/events/FavoriteButton";
+import CalendarView from "@/components/events/CalendarView";
 
 type EventItem = {
     id: string;
@@ -19,6 +22,11 @@ type EventItem = {
     status: "Draft" | "Scheduled" | "Published" | "Archived";
     category: "Fireworks" | "SeasonalOverlay" | "MeetAndGreet" | "Parade" | "Other";
     shortDescription?: string | null;
+    recurrenceFreq: "NONE" | "DAILY" | "WEEKLY";
+    byWeekdayJson: unknown;
+    timesJson: unknown;
+    timezone: string | null;
+    recurrenceUntil: string | null;
 };
 
 const CATEGORY_LABEL: Record<EventItem["category"], string> = {
@@ -148,12 +156,14 @@ const EventCard = memo(({
     event, 
     categoryLabel, 
     formattedStart, 
-    formattedEnd 
+    formattedEnd,
+    displayTimezone
 }: { 
     event: EventItem; 
     categoryLabel: string;
     formattedStart: string;
     formattedEnd: string | null;
+    displayTimezone: string;
 }) => {
     // Parse dates for calendar button
     const startDate = new Date(event.startAt);
@@ -175,13 +185,21 @@ const EventCard = memo(({
                 <CountdownBadge startAt={startDate} endAt={endDate} size="sm" showIcon />
             </div>
 
-            <div className="flex items-center gap-2 text-xs mb-3">
-                <Badge variant="primary" size="sm">
-                    {categoryLabel}
-                </Badge>
-                <Badge variant="default" size="sm">
-                    {event.world}
-                </Badge>
+            <div className="flex items-start justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2 text-xs flex-wrap">
+                    <Badge variant="primary" size="sm">
+                        {categoryLabel}
+                    </Badge>
+                    <Badge variant="default" size="sm">
+                        {event.world}
+                    </Badge>
+                </div>
+                <FavoriteButton 
+                    eventId={event.id} 
+                    eventTitle={event.title}
+                    size="sm"
+                    variant="ghost"
+                />
             </div>
 
             <h3 className="text-lg font-bold text-slate-900 dark:text-white line-clamp-2 mb-2">
@@ -195,7 +213,7 @@ const EventCard = memo(({
             <div className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-4">
                 {formattedStart}
                 {formattedEnd && ` — ${formattedEnd}`}
-                <span className="text-[10px] ml-1">({SITE_TZ})</span>
+                <span className="text-[10px] ml-1">({displayTimezone})</span>
             </div>
 
             {/* Action buttons */}
@@ -250,14 +268,30 @@ function deriveWorlds(events: EventItem[]): string[] {
     return Array.from(worldSet).sort((a, b) => a.localeCompare(b));
 }
 
-export default function EventsPublicFilter({ events }: { events: EventItem[] }) {
+export default function EventsPublicFilter({ events, userTimezone }: { events: EventItem[]; userTimezone?: string }) {
+    const displayTimezone = userTimezone || SITE_TZ;
     const [q, setQ] = useState("");
     const qDeferred = useDeferredValue(q);
     const [cat, setCat] = useState<"All" | keyof typeof CATEGORY_LABEL>("All");
     const [world, setWorld] = useState<"All" | string>("All");
+    const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+    const [favorites, setFavorites] = useState<string[]>([]);
+    const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
     
     // Ref for search input (for keyboard shortcut)
     const searchInputRef = useRef<HTMLInputElement>(null);
+
+    // Load favorites on mount and listen for changes
+    useEffect(() => {
+        setFavorites(getFavorites());
+
+        const handleFavoritesChanged = () => {
+            setFavorites(getFavorites());
+        };
+
+        window.addEventListener("favoritesChanged", handleFavoritesChanged);
+        return () => window.removeEventListener("favoritesChanged", handleFavoritesChanged);
+    }, []);
 
     // Keyboard shortcut: Cmd/Ctrl+K to focus search
     useEffect(() => {
@@ -297,11 +331,14 @@ export default function EventsPublicFilter({ events }: { events: EventItem[] }) 
     // Performance: Optimized filtering with early returns
     const filtered = useMemo(() => {
         // Fast path: no filters applied
-        if (cat === "All" && world === "All" && !qNorm) {
+        if (cat === "All" && world === "All" && !qNorm && !showFavoritesOnly) {
             return events;
         }
 
         return events.filter(event => {
+            // Favorites filter
+            if (showFavoritesOnly && !favorites.includes(event.id)) return false;
+
             // Performance: Check cheapest filters first (category, world)
             if (cat !== "All" && event.category !== cat) return false;
             if (world !== "All" && event.world !== world) return false;
@@ -323,14 +360,14 @@ export default function EventsPublicFilter({ events }: { events: EventItem[] }) 
             
             return true;
         });
-    }, [events, qNorm, cat, world]);
+    }, [events, qNorm, cat, world, showFavoritesOnly, favorites]);
 
     // Performance: Memoize date formatting results
     const formattedEvents = useMemo(() => {
         return filtered.map(event => {
             const formattedStart = (() => {
                 try {
-                    return formatInZone(event.startAt, SITE_TZ);
+                    return formatInZone(event.startAt, displayTimezone);
                 } catch {
                     return event.startAt;
                 }
@@ -339,7 +376,7 @@ export default function EventsPublicFilter({ events }: { events: EventItem[] }) 
             const endSame = isSameInstant(event.startAt, event.endAt);
             const formattedEnd = endSame ? null : (() => {
                 try {
-                    return formatInZone(event.endAt, SITE_TZ);
+                    return formatInZone(event.endAt, displayTimezone);
                 } catch {
                     return event.endAt;
                 }
@@ -350,9 +387,10 @@ export default function EventsPublicFilter({ events }: { events: EventItem[] }) 
                 formattedStart,
                 formattedEnd,
                 categoryLabel: CATEGORY_LABEL[event.category],
+                displayTimezone,
             };
         });
-    }, [filtered]);
+    }, [filtered, displayTimezone]);
 
     // Performance: Memoized input handlers
     const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -430,6 +468,25 @@ export default function EventsPublicFilter({ events }: { events: EventItem[] }) 
                 </div>
                 
                 <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                        onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                        className={cn(
+                            "appearance-none w-full sm:w-auto rounded-xl border-2 font-medium px-4 py-2.5 outline-none transition-all duration-200 flex items-center justify-center gap-2",
+                            showFavoritesOnly
+                                ? "bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-700 dark:text-red-300"
+                                : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-400 dark:hover:border-slate-600",
+                            "shadow-sm hover:shadow focus:ring-2 focus:ring-blue-500/50"
+                        )}
+                        aria-label="Show only favorited events"
+                        aria-pressed={showFavoritesOnly}
+                    >
+                        <Heart className={cn(
+                            "w-4 h-4",
+                            showFavoritesOnly && "fill-red-500 text-red-500"
+                        )} />
+                        <span>Favorites ({favorites.length})</span>
+                    </button>
+
                     <CustomDropdown
                         value={cat}
                         options={categoryOptions}
@@ -446,33 +503,75 @@ export default function EventsPublicFilter({ events }: { events: EventItem[] }) 
                 </div>
             </div>
 
-            {/* Results count */}
-            <div className="mt-4 text-sm text-slate-600 dark:text-slate-400 font-medium">
-                Showing <strong className="text-slate-900 dark:text-white">{formattedEvents.length}</strong> of <strong className="text-slate-900 dark:text-white">{events.length}</strong> events
+            {/* Results count and view toggle */}
+            <div className="mt-4 flex items-center justify-between">
+                <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">
+                    Showing <strong className="text-slate-900 dark:text-white">{formattedEvents.length}</strong> of <strong className="text-slate-900 dark:text-white">{events.length}</strong> events
+                </div>
+
+                {/* View Mode Toggle */}
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setViewMode("list")}
+                        className={cn(
+                            "px-3 py-1.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2",
+                            viewMode === "list"
+                                ? "bg-blue-500 text-white shadow-md"
+                                : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                        )}
+                        aria-label="List view"
+                        aria-pressed={viewMode === "list"}
+                    >
+                        <LayoutGrid className="w-4 h-4" />
+                        <span className="hidden sm:inline">List</span>
+                    </button>
+                    <button
+                        onClick={() => setViewMode("calendar")}
+                        className={cn(
+                            "px-3 py-1.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2",
+                            viewMode === "calendar"
+                                ? "bg-blue-500 text-white shadow-md"
+                                : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                        )}
+                        aria-label="Calendar view"
+                        aria-pressed={viewMode === "calendar"}
+                    >
+                        <Calendar className="w-4 h-4" />
+                        <span className="hidden sm:inline">Calendar</span>
+                    </button>
+                </div>
             </div>
 
-            {/* Event Grid */}
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {formattedEvents.length === 0 && (
-                    <div className="col-span-full">
-                        <EmptyState
-                            icon={<Search className="w-12 h-12" />}
-                            title="No events found"
-                            description="Try adjusting your filters to see more results."
+            {/* Calendar or List View */}
+            {viewMode === "calendar" ? (
+                <div className="mt-6">
+                    <CalendarView events={filtered} />
+                </div>
+            ) : (
+                /* Event Grid */
+                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {formattedEvents.length === 0 && (
+                        <div className="col-span-full">
+                            <EmptyState
+                                icon={<Search className="w-12 h-12" />}
+                                title="No events found"
+                                description="Try adjusting your filters to see more results."
+                            />
+                        </div>
+                    )}
+
+                    {formattedEvents.map(({ event, formattedStart, formattedEnd, categoryLabel, displayTimezone }) => (
+                        <EventCard
+                            key={event.id}
+                            event={event}
+                            categoryLabel={categoryLabel}
+                            formattedStart={formattedStart}
+                            formattedEnd={formattedEnd}
+                            displayTimezone={displayTimezone}
                         />
-                    </div>
-                )}
-
-                {formattedEvents.map(({ event, formattedStart, formattedEnd, categoryLabel }) => (
-                    <EventCard
-                        key={event.id}
-                        event={event}
-                        categoryLabel={categoryLabel}
-                        formattedStart={formattedStart}
-                        formattedEnd={formattedEnd}
-                    />
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

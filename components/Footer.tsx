@@ -125,16 +125,16 @@ export default function Footer() {
         </div>
         
         {/* Right Section: Tagline */}
-        <div className="sm:text-right">
+        <div className="flex flex-col items-start sm:items-end">
           <p 
-            className="text-sm font-medium mb-1"
+            className="text-sm font-medium mb-3"
             style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}
             aria-live="off" 
             role="contentinfo"
           >
             Made with <span aria-label="sparkles" className="inline-block animate-pulse">✨</span> and imagination
           </p>
-          <div className="flex gap-3 mt-3 sm:justify-end">
+          <div className="flex gap-3">
             <a 
               href="https://discord.gg/imaginears" 
               target="_blank" 
