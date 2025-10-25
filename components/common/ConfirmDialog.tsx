@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./Dialog";
-import { AlertTriangle, CheckCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -26,6 +26,7 @@ export interface ConfirmDialogProps {
   cancelText?: string;
   variant?: "danger" | "warning" | "info";
   children?: ReactNode;
+  isLoading?: boolean;
 }
 
 export function ConfirmDialog({
@@ -38,6 +39,7 @@ export function ConfirmDialog({
   cancelText = "Cancel",
   variant = "danger",
   children,
+  isLoading = false,
 }: ConfirmDialogProps) {
   const handleConfirm = async () => {
     await onConfirm();
@@ -97,6 +99,7 @@ export function ConfirmDialog({
             type="button"
             onClick={() => onOpenChange(false)}
             className="btn btn-outline btn-sm"
+            disabled={isLoading}
           >
             {cancelText}
           </button>
@@ -104,7 +107,9 @@ export function ConfirmDialog({
             type="button"
             onClick={handleConfirm}
             className={cn("btn btn-sm", config.buttonClass)}
+            disabled={isLoading}
           >
+            {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             {confirmText}
           </button>
         </DialogFooter>
