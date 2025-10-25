@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 import AddToCalendarButton from "@/components/events/AddToCalendarButton";
 import ShareButton from "@/components/events/ShareButton";
+import CountdownBadge from "@/components/events/CountdownBadge";
 
 // Security: Define allowed string lengths to prevent abuse
 const MAX_TITLE_LENGTH = 200;
@@ -76,6 +77,11 @@ const EventCard = memo(function EventCard({
                 "hover:border-slate-400 dark:hover:border-slate-600"
             )}
         >
+            {/* Countdown badge */}
+            <div className="mb-3">
+                <CountdownBadge startAt={startAt} endAt={endAt} size="sm" showIcon />
+            </div>
+
             {/* Header with title and category badge */}
             <header className="flex items-start justify-between gap-3 mb-4">
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-snug flex-1 min-w-0">
