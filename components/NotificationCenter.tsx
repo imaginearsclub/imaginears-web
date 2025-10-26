@@ -146,7 +146,16 @@ export function NotificationCenter() {
   };
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu 
+      open={open} 
+      onOpenChange={(isOpen) => {
+        setOpen(isOpen);
+        // Fetch latest notifications when opening
+        if (isOpen) {
+          fetchNotifications();
+        }
+      }}
+    >
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
