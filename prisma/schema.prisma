@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,56 +8,60 @@ datasource db {
 }
 
 model User {
-  id            String       @id @default(cuid())
+  id            String   @id @default(cuid())
   name          String?
-  email         String?      @unique
-  emailVerified Boolean?     @default(false)
+  email         String?  @unique
+  emailVerified Boolean? @default(false)
   image         String?
-  minecraftName String?      // Minecraft username for display
-  timezone      String?      @default("America/New_York") // User's preferred timezone (IANA timezone)
-  role          String       @default("USER") // Can be system role (UserRole) or custom role slug
-  permissions   Json?        // Custom permissions override { "events:write": true, "applications:read": true }
-  
+  minecraftName String? // Minecraft username for display
+  timezone      String?  @default("America/New_York") // User's preferred timezone (IANA timezone)
+  role          String   @default("USER") // Can be system role (UserRole) or custom role slug
+  permissions   Json? // Custom permissions override { "events:write": true, "applications:read": true }
+
   // Two-Factor Authentication
-  twoFactorEnabled Boolean?   @default(false)
-  twoFactorSecret  String?    @db.Text // Encrypted TOTP secret
-  backupCodes      Json?      // Array of hashed backup codes
-  
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  accounts      Account[]
-  sessions      Session[]
-  teammembers   TeamMember[]
-  members       Member[]
-  invitations   Invitation[]
-  
+  twoFactorEnabled Boolean? @default(false)
+  twoFactorSecret  String?  @db.Text // Encrypted TOTP secret
+  backupCodes      Json? // Array of hashed backup codes
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  accounts    Account[]
+  sessions    Session[]
+  teammembers TeamMember[]
+  members     Member[]
+  invitations Invitation[]
+
   // Relations for tracking changes
-  createdEvents Event[] @relation("EventCreatedBy")
-  updatedEvents Event[] @relation("EventUpdatedBy")
+  createdEvents       Event[]       @relation("EventCreatedBy")
+  updatedEvents       Event[]       @relation("EventUpdatedBy")
   createdApplications Application[] @relation("ApplicationCreatedBy")
   updatedApplications Application[] @relation("ApplicationUpdatedBy")
-  apiKeys ApiKey[] // API keys created by this user
+  apiKeys             ApiKey[] // API keys created by this user
+
+  // Notification relations
+  notifications           Notification[]           @relation("UserNotifications")
+  notificationPreferences NotificationPreferences? @relation("UserNotificationPreferences")
 
   @@index([role])
   @@map("user")
 }
 
 model Account {
-  id                     String   @id @default(cuid())
-  userId                 String
-  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Better-Auth core fields
-  providerId             String   @db.VarChar(255)
-  accountId              String   @db.VarChar(255)
-  password               String?  @db.Text
-  accessToken            String?  @db.Text
-  refreshToken           String?  @db.Text
-  idToken                String?  @db.Text
-  accessTokenExpiresAt   DateTime?
-  refreshTokenExpiresAt  DateTime?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  providerId            String    @db.VarChar(255)
+  accountId             String    @db.VarChar(255)
+  password              String?   @db.Text
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@unique([providerId, accountId])
   @@index([userId], map: "Account_userId_fkey")
@@ -66,40 +69,40 @@ model Account {
 }
 
 model Session {
-  id                    String   @id @default(cuid())
-  userId                String
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  expiresAt             DateTime
-  token                 String   @unique
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  ipAddress             String?  @db.Text
-  userAgent             String?  @db.Text
-  activeOrganizationId  String?  @db.Text
-  activeTeamId          String?  @db.Text
-  
+  expiresAt            DateTime
+  token                String   @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  ipAddress            String?  @db.Text
+  userAgent            String?  @db.Text
+  activeOrganizationId String?  @db.Text
+  activeTeamId         String?  @db.Text
+
   // Enhanced session tracking
-  deviceName            String?  @db.VarChar(255) // User-friendly device name (e.g., "John's iPhone")
-  deviceType            String?  @db.VarChar(50)  // mobile, desktop, tablet
-  browser               String?  @db.VarChar(100) // Chrome, Firefox, Safari, etc.
-  os                    String?  @db.VarChar(100) // Windows, macOS, iOS, Android, etc.
-  country               String?  @db.VarChar(100) // Country name from IP
-  city                  String?  @db.VarChar(255) // City name from IP
-  
+  deviceName String? @db.VarChar(255) // User-friendly device name (e.g., "John's iPhone")
+  deviceType String? @db.VarChar(50) // mobile, desktop, tablet
+  browser    String? @db.VarChar(100) // Chrome, Firefox, Safari, etc.
+  os         String? @db.VarChar(100) // Windows, macOS, iOS, Android, etc.
+  country    String? @db.VarChar(100) // Country name from IP
+  city       String? @db.VarChar(255) // City name from IP
+
   // Security & Trust
-  trustLevel            Int      @default(0)      // 0=new, 1=recognized, 2=trusted
-  isSuspicious          Boolean  @default(false)  // Flagged for unusual activity
-  lastActivityAt        DateTime @default(now())  // Last API call or page view
-  
+  trustLevel     Int      @default(0) // 0=new, 1=recognized, 2=trusted
+  isSuspicious   Boolean  @default(false) // Flagged for unusual activity
+  lastActivityAt DateTime @default(now()) // Last API call or page view
+
   // Remember me
-  isRememberMe          Boolean  @default(false)  // Extended session duration
-  
+  isRememberMe Boolean @default(false) // Extended session duration
+
   // Session metadata
-  loginMethod           String?  @db.VarChar(50)  // password, oauth, 2fa
-  requiredStepUp        Boolean  @default(false)  // Requires 2FA for sensitive actions
-  
-  activities            SessionActivity[]
+  loginMethod    String? @db.VarChar(50) // password, oauth, 2fa
+  requiredStepUp Boolean @default(false) // Requires 2FA for sensitive actions
+
+  activities SessionActivity[]
 
   @@index([userId], map: "Session_userId_fkey")
   @@index([lastActivityAt])
@@ -109,31 +112,115 @@ model Session {
 
 // Track detailed session activity
 model SessionActivity {
-  id          String   @id @default(cuid())
-  sessionId   String
-  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  
+  id        String  @id @default(cuid())
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
   // Activity details
-  action      String   @db.VarChar(100) // login, logout, page_view, api_call, password_change, etc.
-  endpoint    String?  @db.VarChar(500) // URL or API endpoint
-  method      String?  @db.VarChar(10)  // GET, POST, etc.
-  
+  action   String  @db.VarChar(100) // login, logout, page_view, api_call, password_change, etc.
+  endpoint String? @db.VarChar(500) // URL or API endpoint
+  method   String? @db.VarChar(10) // GET, POST, etc.
+
   // Context
-  ipAddress   String?  @db.Text
-  userAgent   String?  @db.Text
-  statusCode  Int?                      // HTTP status code
-  duration    Int?                      // Request duration in ms
-  
+  ipAddress  String? @db.Text
+  userAgent  String? @db.Text
+  statusCode Int? // HTTP status code
+  duration   Int? // Request duration in ms
+
   // Flags
-  isError     Boolean  @default(false)
+  isError      Boolean @default(false)
   isSuspicious Boolean @default(false)
-  
-  createdAt   DateTime @default(now())
-  
+
+  createdAt DateTime @default(now())
+
   @@index([sessionId])
   @@index([action])
   @@index([createdAt])
   @@index([isSuspicious])
+}
+
+// Notification System
+model Notification {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+
+  // Notification content
+  title   String @db.VarChar(255)
+  message String @db.Text
+  type    String @db.VarChar(50) // info, success, warning, error, security, event, player, system
+
+  // Priority & Category
+  priority String @default("normal") @db.VarChar(20) // low, normal, high, urgent
+  category String @db.VarChar(50) // security, events, players, sessions, system, announcement
+
+  // Action link
+  actionUrl  String? @db.VarChar(500) // Link to relevant page
+  actionText String? @db.VarChar(100) // Button text (e.g., "View Event", "Review Login")
+
+  // Metadata
+  metadata Json? // Additional data (event ID, player name, etc.)
+
+  // Status
+  isRead     Boolean   @default(false)
+  readAt     DateTime?
+  isArchived Boolean   @default(false)
+  archivedAt DateTime?
+
+  // Delivery tracking
+  deliveredVia Json? // ["in_app", "email", "push"] - which channels were used
+  emailSentAt  DateTime?
+
+  // Expiration
+  expiresAt DateTime? // Auto-archive after this date
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([type])
+  @@index([category])
+  @@index([isRead])
+  @@index([priority])
+  @@index([createdAt])
+  @@index([expiresAt])
+  @@map("notification")
+}
+
+// User notification preferences
+model NotificationPreferences {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation("UserNotificationPreferences", fields: [userId], references: [id], onDelete: Cascade)
+
+  // Channel preferences
+  inAppEnabled Boolean @default(true) // In-app notifications
+  emailEnabled Boolean @default(true) // Email notifications
+  pushEnabled  Boolean @default(false) // Browser push notifications (future)
+
+  // Category preferences (can be disabled per category)
+  securityAlerts      Boolean @default(true) // Login alerts, suspicious activity
+  eventReminders      Boolean @default(true) // Event starting soon
+  playerAlerts        Boolean @default(true) // Player join/leave (for admins)
+  sessionAlerts       Boolean @default(true) // Session warnings (idle, expiring)
+  systemAnnouncements Boolean @default(true) // System updates, maintenance
+
+  // Delivery timing
+  digestEnabled     Boolean @default(false) // Bundle notifications into digest
+  digestFrequency   String  @default("daily") @db.VarChar(20) // instant, hourly, daily, weekly
+  quietHoursEnabled Boolean @default(false) // Mute during certain hours
+  quietHoursStart   String? @db.VarChar(5) // "22:00"
+  quietHoursEnd     String? @db.VarChar(5) // "08:00"
+
+  // Sound & Visual
+  soundEnabled         Boolean @default(true) // Play sound for notifications
+  desktopNotifications Boolean @default(false) // Browser desktop notifications
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("notification_preferences")
 }
 
 model VerificationToken {
@@ -168,7 +255,7 @@ model Event {
   timesJson     Json?
 
   recurrenceUntil DateTime? // last day to schedule (optional)
-  
+
   // Track who created and last updated this event
   createdById String?
   createdBy   User?   @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
@@ -262,7 +349,7 @@ model Application {
 
   // Free-form metadata
   notes String? @db.Text
-  
+
   // Track who created and last updated this application
   createdById String?
   createdBy   User?   @relation("ApplicationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
@@ -294,11 +381,11 @@ enum AppStatus {
 model CustomRole {
   id          String   @id @default(cuid())
   slug        String   @unique // URL-friendly identifier (e.g., "event-manager")
-  name        String   // Display name (e.g., "Event Manager")
+  name        String // Display name (e.g., "Event Manager")
   description String?  @db.Text
-  permissions Json     // Array of permission strings ["events:write", "events:read"]
+  permissions Json // Array of permission strings ["events:write", "events:read"]
   isSystem    Boolean  @default(false) // System roles (OWNER, ADMIN, etc.) cannot be deleted
-  color       String?  // Hex color for UI badges
+  color       String? // Hex color for UI badges
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -308,32 +395,32 @@ model CustomRole {
 
 // API Keys for external/programmatic access
 model ApiKey {
-  id          String   @id @default(cuid())
-  name        String   // Friendly name for the key (e.g., "Mobile App", "Analytics Service")
-  key         String   @unique // The actual API key (hashed)
-  keyPrefix   String   // First 8 chars of key for identification (e.g., "sk_live_12345678...")
-  
+  id        String @id @default(cuid())
+  name      String // Friendly name for the key (e.g., "Mobile App", "Analytics Service")
+  key       String @unique // The actual API key (hashed)
+  keyPrefix String // First 8 chars of key for identification (e.g., "sk_live_12345678...")
+
   // Permissions & Scopes
-  scopes      Json     // Array of allowed scopes: ["events:read", "applications:read", etc.]
-  isActive    Boolean  @default(true)
-  
+  scopes   Json // Array of allowed scopes: ["events:read", "applications:read", etc.]
+  isActive Boolean @default(true)
+
   // Rate Limiting
-  rateLimit   Int      @default(100) // Requests per minute
-  
+  rateLimit Int @default(100) // Requests per minute
+
   // Ownership & Tracking
   createdById String
-  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
-  
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
   // Usage tracking
-  lastUsedAt  DateTime?
-  usageCount  Int      @default(0)
-  
+  lastUsedAt DateTime?
+  usageCount Int       @default(0)
+
   // Metadata
-  description String?  @db.Text
+  description String?   @db.Text
   expiresAt   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
   @@index([key])
   @@index([keyPrefix])
   @@index([createdById])
@@ -342,23 +429,23 @@ model ApiKey {
 
 // Rate limiting tracking
 model RateLimit {
-  id         String   @id @default(cuid())
-  identifier String   // API key or IP address
-  endpoint   String   // Which endpoint was called
-  count      Int      @default(1)
+  id          String   @id @default(cuid())
+  identifier  String // API key or IP address
+  endpoint    String // Which endpoint was called
+  count       Int      @default(1)
   windowStart DateTime @default(now())
-  
+
   @@unique([identifier, endpoint, windowStart])
   @@index([identifier, windowStart])
   @@index([windowStart]) // For cleanup
 }
 
 enum UserRole {
-  OWNER      // Full system access, can manage everything
-  ADMIN      // Can manage most features, users, and settings
-  MODERATOR  // Can manage events, applications, and players
-  STAFF      // Can view and assist, limited editing
-  USER       // Basic authenticated access
+  OWNER // Full system access, can manage everything
+  ADMIN // Can manage most features, users, and settings
+  MODERATOR // Can manage events, applications, and players
+  STAFF // Can view and assist, limited editing
+  USER // Basic authenticated access
 }
 
 enum EventStatus {
