@@ -1,11 +1,11 @@
 "use client";
 
-import { User, Shield, Link2, Lock, FileText, Key } from "lucide-react";
+import { User, Shield, Link2, Lock, FileText, Key, Bell } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SignOutButton from "@/components/admin/SignOutButton";
 
-export type ProfileSection = "general" | "security" | "connections" | "applications" | "api-keys" | "privacy";
+export type ProfileSection = "general" | "security" | "connections" | "applications" | "api-keys" | "privacy" | "notifications";
 
 interface NavItem {
   id: ProfileSection;
@@ -46,6 +46,12 @@ const navItems: NavItem[] = [
     icon: Key,
     description: "Manage programmatic access",
     requiresStaff: true,
+  },
+  {
+    id: "notifications",
+    title: "Notifications",
+    icon: Bell,
+    description: "Notification preferences",
   },
   {
     id: "privacy",
