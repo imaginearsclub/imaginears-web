@@ -60,7 +60,6 @@ import {
 } from "@/components/common";
 import type { CommandItem, ComboboxOption } from "@/components/common";
 import {
-  Bell,
   User,
   Search,
   Settings,
