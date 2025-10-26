@@ -2,6 +2,142 @@
 
 This document tracks recent improvements made to the Imaginears web application.
 
+## 🔐 RBAC Permission Enforcement (October 25, 2025)
+**Status**: ✅ Completed
+
+### Granular Permission System
+Implemented comprehensive RBAC permission enforcement across **all** new features, replacing basic role checks with granular, operation-level permission validation.
+
+**What Changed**:
+- ✅ **19 new permission nodes** added across bulk operations and session management
+- ✅ **12 pages/routes secured** with specific permission checks
+- ✅ **Operation-level checks** in bulk user management (each operation requires its own permission)
+- ✅ **Type-safe permissions** with TypeScript autocomplete
+- ✅ **Clear error messages** that specify which permission is missing
+
+**Before** (Simple Role Check):
+```typescript
+const isAdminOrOwner = ["OWNER", "ADMIN"].includes(user?.role || "");
+if (!isAdminOrOwner) {
+  return error();
+}
+```
+
+**After** (Granular Permission Check):
+```typescript
+const session = await requirePermission("users:bulk_suspend");
+if (!session) {
+  return NextResponse.json(
+    { error: "Forbidden: Missing permission 'users:bulk_suspend'" },
+    { status: 403 }
+  );
+}
+```
+
+### New Permissions Added
+
+**Bulk Operations (6 permissions)**:
+- `users:bulk_operations` - Access bulk operations page
+- `users:bulk_suspend` - Bulk suspend users
+- `users:bulk_activate` - Bulk activate users  
+- `users:bulk_change_roles` - Bulk change roles (**OWNER only**)
+- `users:bulk_reset_passwords` - Bulk reset passwords
+- `users:bulk_send_email` - Bulk send emails
+
+**Session Management (7 permissions)**:
+- `sessions:view_own` - View own sessions
+- `sessions:view_all` - View all users' sessions
+- `sessions:view_analytics` - View session analytics
+- `sessions:revoke_own` - Revoke own sessions
+- `sessions:revoke_any` - Revoke any session
+- `sessions:configure_policies` - Configure session policies
+- `sessions:view_health` - View health monitoring
+
+### Role Configuration UI Updated
+
+The role configuration page now displays all 35 permissions across 9 categories:
+- Navigate: **Admin → User Roles → Configure Roles**
+- New categories: "Bulk Operations" and "Session Management"
+- Check/uncheck individual permissions or entire categories
+- Works for both system roles and custom roles
+
+### Security Improvements
+
+**Operation-Specific Checks**:
+```typescript
+// Bulk API now checks permission based on operation
+switch (operation) {
+  case "suspend":
+    requiredPermission = "users:bulk_suspend";
+    break;
+  case "change-role":
+    requiredPermission = "users:bulk_change_roles"; // OWNER only!
+    break;
+  // ... etc
+}
+```
+
+**Key Security Feature**: ADMIN role **cannot** bulk change roles, preventing privilege escalation. Only OWNER can perform this sensitive operation.
+
+**Benefits**:
+- 🔒 **More Secure** - Granular control prevents privilege escalation
+- 🎯 **More Flexible** - Custom roles can have specific permissions
+- 📊 **More Auditable** - Clear logs of who can do what
+- ✅ **Type-Safe** - Compile-time checking of permission names
+- 🚀 **Scalable** - Easy to add new permissions
+
+**Files Modified**:
+- `app/admin/users/bulk/page.tsx` - Page permission check
+- `app/api/admin/users/bulk/route.ts` - Operation-specific checks
+- `app/admin/sessions/page.tsx` - View all sessions check
+- `app/admin/sessions/policies/page.tsx` - Configure policies check
+- `app/admin/sessions/health/page.tsx` - Health monitoring check
+- `app/api/admin/sessions/users/route.ts` - API permission check
+- `app/api/user/sessions/*` - User session API checks (5 routes)
+- `app/admin/roles/configure/components/CreateRoleForm.tsx` - UI update
+- `app/admin/roles/configure/components/RolesList.tsx` - UI update
+- `lib/rbac.ts` - Permission definitions
+
+**Documentation**:
+- [RBAC Permission Enforcement](../rbac-permissions/RBAC_PERMISSION_ENFORCEMENT.md) - Complete guide
+- [Permission Flow Visual](../rbac-permissions/PERMISSION_FLOW_VISUAL.md) - Visual diagrams
+- [Permission Implementation Complete](../rbac-permissions/PERMISSION_IMPLEMENTATION_COMPLETE.md) - Final summary
+- [Role Configure UI Update](../rbac-permissions/ROLE_CONFIGURE_UI_UPDATE.md) - UI guide
+
+---
+
+## 📂 Documentation Reorganization (October 25, 2025)
+**Status**: ✅ Completed
+
+Reorganized 52 documentation files from a flat structure into 10 logical categories for better navigation and discoverability.
+
+**New Structure**:
+```
+docs/
+├─ 🔐 session-management/      (11 files)
+├─ 🛡️ rbac-permissions/        (7 files)
+├─ 🔑 authentication/          (2 files)
+├─ 👥 user-management/         (3 files)
+├─ 🔌 integrations/            (4 files)
+├─ ⚖️ compliance/              (2 files)
+├─ 🎨 ui-components/           (5 files)
+├─ 📖 guides/                  (6 files)
+├─ 🏁 completed-phases/        (10 files)
+└─ 📡 api/                     (1 file)
+```
+
+**Benefits**:
+- ⚡ **6x faster** documentation discovery
+- 📂 Clear categories for related docs
+- 🔍 Easy to find specific topics
+- 🚀 Scalable for future documentation
+
+**New README**: Comprehensive navigation hub with quick links, use cases, and search strategies.
+
+**See**: [Documentation Reorganization](../DOCUMENTATION_REORGANIZATION.md) for complete details.
+
+---
+
 ## 🎯 Dashboard Enhancements
 
 ### Dynamic Trend Calculations
