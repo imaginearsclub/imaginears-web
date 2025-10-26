@@ -6,7 +6,7 @@ import { AlertCircle, CheckCircle, Eye, EyeOff, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CreateStaffFormProps {
-  action: (formData: FormData) => Promise<{ success: boolean; message: string; userId?: string }>;
+  action: (formData: FormData) => Promise<{ success: boolean; message?: string; userId?: string | undefined }>;
 }
 
 const ROLES = [
@@ -18,7 +18,7 @@ const ROLES = [
 
 export function CreateStaffForm({ action }: CreateStaffFormProps) {
   const [isPending, startTransition] = useTransition();
-  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [result, setResult] = useState<{ success: boolean; message?: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState("");
   const [minecraftName, setMinecraftName] = useState("");
