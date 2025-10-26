@@ -569,3 +569,195 @@ model Invitation {
 
   @@map("invitation")
 }
+
+// ============================================================================
+// ANALYTICS SYSTEM
+// ============================================================================
+
+// Track individual analytics events (page views, clicks, actions)
+model AnalyticsEvent {
+  id String @id @default(cuid())
+
+  // Event identification
+  eventType String @db.VarChar(100) // page_view, button_click, form_submit, event_view, etc.
+  eventName String @db.VarChar(255) // Friendly name (e.g., "Homepage Visit", "Apply Button Clicked")
+
+  // User context
+  userId    String? // null for anonymous users
+  sessionId String? // Session tracking
+  anonymousId String? @db.VarChar(100) // For anonymous tracking (browser fingerprint)
+
+  // Page context
+  path       String  @db.VarChar(500) // URL path
+  referrer   String? @db.VarChar(500) // Where they came from
+  urlParams  Json? // Query parameters
+  
+  // Device & Location
+  deviceType String? @db.VarChar(50) // mobile, desktop, tablet
+  browser    String? @db.VarChar(100)
+  os         String? @db.VarChar(100)
+  country    String? @db.VarChar(100)
+  city       String? @db.VarChar(255)
+
+  // Event metadata
+  properties Json? // Custom properties (e.g., { eventId: "123", category: "Fireworks" })
+  duration   Int? // Time spent (for page views) in milliseconds
+
+  // Timestamps
+  timestamp DateTime @default(now())
+  date      DateTime @default(now()) @db.Date // For aggregation queries
+
+  @@index([eventType])
+  @@index([userId])
+  @@index([sessionId])
+  @@index([date])
+  @@index([eventType, date])
+  @@index([userId, date])
+  @@index([timestamp])
+  @@map("analytics_event")
+}
+
+// Aggregated analytics metrics (for fast dashboard queries)
+model AnalyticsMetric {
+  id String @id @default(cuid())
+
+  // Time window
+  date  DateTime @db.Date // Which day this metric is for
+  hour  Int? // Hour of day (0-23) for hourly metrics, null for daily
+  period String @db.VarChar(20) // "hourly" or "daily"
+
+  // Metric identification
+  metricType String @db.VarChar(100) // page_views, unique_visitors, events_viewed, applications_submitted, etc.
+  category   String? @db.VarChar(100) // Optional category (e.g., "Fireworks", "Developer")
+
+  // Aggregated values
+  value    Int // Count, sum, etc.
+  metadata Json? // Additional aggregated data
+
+  // Dimensions (for filtering)
+  dimension String? @db.VarChar(100) // e.g., "deviceType:mobile", "country:US"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([date, hour, period, metricType, category, dimension])
+  @@index([date])
+  @@index([metricType])
+  @@index([date, metricType])
+  @@map("analytics_metric")
+}
+
+// Player analytics (Web + Minecraft integration)
+model PlayerAnalytics {
+  id String @id @default(cuid())
+
+  // Player identification
+  userId        String? // If they have an account
+  minecraftUuid String? @db.VarChar(36) // Minecraft UUID (from MC Player Analytics)
+  minecraftName String? @db.VarChar(16) // Minecraft username
+
+  // Web activity
+  lastWebVisit    DateTime?
+  totalWebVisits  Int       @default(0)
+  totalPageViews  Int       @default(0)
+  eventsViewed    Int       @default(0)
+  applicationsSubmitted Int @default(0)
+
+  // Minecraft activity (populated from Player Analytics Plugin)
+  lastMinecraftJoin  DateTime?
+  totalMinecraftTime Int @default(0) // Total playtime in minutes
+  totalMinecraftJoins Int @default(0)
+  firstMinecraftJoin DateTime?
+
+  // Engagement scores
+  webEngagementScore  Float @default(0) // 0-100
+  mcEngagementScore   Float @default(0) // 0-100
+  overallEngagement   Float @default(0) // Combined score
+
+  // Retention
+  isActive      Boolean  @default(true) // Active in last 30 days
+  lastActiveAt  DateTime @default(now())
+  cohortMonth   String? @db.VarChar(7) // YYYY-MM when they first joined
+
+  // Metadata
+  metadata  Json? // Additional player data from Minecraft plugin
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId])
+  @@unique([minecraftUuid])
+  @@index([minecraftName])
+  @@index([isActive])
+  @@index([lastActiveAt])
+  @@index([cohortMonth])
+  @@map("player_analytics")
+}
+
+// Event analytics (track event performance)
+model EventAnalytics {
+  id String @id @default(cuid())
+
+  // Event reference
+  eventId    String
+  eventTitle String @db.VarChar(255)
+  category   String @db.VarChar(100)
+  startAt    DateTime
+
+  // View metrics
+  totalViews    Int @default(0)
+  uniqueVisitors Int @default(0)
+
+  // Engagement
+  totalClicks   Int @default(0) // Clicks on event details/actions
+  shareCount    Int @default(0)
+  favoriteCount Int @default(0)
+
+  // Attendance tracking (if integration is added later)
+  expectedAttendance Int? // Estimated from RSVP or registration
+  actualAttendance   Int? // Actual players who attended (from Minecraft)
+
+  // Time-based metrics
+  viewsByHour Json? // { "0": 5, "1": 3, ... } views per hour of day
+  peakViewTime DateTime? // When most people viewed it
+
+  // Metadata
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([eventId])
+  @@index([category])
+  @@index([startAt])
+  @@map("event_analytics")
+}
+
+// Application analytics
+model ApplicationAnalytics {
+  id String @id @default(cuid())
+
+  // Time window
+  date DateTime @db.Date
+
+  // Metrics by role
+  role   String @db.VarChar(50) // Developer, Imagineer, GuestServices, or "all"
+  status String @db.VarChar(50) // New, InReview, Approved, Rejected, or "all"
+
+  // Counts
+  totalApplications    Int @default(0)
+  approvedApplications Int @default(0)
+  rejectedApplications Int @default(0)
+  avgProcessingTime    Int? // Average time to process in hours
+
+  // Funnel metrics
+  formStarted   Int @default(0) // How many started the form
+  formCompleted Int @default(0) // How many completed it
+  conversionRate Float @default(0) // Completion rate
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([date, role, status])
+  @@index([date])
+  @@index([role])
+  @@map("application_analytics")
+}

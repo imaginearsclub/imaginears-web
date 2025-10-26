@@ -16,6 +16,7 @@ import {
     User,
     BookOpen,
     Activity,
+    BarChart3,
 } from "lucide-react";
 import { memo, useCallback, useMemo, useState, type ComponentType } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -277,6 +278,12 @@ const SidebarInner = memo(function SidebarInner({
                         href="/admin/dashboard" 
                         icon={LayoutDashboard} 
                         label="Dashboard" 
+                        onClick={handleClose} 
+                    />
+                    <NavItem 
+                        href="/admin/analytics" 
+                        icon={BarChart3} 
+                        label="Analytics" 
                         onClick={handleClose} 
                     />
                     <NavItem 
