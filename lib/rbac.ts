@@ -49,6 +49,9 @@ export type Permission =
   | "settings:read"
   | "settings:write"
   | "settings:security"
+  // Analytics
+  | "analytics:read"
+  | "analytics:export"
   // Dashboard
   | "dashboard:view"
   | "dashboard:stats"
@@ -102,6 +105,9 @@ export const ROLE_PERMISSIONS: any = {
     "settings:read",
     "settings:write",
     "settings:security",
+    // Analytics
+    "analytics:read",
+    "analytics:export",
     // Dashboard
     "dashboard:view",
     "dashboard:stats",
@@ -147,6 +153,9 @@ export const ROLE_PERMISSIONS: any = {
     // Settings
     "settings:read",
     "settings:write",
+    // Analytics
+    "analytics:read",
+    "analytics:export",
     // Dashboard
     "dashboard:view",
     "dashboard:stats",
@@ -177,6 +186,8 @@ export const ROLE_PERMISSIONS: any = {
     // Note: No bulk operations or policy configuration
     // Settings
     "settings:read",
+    // Analytics
+    "analytics:read",
     // Dashboard
     "dashboard:view",
     "dashboard:stats",
