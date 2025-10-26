@@ -23,11 +23,6 @@ function applyTheme(theme: Theme) {
   }
   
   root.setAttribute("data-theme", theme);
-  
-  // Log for debugging
-  if (process.env.NODE_ENV === "development") {
-    console.log("[ThemeToggle] Applied theme:", theme, "| HTML has dark class:", root.classList.contains("dark"));
-  }
 }
 
 function readPersistedTheme(): Theme | null {
