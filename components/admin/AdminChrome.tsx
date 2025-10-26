@@ -6,6 +6,7 @@ import { Menu, Home, CalendarRange, FileText, Users, Settings, Plus, Search, Moo
 import { SidebarDesktop, SidebarDrawer } from "@/components/admin/Sidebar";
 import { CommandPalette, Badge } from "@/components/common";
 import type { CommandItem } from "@/components/common";
+import { NotificationCenter } from "@/components/NotificationCenter";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
@@ -314,8 +315,9 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
                             </Badge>
                         </div>
                     </div>
-                    {/* Command Palette Trigger */}
+                    {/* Notifications & Command Palette */}
                     <div className="flex items-center gap-2">
+                        <NotificationCenter />
                         <CommandPalette items={commandItems} userPermissions={userPermissions} />
                     </div>
                 </div>
