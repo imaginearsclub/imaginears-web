@@ -26,14 +26,14 @@ interface StaffMember {
 interface StaffListProps {
   staff: StaffMember[];
   currentUserId: string;
-  updateAction: (formData: FormData) => Promise<{ success: boolean; message: string }>;
-  deleteAction: (formData: FormData) => Promise<{ success: boolean; message: string }>;
+  updateAction: (formData: FormData) => Promise<{ success: boolean; message?: string }>;
+  deleteAction: (formData: FormData) => Promise<{ success: boolean; message?: string }>;
 }
 
 const ROLE_COLORS = {
-  OWNER: "destructive",
+  OWNER: "danger",
   ADMIN: "primary",
-  MODERATOR: "secondary",
+  MODERATOR: "info",
   STAFF: "default",
   USER: "default",
 } as const;
@@ -48,7 +48,7 @@ const ROLE_LABELS = {
 
 export function StaffList({ staff, currentUserId, updateAction, deleteAction }: StaffListProps) {
   const [isPending, startTransition] = useTransition();
-  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [result, setResult] = useState<{ success: boolean; message?: string } | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
   const [editingMinecraftName, setEditingMinecraftName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
