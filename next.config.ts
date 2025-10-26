@@ -6,6 +6,14 @@ const nextConfig: NextConfig = {
     
     // Performance: Produce a self-contained .next/standalone output that's easier to deploy in Docker/serverless
     output: "standalone",
+
+    // Performance & Security: Optimize images
+    images: {
+        formats: ['image/webp', 'image/avif'],
+        minimumCacheTTL: 31536000, // 1 year
+        dangerouslyAllowSVG: false, // Security: Disable SVG by default
+        contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    },
     
     // Performance: Enable optimized package imports
     experimental: { 
@@ -48,14 +56,6 @@ const nextConfig: NextConfig = {
                 ]
             }
         ];
-    },
-    
-    // Performance: Optimize images
-    images: {
-        formats: ['image/webp', 'image/avif'],
-        minimumCacheTTL: 31536000, // 1 year
-        dangerouslyAllowSVG: false, // Security: Disable SVG by default
-        contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;"
     },
     
     // Performance: Enable compression
