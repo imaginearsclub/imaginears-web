@@ -7,6 +7,7 @@ import { SecuritySection } from "./sections/SecuritySection";
 import { ConnectionsSection } from "./sections/ConnectionsSection";
 import { ApplicationsSection } from "./sections/ApplicationsSection";
 import { ApiKeysSection } from "./sections/ApiKeysSection";
+import { NotificationsSection } from "./sections/NotificationsSection";
 import { PrivacySection } from "./sections/PrivacySection";
 
 interface ProfileContentProps {
@@ -127,6 +128,9 @@ export function ProfileContent({
           )}
           {activeSection === "api-keys" && (
             <ApiKeysSection apiKeys={apiKeys} />
+          )}
+          {activeSection === "notifications" && (
+            <NotificationsSection />
           )}
           {activeSection === "privacy" && (
             <PrivacySection hasPassword={hasPasswordAuth} />
