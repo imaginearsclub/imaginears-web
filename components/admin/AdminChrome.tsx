@@ -13,6 +13,11 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
     const [mobileOpen, setMobileOpen] = useState(false);
     const router = useRouter();
 
+    // TODO: Get user permissions from session in production
+    // Example: const userPermissions = session?.user?.permissions || [];
+    // For now, we'll show all commands (empty array = no filtering)
+    const userPermissions: string[] = [];
+
     // Command palette items
     const commandItems: CommandItem[] = [
         {
@@ -20,6 +25,7 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
             label: "Dashboard",
             description: "View dashboard overview and statistics",
             icon: <Home className="w-4 h-4" />,
+            shortcut: "⌘D",
             group: "Navigation",
             onSelect: () => router.push("/admin/dashboard"),
             keywords: ["home", "overview", "stats"],
@@ -74,27 +80,33 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
             label: "User Roles",
             description: "Configure roles and permissions (RBAC)",
             icon: <Shield className="w-4 h-4" />,
+            shortcut: "⌘R",
             group: "Navigation",
             onSelect: () => router.push("/admin/roles/configure"),
             keywords: ["rbac", "permissions", "access", "security", "custom roles"],
+            requiredPermission: "roles:configure",
         },
         {
             id: "bulk-users",
             label: "Bulk User Management",
             description: "Manage multiple users at once",
             icon: <UsersRound className="w-4 h-4" />,
+            shortcut: "⌘B",
             group: "Navigation",
             onSelect: () => router.push("/admin/users/bulk"),
             keywords: ["bulk", "batch", "multiple", "operations", "suspend", "activate"],
+            requiredPermission: "users:bulk_operations",
         },
         {
             id: "sessions",
             label: "Sessions",
             description: "Monitor and manage user sessions",
             icon: <Activity className="w-4 h-4" />,
+            shortcut: "⌘S",
             group: "Navigation",
             onSelect: () => router.push("/admin/sessions"),
             keywords: ["active", "monitoring", "security", "logins", "devices"],
+            requiredPermission: "sessions:view_all",
         },
         {
             id: "sessions-policies",
@@ -104,15 +116,18 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
             group: "Navigation",
             onSelect: () => router.push("/admin/sessions/policies"),
             keywords: ["policies", "security", "rules", "restrictions", "access"],
+            requiredPermission: "sessions:configure_policies",
         },
         {
             id: "sessions-health",
             label: "Session Health",
             description: "Monitor session system health and performance",
             icon: <HeartPulse className="w-4 h-4" />,
+            shortcut: "⌘H",
             group: "Navigation",
             onSelect: () => router.push("/admin/sessions/health"),
             keywords: ["health", "performance", "metrics", "monitoring", "diagnostics"],
+            requiredPermission: "sessions:view_health",
         },
         {
             id: "api-docs",
@@ -122,6 +137,7 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
             group: "Navigation",
             onSelect: () => router.push("/admin/api-docs"),
             keywords: ["api", "docs", "documentation", "endpoints", "reference"],
+            requiredPermission: "api_keys:read",
         },
         {
             id: "profile",
@@ -169,6 +185,7 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
             group: "Quick Actions",
             onSelect: () => router.push("/admin/roles/configure"),
             keywords: ["add", "role", "permissions", "rbac", "custom", "new"],
+            requiredPermission: "roles:configure",
         },
         {
             id: "bulk-operations",
@@ -178,6 +195,7 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
             group: "Quick Actions",
             onSelect: () => router.push("/admin/users/bulk"),
             keywords: ["bulk", "suspend", "activate", "batch", "multiple"],
+            requiredPermission: "users:bulk_operations",
         },
         {
             id: "search-apps",
@@ -205,6 +223,7 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
             group: "Quick Actions",
             onSelect: () => router.push("/admin/sessions"),
             keywords: ["find", "sessions", "active", "monitoring", "security"],
+            requiredPermission: "sessions:view_all",
         },
         // Theme Controls
         {
@@ -297,7 +316,7 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
                     </div>
                     {/* Command Palette Trigger */}
                     <div className="flex items-center gap-2">
-                        <CommandPalette items={commandItems} />
+                        <CommandPalette items={commandItems} userPermissions={userPermissions} />
                     </div>
                 </div>
             </header>
