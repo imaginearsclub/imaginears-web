@@ -12,6 +12,17 @@ export interface CardProps {
    */
   variant?: "default" | "bordered" | "elevated";
   /**
+   * Color accent for visual hierarchy
+   * - default: No accent
+   * - primary: Blue accent (primary actions, navigation)
+   * - success: Green accent (success states, active)
+   * - warning: Amber accent (warnings, pending)
+   * - danger: Red accent (errors, critical)
+   * - info: Sky blue accent (information)
+   * - purple: Purple accent (settings, configuration)
+   */
+  accent?: "default" | "primary" | "success" | "warning" | "danger" | "info" | "purple";
+  /**
    * Padding size
    */
   padding?: "none" | "sm" | "md" | "lg";
@@ -46,6 +57,7 @@ export interface CardProps {
 export function Card({ 
   children, 
   variant = "default",
+  accent = "default",
   padding = "md",
   interactive = false,
   className 
@@ -53,7 +65,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-2xl transition-all duration-200",
+        "rounded-2xl transition-all duration-200 relative overflow-hidden",
         
         // Variant styles
         variant === "default" && [
@@ -69,6 +81,14 @@ export function Card({
           "border border-slate-200 dark:border-slate-800",
           "shadow-lg shadow-slate-200/50 dark:shadow-slate-950/50",
         ],
+        
+        // Accent border - adds colored top border for visual hierarchy
+        accent === "primary" && "border-t-4 border-t-blue-500 dark:border-t-blue-400",
+        accent === "success" && "border-t-4 border-t-emerald-500 dark:border-t-emerald-400",
+        accent === "warning" && "border-t-4 border-t-amber-500 dark:border-t-amber-400",
+        accent === "danger" && "border-t-4 border-t-red-500 dark:border-t-red-400",
+        accent === "info" && "border-t-4 border-t-sky-500 dark:border-t-sky-400",
+        accent === "purple" && "border-t-4 border-t-purple-500 dark:border-t-purple-400",
         
         // Padding variants
         padding === "none" && "p-0",

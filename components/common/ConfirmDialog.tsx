@@ -1,5 +1,5 @@
 "use client";
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,7 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./Dialog";
-import { AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
+import { Button } from "./Button";
+import { AlertTriangle, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -41,29 +42,57 @@ export function ConfirmDialog({
   children,
   isLoading = false,
 }: ConfirmDialogProps) {
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Auto-focus confirm button when dialog opens (after a small delay for accessibility)
+  useEffect(() => {
+    if (!open) return;
+    
+    const timer = setTimeout(() => {
+      confirmButtonRef.current?.focus();
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [open]);
+
   const handleConfirm = async () => {
     await onConfirm();
     onOpenChange(false);
   };
+
+  // Keyboard shortcut: Enter key confirms (in addition to button click)
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter" && !isLoading) {
+        e.preventDefault();
+        handleConfirm();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, isLoading]);
 
   const variantConfig = {
     danger: {
       icon: <AlertTriangle className="w-6 h-6" />,
       iconColor: "text-red-600 dark:text-red-400",
       iconBg: "bg-red-50 dark:bg-red-900/20",
-      buttonClass: "bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white",
+      buttonVariant: "danger" as const,
     },
     warning: {
       icon: <AlertTriangle className="w-6 h-6" />,
       iconColor: "text-amber-600 dark:text-amber-400",
       iconBg: "bg-amber-50 dark:bg-amber-900/20",
-      buttonClass: "bg-amber-600 hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600 text-white",
+      buttonVariant: "primary" as const,
     },
     info: {
       icon: <CheckCircle className="w-6 h-6" />,
       iconColor: "text-blue-600 dark:text-blue-400",
       iconBg: "bg-blue-50 dark:bg-blue-900/20",
-      buttonClass: "bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white",
+      buttonVariant: "primary" as const,
     },
   };
 
@@ -94,24 +123,27 @@ export function ConfirmDialog({
           </div>
         )}
 
-        <DialogFooter className="flex-row justify-end gap-2 sm:gap-2">
-          <button
-            type="button"
+        <DialogFooter className="flex-row justify-end gap-3 sm:gap-3">
+          <Button
+            variant="outline"
+            size="md"
             onClick={() => onOpenChange(false)}
-            className="btn btn-outline btn-sm"
             disabled={isLoading}
+            ariaLabel={`${cancelText} (Escape key)`}
           >
             {cancelText}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            ref={confirmButtonRef}
+            variant={config.buttonVariant}
+            size="md"
             onClick={handleConfirm}
-            className={cn("btn btn-sm", config.buttonClass)}
-            disabled={isLoading}
+            isLoading={isLoading}
+            loadingText={confirmText}
+            ariaLabel={`${confirmText} (Enter key)`}
           >
-            {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             {confirmText}
-          </button>
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
