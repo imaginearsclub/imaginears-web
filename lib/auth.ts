@@ -4,6 +4,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "@/lib/prisma";
 import { organization } from "better-auth/plugins";
 import { env } from "@/lib/env";
+import { hashPasswordArgon2, verifyAndMigratePassword } from "@/lib/password-migration";
 
 // Build a safe baseURL. In production, require a valid HTTPS origin.
 const baseURL: string | undefined = (() => {
@@ -58,10 +59,26 @@ export const auth = betterAuth({
     },
   },
 
-  // Use email and password; you can add Discord too.
+  // Use email and password with Argon2id hashing
   emailAndPassword: { 
     enabled: true,
     requireEmailVerification: env.NODE_ENV === "production",
+    // Custom password hashing with Argon2id (OWASP 2023 recommendation)
+    // Supports automatic migration from legacy bcrypt hashes
+    password: {
+      hash: async (password: string) => {
+        return await hashPasswordArgon2(password);
+      },
+      verify: async (hash: string, password: string, userId?: string) => {
+        // If userId is available, use migration-aware verification
+        if (userId) {
+          return await verifyAndMigratePassword(hash, password, userId);
+        }
+        // Fallback to basic verification (no migration)
+        const { verifyPassword } = await import("@/lib/password-migration");
+        return await verifyPassword(hash, password);
+      },
+    },
   },
 
   socialProviders: env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET
