@@ -7,6 +7,29 @@ import { CreateStaffForm } from "./components/CreateStaffForm";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/common";
 import { Users, UserPlus, Shield } from "lucide-react";
 import { validateMinecraftUsernameDb } from "@/lib/luckperms";
+import {
+  sanitizeInput,
+  normalizeEmail,
+  sanitizeMinecraftName,
+} from "@/lib/input-sanitization";
+import {
+  validateLength,
+  validateEmail,
+  validateMinecraftName,
+  validatePassword,
+  MAX_LENGTHS,
+  MIN_LENGTHS,
+} from "@/lib/input-validation";
+import {
+  canAssignRole,
+  isValidSystemRole,
+  validateRoleChange,
+} from "@/lib/role-security";
+import {
+  logUserCreated,
+  logOperationFailed,
+} from "@/lib/audit-logger";
+import { hashPasswordArgon2 } from "@/lib/password-migration";
 
 export const dynamic = "force-dynamic";
 
@@ -15,44 +38,70 @@ export async function createStaffAction(formData: FormData) {
   "use server";
   
   const session = await requireAdmin();
-  if (!session) {
+  if (!session?.user?.id || !session?.user?.email) {
     throw new Error("Unauthorized");
   }
 
-  const name = formData.get("name") as string;
-  const email = formData.get("email") as string;
-  const minecraftName = formData.get("minecraftName") as string;
-  const role = formData.get("role") as string;
-  const password = formData.get("password") as string;
+  // Extract and sanitize inputs
+  const rawName = formData.get("name") as string;
+  const rawEmail = formData.get("email") as string;
+  const rawMinecraftName = formData.get("minecraftName") as string;
+  const rawRole = formData.get("role") as string;
+  const rawPassword = formData.get("password") as string;
 
-  // Validation
-  if (!name || !email || !password || !role) {
-    return { success: false, message: "Name, email, role, and password are required" };
+  const name = sanitizeInput(rawName, MAX_LENGTHS.NAME);
+  const email = normalizeEmail(rawEmail);
+  const minecraftName = rawMinecraftName ? sanitizeMinecraftName(rawMinecraftName) : "";
+  const role = rawRole?.trim();
+  const password = rawPassword;
+
+  // Comprehensive validation
+  const nameValidation = validateLength(name, "Name", MIN_LENGTHS.NAME, MAX_LENGTHS.NAME);
+  if (!nameValidation.valid) {
+    return { success: false, message: nameValidation.error };
   }
 
-  if (password.length < 8) {
-    return { success: false, message: "Password must be at least 8 characters" };
+  const emailValidation = validateEmail(email);
+  if (!emailValidation.valid) {
+    return { success: false, message: emailValidation.error };
   }
 
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return { success: false, message: "Invalid email format" };
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.valid) {
+    return { success: false, message: passwordValidation.error };
   }
 
-  // Validate Minecraft username format (3-16 alphanumeric + underscore)
+  // Validate role exists and user can assign it
+  if (!role || !isValidSystemRole(role)) {
+    return { success: false, message: "Invalid role selected" };
+  }
+
+  if (!canAssignRole(session.user.role, role)) {
+    logOperationFailed(
+      "user.created",
+      session.user.id,
+      session.user.email,
+      `Attempted to assign unauthorized role: ${role}`
+    );
+    return { 
+      success: false, 
+      message: `You don't have permission to assign the ${role} role.` 
+    };
+  }
+
+  // Validate Minecraft username if provided
   if (minecraftName) {
-    const mcRegex = /^[a-zA-Z0-9_]{3,16}$/;
-    if (!mcRegex.test(minecraftName)) {
-      return { success: false, message: "Invalid Minecraft username format (3-16 characters, alphanumeric and underscores only)" };
+    const mcValidation = validateMinecraftName(minecraftName);
+    if (!mcValidation.valid) {
+      return { success: false, message: mcValidation.error };
     }
 
     // Validate against LuckPerms database
-    const mcValidation = await validateMinecraftUsernameDb(minecraftName);
-    if (!mcValidation.valid) {
+    const mcDbValidation = await validateMinecraftUsernameDb(minecraftName);
+    if (!mcDbValidation.valid) {
       return { 
         success: false, 
-        message: `Minecraft username validation failed: ${mcValidation.error || 'Player not found in LuckPerms database'}` 
+        message: `Minecraft username validation failed: ${mcDbValidation.error || 'Player not found in LuckPerms database'}` 
       };
     }
   }
@@ -81,9 +130,8 @@ export async function createStaffAction(formData: FormData) {
       }
     }
 
-    // Import Better-Auth for password hashing
-    const bcrypt = require("bcryptjs");
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Hash password with Argon2id (OWASP 2023 recommendation)
+    const hashedPassword = await hashPasswordArgon2(password);
 
     // Create user and account in a transaction
     const user = await prisma.user.create({
@@ -106,6 +154,16 @@ export async function createStaffAction(formData: FormData) {
       },
     });
 
+    // Audit log
+    logUserCreated(
+      session.user.id,
+      session.user.email,
+      session.user.role,
+      user.id,
+      user.email!,
+      user.role
+    );
+
     revalidatePath("/admin/staff");
     return { 
       success: true, 
@@ -114,7 +172,13 @@ export async function createStaffAction(formData: FormData) {
     };
   } catch (error: any) {
     console.error("[CreateStaff] Error:", error);
-    return { success: false, message: error.message || "Failed to create staff member" };
+    logOperationFailed(
+      "user.created",
+      session.user.id,
+      session.user.email,
+      "Database error during user creation"
+    );
+    return { success: false, message: "Failed to create staff member. Please try again." };
   }
 }
 
@@ -123,64 +187,134 @@ export async function updateStaffAction(formData: FormData) {
   "use server";
   
   const session = await requireAdmin();
-  if (!session) {
+  if (!session?.user?.id || !session?.user?.email) {
     throw new Error("Unauthorized");
   }
 
+  // Extract and sanitize inputs
   const userId = formData.get("userId") as string;
-  const minecraftName = formData.get("minecraftName") as string;
-  const role = formData.get("role") as string;
+  const rawMinecraftName = formData.get("minecraftName") as string;
+  const rawRole = formData.get("role") as string;
+
+  const minecraftName = rawMinecraftName ? sanitizeMinecraftName(rawMinecraftName) : "";
+  const role = rawRole?.trim();
 
   if (!userId) {
     return { success: false, message: "User ID is required" };
   }
 
-  // Validate Minecraft username format (if provided)
-  if (minecraftName) {
-    const mcRegex = /^[a-zA-Z0-9_]{3,16}$/;
-    if (!mcRegex.test(minecraftName)) {
-      return { success: false, message: "Invalid Minecraft username format" };
-    }
-
-    // Validate against LuckPerms database
-    const mcValidation = await validateMinecraftUsernameDb(minecraftName);
-    if (!mcValidation.valid) {
-      return { 
-        success: false, 
-        message: `Minecraft username validation failed: ${mcValidation.error || 'Player not found in LuckPerms database'}` 
-      };
-    }
-
-    // Check if Minecraft name is already taken by someone else
-    const existingMC = await prisma.user.findFirst({
-      where: { 
-        minecraftName,
-        NOT: { 
-          id: userId,
-          minecraftName: null 
-        }
-      },
+  try {
+    // Get target user's current details
+    const targetUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, role: true },
     });
 
-    if (existingMC) {
-      return { success: false, message: "This Minecraft username is already linked to another account" };
+    if (!targetUser) {
+      return { success: false, message: "User not found" };
     }
-  }
 
-  try {
+    // Build update data
+    const updateData: any = {};
+    const changes: Record<string, unknown> = {};
+
+    // Validate and update Minecraft username if provided
+    if (minecraftName) {
+      const mcValidation = validateMinecraftName(minecraftName);
+      if (!mcValidation.valid) {
+        return { success: false, message: mcValidation.error };
+      }
+
+      // Validate against LuckPerms database
+      const mcDbValidation = await validateMinecraftUsernameDb(minecraftName);
+      if (!mcDbValidation.valid) {
+        return { 
+          success: false, 
+          message: `Minecraft username validation failed: ${mcDbValidation.error || 'Player not found in LuckPerms database'}` 
+        };
+      }
+
+      // Check if Minecraft name is already taken by someone else
+      const existingMC = await prisma.user.findFirst({
+        where: { 
+          minecraftName,
+          NOT: { 
+            id: userId,
+            minecraftName: null 
+          }
+        },
+      });
+
+      if (existingMC) {
+        return { success: false, message: "This Minecraft username is already linked to another account" };
+      }
+
+      updateData["minecraftName"] = minecraftName;
+      changes["minecraftName"] = minecraftName;
+    }
+
+    // Validate and update role if provided
+    if (role) {
+      const roleValidation = validateRoleChange(
+        session.user.role,
+        targetUser.role,
+        role,
+        session.user.id,
+        userId
+      );
+
+      if (!roleValidation.valid) {
+        logOperationFailed(
+          "role.assigned",
+          session.user.id,
+          session.user.email,
+          roleValidation.error || "Role validation failed"
+        );
+        return { success: false, message: roleValidation.error };
+      }
+
+      updateData["role"] = role;
+      changes["role"] = { from: targetUser.role, to: role };
+    }
+
+    // Perform update
     await prisma.user.update({
       where: { id: userId },
-      data: {
-        minecraftName: minecraftName || null,
-        ...(role && { role }),
-      },
+      data: updateData,
     });
+
+    // Audit log
+    const { logUserUpdated, logRoleAssigned } = await import("@/lib/audit-logger");
+    logUserUpdated(
+      session.user.id,
+      session.user.email,
+      targetUser.id,
+      targetUser.email!,
+      changes
+    );
+
+    if (role && role !== targetUser.role) {
+      logRoleAssigned(
+        session.user.id,
+        session.user.email,
+        targetUser.id,
+        targetUser.email!,
+        targetUser.role,
+        role
+      );
+    }
 
     revalidatePath("/admin/staff");
     return { success: true, message: "Staff member updated successfully" };
   } catch (error: any) {
     console.error("[UpdateStaff] Error:", error);
-    return { success: false, message: error.message || "Failed to update staff member" };
+    logOperationFailed(
+      "user.updated",
+      session.user.id,
+      session.user.email,
+      "Database error during user update"
+    );
+    return { success: false, message: "Failed to update staff member. Please try again." };
   }
 }
 
@@ -189,7 +323,7 @@ export async function deleteStaffAction(formData: FormData) {
   "use server";
   
   const session = await requireAdmin();
-  if (!session) {
+  if (!session?.user?.id || !session?.user?.email) {
     throw new Error("Unauthorized");
   }
 
@@ -199,37 +333,73 @@ export async function deleteStaffAction(formData: FormData) {
     return { success: false, message: "User ID is required" };
   }
 
-  // Prevent deleting yourself
-  if (userId === session.user?.id) {
-    return { success: false, message: "You cannot delete your own account" };
-  }
-
-  // Prevent deleting the last owner
-  const targetUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { role: true },
-  });
-
-  if (targetUser?.role === "OWNER") {
-    const ownerCount = await prisma.user.count({
-      where: { role: "OWNER" },
+  try {
+    // Get target user details
+    const targetUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, role: true },
     });
 
-    if (ownerCount <= 1) {
-      return { success: false, message: "Cannot delete the last owner account" };
+    if (!targetUser) {
+      return { success: false, message: "User not found" };
     }
-  }
 
-  try {
+    // Validate deletion permission
+    const { validateUserDeletion } = await import("@/lib/role-security");
+    const deletionValidation = validateUserDeletion(
+      session.user.role,
+      targetUser.role,
+      session.user.id,
+      userId
+    );
+
+    if (!deletionValidation.valid) {
+      logOperationFailed(
+        "user.deleted",
+        session.user.id,
+        session.user.email,
+        deletionValidation.error || "Deletion validation failed"
+      );
+      return { success: false, message: deletionValidation.error };
+    }
+
+    // Extra safety: Prevent deleting the last owner
+    if (targetUser.role === "OWNER") {
+      const ownerCount = await prisma.user.count({
+        where: { role: "OWNER" },
+      });
+
+      if (ownerCount <= 1) {
+        return { success: false, message: "Cannot delete the last owner account" };
+      }
+    }
+
+    // Perform deletion
     await prisma.user.delete({
       where: { id: userId },
     });
+
+    // Audit log
+    const { logUserDeleted } = await import("@/lib/audit-logger");
+    logUserDeleted(
+      session.user.id,
+      session.user.email,
+      targetUser.id,
+      targetUser.email!,
+      targetUser.role
+    );
 
     revalidatePath("/admin/staff");
     return { success: true, message: "Staff member deleted successfully" };
   } catch (error: any) {
     console.error("[DeleteStaff] Error:", error);
-    return { success: false, message: error.message || "Failed to delete staff member" };
+    logOperationFailed(
+      "user.deleted",
+      session.user.id,
+      session.user.email,
+      "Database error during user deletion"
+    );
+    return { success: false, message: "Failed to delete staff member. Please try again." };
   }
 }
 
