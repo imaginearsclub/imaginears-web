@@ -142,3 +142,7 @@ export { default as MarkdownEditor } from "./MarkdownEditor";
 
 // GDPR Compliance
 export { CookieConsent } from "./CookieConsent";
+
+// Toast Notifications
+export { ToastContainer, toast } from "./Toast";
+export type { Toast, ToastType, ToastPosition, ToastAction } from "./Toast";
