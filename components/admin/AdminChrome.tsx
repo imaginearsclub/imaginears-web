@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Menu, Home, CalendarRange, FileText, Users, Settings, Plus, Search, Moon, Sun, Palette, LogOut, Code, UserCog, User } from "lucide-react";
+import { Menu, Home, CalendarRange, FileText, Users, Settings, Plus, Search, Moon, Sun, Palette, LogOut, Code, UserCog, User, Shield, Activity, HeartPulse, BookOpen, UsersRound } from "lucide-react";
 import { SidebarDesktop, SidebarDrawer } from "@/components/admin/Sidebar";
 import { CommandPalette, Badge } from "@/components/common";
 import type { CommandItem } from "@/components/common";
@@ -70,6 +70,60 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
             keywords: ["orgs", "teams"],
         },
         {
+            id: "roles",
+            label: "User Roles",
+            description: "Configure roles and permissions (RBAC)",
+            icon: <Shield className="w-4 h-4" />,
+            group: "Navigation",
+            onSelect: () => router.push("/admin/roles/configure"),
+            keywords: ["rbac", "permissions", "access", "security", "custom roles"],
+        },
+        {
+            id: "bulk-users",
+            label: "Bulk User Management",
+            description: "Manage multiple users at once",
+            icon: <UsersRound className="w-4 h-4" />,
+            group: "Navigation",
+            onSelect: () => router.push("/admin/users/bulk"),
+            keywords: ["bulk", "batch", "multiple", "operations", "suspend", "activate"],
+        },
+        {
+            id: "sessions",
+            label: "Sessions",
+            description: "Monitor and manage user sessions",
+            icon: <Activity className="w-4 h-4" />,
+            group: "Navigation",
+            onSelect: () => router.push("/admin/sessions"),
+            keywords: ["active", "monitoring", "security", "logins", "devices"],
+        },
+        {
+            id: "sessions-policies",
+            label: "Session Policies",
+            description: "Configure session security policies",
+            icon: <Shield className="w-4 h-4" />,
+            group: "Navigation",
+            onSelect: () => router.push("/admin/sessions/policies"),
+            keywords: ["policies", "security", "rules", "restrictions", "access"],
+        },
+        {
+            id: "sessions-health",
+            label: "Session Health",
+            description: "Monitor session system health and performance",
+            icon: <HeartPulse className="w-4 h-4" />,
+            group: "Navigation",
+            onSelect: () => router.push("/admin/sessions/health"),
+            keywords: ["health", "performance", "metrics", "monitoring", "diagnostics"],
+        },
+        {
+            id: "api-docs",
+            label: "API Documentation",
+            description: "View interactive API documentation",
+            icon: <BookOpen className="w-4 h-4" />,
+            group: "Navigation",
+            onSelect: () => router.push("/admin/api-docs"),
+            keywords: ["api", "docs", "documentation", "endpoints", "reference"],
+        },
+        {
             id: "profile",
             label: "My Profile",
             description: "Manage your account and personal settings",
@@ -108,6 +162,24 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
             keywords: ["add", "event", "calendar", "new"],
         },
         {
+            id: "create-role",
+            label: "Create Custom Role",
+            description: "Create a new custom role with specific permissions",
+            icon: <Plus className="w-4 h-4" />,
+            group: "Quick Actions",
+            onSelect: () => router.push("/admin/roles/configure"),
+            keywords: ["add", "role", "permissions", "rbac", "custom", "new"],
+        },
+        {
+            id: "bulk-operations",
+            label: "Bulk User Operations",
+            description: "Perform operations on multiple users",
+            icon: <UsersRound className="w-4 h-4" />,
+            group: "Quick Actions",
+            onSelect: () => router.push("/admin/users/bulk"),
+            keywords: ["bulk", "suspend", "activate", "batch", "multiple"],
+        },
+        {
             id: "search-apps",
             label: "Search Applications",
             description: "Find and filter applications",
@@ -124,6 +196,15 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
             group: "Quick Actions",
             onSelect: () => router.push("/admin/players"),
             keywords: ["find", "users", "members", "lookup"],
+        },
+        {
+            id: "search-sessions",
+            label: "Search Sessions",
+            description: "Find and monitor active sessions",
+            icon: <Search className="w-4 h-4" />,
+            group: "Quick Actions",
+            onSelect: () => router.push("/admin/sessions"),
+            keywords: ["find", "sessions", "active", "monitoring", "security"],
         },
         // Theme Controls
         {
