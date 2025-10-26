@@ -3,7 +3,18 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { Command } from "cmdk";
 import { Dialog, DialogContent, DialogPortal, DialogOverlay, DialogTitle } from "./Dialog";
 import { cn } from "@/lib/utils";
-import { Search, ArrowRight, Clock } from "lucide-react";
+import { 
+  Search, 
+  Clock, 
+  Hash, 
+  Navigation, 
+  Settings, 
+  Users, 
+  Wrench,
+  TrendingUp,
+  Zap
+} from "lucide-react";
+import { useHotkeys } from "react-hotkeys-hook";
 
 /**
  * Command Palette (Cmd+K / Ctrl+K)
@@ -11,10 +22,15 @@ import { Search, ArrowRight, Clock } from "lucide-react";
  * Built with cmdk library for excellent UX
  * 
  * Features:
- * - Recently used commands tracking
- * - Result count statistics
- * - Quick filter tags
- * - Keyboard shortcuts
+ * - Recently used commands tracking (last 5, within 7 days)
+ * - Result count & statistics display
+ * - Quick filter tags by group with icons & colors
+ * - Usage analytics badges (shows command usage count)
+ * - Enhanced keyboard shortcuts (⌘S, ⌘B, ⌘R, ⌘H, ⌘D)
+ * - Role-based command filtering (RBAC)
+ * - Trending & Most Used indicators
+ * - Smart contextual suggestions (time-based & page-based)
+ * - Visual hierarchy with group icons and color coding
  */
 
 export interface CommandItem {
@@ -26,6 +42,7 @@ export interface CommandItem {
   onSelect: () => void;
   keywords?: string[];
   group?: string;
+  requiredPermission?: string; // For role-based filtering
 }
 
 interface RecentCommand {
@@ -39,30 +56,63 @@ interface CommandPaletteProps {
   placeholder?: string;
   emptyMessage?: string;
   className?: string;
+  userPermissions?: string[]; // For role-based filtering
 }
+
+// Group configuration with icons and colors
+const GROUP_CONFIG: Record<string, { icon: React.ReactNode; color: string; bgColor: string }> = {
+  Navigation: {
+    icon: <Navigation className="w-3.5 h-3.5" />,
+    color: "text-blue-600 dark:text-blue-400",
+    bgColor: "bg-blue-50 dark:bg-blue-900/20",
+  },
+  Settings: {
+    icon: <Settings className="w-3.5 h-3.5" />,
+    color: "text-purple-600 dark:text-purple-400",
+    bgColor: "bg-purple-50 dark:bg-purple-900/20",
+  },
+  Management: {
+    icon: <Users className="w-3.5 h-3.5" />,
+    color: "text-green-600 dark:text-green-400",
+    bgColor: "bg-green-50 dark:bg-green-900/20",
+  },
+  Tools: {
+    icon: <Wrench className="w-3.5 h-3.5" />,
+    color: "text-orange-600 dark:text-orange-400",
+    bgColor: "bg-orange-50 dark:bg-orange-900/20",
+  },
+  Commands: {
+    icon: <Zap className="w-3.5 h-3.5" />,
+    color: "text-slate-600 dark:text-slate-400",
+    bgColor: "bg-slate-50 dark:bg-slate-900/20",
+  },
+};
 
 export function CommandPalette({
   items,
   placeholder = "Type a command or search...",
   emptyMessage = "No results found.",
   className,
+  userPermissions = [],
 }: CommandPaletteProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [recentCommands, setRecentCommands] = useState<RecentCommand[]>([]);
+  const [currentPath, setCurrentPath] = useState<string>("");
 
-  // Load recent commands from localStorage
+  // Load recent commands from localStorage and track current path
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("commandPalette.recent");
-      if (stored) {
+      const storedRecent = localStorage.getItem("commandPalette.recent");
+      if (storedRecent) {
         try {
-          setRecentCommands(JSON.parse(stored));
+          setRecentCommands(JSON.parse(storedRecent));
         } catch (e) {
           console.error("Failed to load recent commands", e);
         }
       }
+      setCurrentPath(window.location.pathname);
     }
   }, []);
 
@@ -99,18 +149,90 @@ export function CommandPalette({
     });
   }, []);
 
-  // Keyboard shortcut handler
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setOpen((open) => !open);
+  // Helper function to execute a command by ID
+  const executeCommand = useCallback((commandId: string) => {
+    console.log('executeCommand called for:', commandId);
+    const command = items.find((item) => item.id === commandId);
+    console.log('Found command:', command ? command.label : 'NOT FOUND');
+    if (command) {
+      // Check permission if required
+      if (command.requiredPermission && userPermissions.length > 0 && !userPermissions.includes(command.requiredPermission)) {
+        console.log(`Permission denied for command: ${commandId}`);
+        return;
       }
-    };
+      console.log('Executing command:', commandId);
+      trackRecentCommand(command.id);
+      command.onSelect();
+    } else {
+      console.log(`Command not found: ${commandId}`);
+    }
+  }, [items, userPermissions, trackRecentCommand]);
 
-    document.addEventListener("keydown", down);
-    return () => document.removeEventListener("keydown", down);
+  // Toggle command palette - works anywhere
+  useHotkeys('mod+k', (e) => {
+    console.log('mod+k pressed');
+    e.preventDefault();
+    setOpen((prev) => !prev);
+  }, { 
+    enableOnFormTags: true,
+    enableOnContentEditable: true,
   }, []);
+
+  // Direct navigation shortcuts - work anywhere when palette is closed
+  useHotkeys('mod+s', (e) => {
+    console.log('mod+s pressed, palette open:', open);
+    if (!open) {
+      e.preventDefault();
+      executeCommand('sessions');
+    }
+  }, { 
+    enableOnFormTags: false,
+    enableOnContentEditable: false,
+  }, [open, executeCommand]);
+
+  useHotkeys('mod+b', (e) => {
+    console.log('mod+b pressed, palette open:', open);
+    if (!open) {
+      e.preventDefault();
+      executeCommand('bulk-users');
+    }
+  }, { 
+    enableOnFormTags: false,
+    enableOnContentEditable: false,
+  }, [open, executeCommand]);
+
+  useHotkeys('mod+r', (e) => {
+    console.log('mod+r pressed, palette open:', open);
+    if (!open) {
+      e.preventDefault();
+      executeCommand('roles');
+    }
+  }, { 
+    enableOnFormTags: false,
+    enableOnContentEditable: false,
+  }, [open, executeCommand]);
+
+  useHotkeys('mod+h', (e) => {
+    console.log('mod+h pressed, palette open:', open);
+    if (!open) {
+      e.preventDefault();
+      executeCommand('sessions-health');
+    }
+  }, { 
+    enableOnFormTags: false,
+    enableOnContentEditable: false,
+  }, [open, executeCommand]);
+
+  useHotkeys('mod+d', (e) => {
+    console.log('mod+d pressed, palette open:', open);
+    if (!open) {
+      e.preventDefault();
+      executeCommand('dashboard');
+    }
+  }, { 
+    enableOnFormTags: false,
+    enableOnContentEditable: false,
+  }, [open, executeCommand]);
 
   // Close on item select
   const handleSelect = useCallback((item: CommandItem) => {
@@ -120,11 +242,25 @@ export function CommandPalette({
     item.onSelect();
   }, [trackRecentCommand]);
 
-  // Filter items by active group filter
+  // Filter items by active group filter and user permissions
   const filteredItems = useMemo(() => {
-    if (!activeFilter) return items;
-    return items.filter((item) => (item.group || "Commands") === activeFilter);
-  }, [items, activeFilter]);
+    let filtered = items;
+
+    // Role-based filtering
+    if (userPermissions.length > 0) {
+      filtered = filtered.filter((item) => {
+        if (!item.requiredPermission) return true; // No permission required
+        return userPermissions.includes(item.requiredPermission);
+      });
+    }
+
+    // Group filtering
+    if (activeFilter) {
+      filtered = filtered.filter((item) => (item.group || "Commands") === activeFilter);
+    }
+
+    return filtered;
+  }, [items, activeFilter, userPermissions]);
 
   // Group items by category
   const groupedItems = filteredItems.reduce((acc, item) => {
@@ -140,9 +276,65 @@ export function CommandPalette({
     return recentCommands
       .filter((recent) => recent.timestamp > sevenDaysAgo)
       .slice(0, 5)
-      .map((recent) => items.find((item) => item.id === recent.id))
+      .map((recent) => filteredItems.find((item) => item.id === recent.id))
       .filter((item): item is CommandItem => item !== undefined);
-  }, [recentCommands, items]);
+  }, [recentCommands, filteredItems]);
+
+  // Calculate trending commands (usage increased in last 24h vs previous 7 days)
+  const getMostUsedCommand = useMemo(() => {
+    if (recentCommands.length === 0) return null;
+    const sorted = [...recentCommands].sort((a, b) => b.count - a.count);
+    const topCommand = sorted[0];
+    return topCommand && topCommand.count > 5 ? topCommand.id : null;
+  }, [recentCommands]);
+
+  // Check if a command is trending (used multiple times in last 24h)
+  const isTrending = useCallback((commandId: string): boolean => {
+    const recent = recentCommands.find((r) => r.id === commandId);
+    if (!recent) return false;
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    return recent.timestamp > oneDayAgo && recent.count >= 3;
+  }, [recentCommands]);
+
+  // Smart Suggestions based on context (used in UI below)
+  const suggestedItems = useMemo(() => {
+    const suggestions: CommandItem[] = [];
+    const hour = new Date().getHours();
+
+    // Time-based suggestions
+    if (hour >= 9 && hour < 12) {
+      // Morning: suggest dashboard
+      const dashboardCmd = items.find((item) => item.id === "dashboard");
+      if (dashboardCmd && !suggestions.includes(dashboardCmd)) suggestions.push(dashboardCmd);
+    } else if (hour >= 14 && hour < 17) {
+      // Afternoon: suggest sessions or bulk users
+      const sessionsCmd = items.find((item) => item.id === "sessions");
+      if (sessionsCmd && !suggestions.includes(sessionsCmd)) suggestions.push(sessionsCmd);
+    }
+
+    // Context-based suggestions (current page)
+    if (currentPath.includes("/admin/sessions")) {
+      const healthCmd = items.find((item) => item.id === "sessions-health");
+      const policiesCmd = items.find((item) => item.id === "sessions-policies");
+      if (healthCmd && !suggestions.includes(healthCmd)) suggestions.push(healthCmd);
+      if (policiesCmd && !suggestions.includes(policiesCmd)) suggestions.push(policiesCmd);
+    } else if (currentPath.includes("/admin/dashboard")) {
+      const sessionsCmd = items.find((item) => item.id === "sessions");
+      const eventsCmd = items.find((item) => item.id === "events");
+      if (sessionsCmd && !suggestions.includes(sessionsCmd)) suggestions.push(sessionsCmd);
+      if (eventsCmd && !suggestions.includes(eventsCmd)) suggestions.push(eventsCmd);
+    }
+
+    // Filter out already recent commands and apply permissions
+    return suggestions
+      .filter((item) => !recentItems.some((recent) => recent.id === item.id))
+      .filter((item) => {
+        if (!item.requiredPermission) return true;
+        if (userPermissions.length === 0) return true;
+        return userPermissions.includes(item.requiredPermission);
+      })
+      .slice(0, 3); // Max 3 suggestions
+  }, [items, currentPath, recentItems, userPermissions]);
 
   // Count total visible items
   const totalItems = filteredItems.length;
@@ -172,24 +364,39 @@ export function CommandPalette({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogPortal>
           <DialogOverlay />
-          <DialogContent className="overflow-hidden p-0 max-w-2xl bg-white dark:bg-slate-900 [&>button]:absolute [&>button]:right-3 [&>button]:top-3 [&>button]:z-10 [&>button]:bg-white [&>button]:dark:bg-slate-900 [&>button]:hover:bg-slate-100 [&>button]:dark:hover:bg-slate-800 [&>button]:p-1.5 [&>button]:rounded-md">
+          <DialogContent className="overflow-hidden p-0 max-w-3xl w-[90vw] bg-white dark:bg-slate-900 [&>button]:absolute [&>button]:right-3 [&>button]:top-3 [&>button]:z-10 [&>button]:bg-white [&>button]:dark:bg-slate-900 [&>button]:hover:bg-slate-100 [&>button]:dark:hover:bg-slate-800 [&>button]:p-1.5 [&>button]:rounded-md">
             <DialogTitle className="sr-only">Command Palette</DialogTitle>
             <Command className="bg-white dark:bg-slate-900 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-slate-500 dark:[&_[cmdk-group-heading]]:text-slate-400 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
-              <div className="flex items-center border-b border-slate-200 dark:border-slate-800 px-3 pr-12 bg-white dark:bg-slate-900">
-                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+              {/* Enhanced Search Input */}
+              <div className="relative flex items-center border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                <div className="absolute left-4 pointer-events-none">
+                  <Search className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                </div>
                 <Command.Input
                   placeholder={placeholder}
                   value={search}
                   onValueChange={setSearch}
-                  className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-500 dark:placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-14 w-full rounded-md bg-transparent py-4 pl-11 pr-12 text-sm text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
                 />
+                {search && (
+                  <button
+                    onClick={() => setSearch("")}
+                    className="absolute right-4 p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    title="Clear search"
+                  >
+                    <span className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xs font-medium">
+                      ESC
+                    </span>
+                  </button>
+                )}
               </div>
 
               {/* Stats Bar */}
               <div className="flex items-center justify-between px-3 py-2 text-xs text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
                 <div className="flex items-center gap-4">
-                  <span>
-                    Found <strong className="text-slate-700 dark:text-slate-300">{totalItems}</strong> command{totalItems !== 1 ? 's' : ''}
+                  <span className="flex items-center gap-1">
+                    <Hash className="w-3 h-3" />
+                    <strong className="text-slate-700 dark:text-slate-300">{totalItems}</strong> command{totalItems !== 1 ? 's' : ''}
                   </span>
                   {recentCount > 0 && (
                     <span className="flex items-center gap-1">
@@ -208,7 +415,7 @@ export function CommandPalette({
                 )}
               </div>
 
-              {/* Quick Filter Tags */}
+              {/* Quick Filter Tags with Icons & Colors */}
               {!search && (
                 <div className="flex gap-2 p-2 border-b border-slate-200 dark:border-slate-800 overflow-x-auto bg-white dark:bg-slate-900">
                   {Object.keys(items.reduce((acc, item) => {
@@ -219,45 +426,113 @@ export function CommandPalette({
                   }, {} as Record<string, CommandItem[]>)).map((group) => {
                     const count = items.filter((item) => (item.group || "Commands") === group).length;
                     const isActive = activeFilter === group;
+                    const groupConfig = (GROUP_CONFIG as Record<string, { icon: React.ReactNode; color: string; bgColor: string }>)[group] || GROUP_CONFIG["Commands"];
+                    if (!groupConfig) return null;
+                    const { icon, color, bgColor } = groupConfig;
                     return (
                       <button
                         key={group}
                         onClick={() => setActiveFilter(isActive ? null : group)}
                         className={cn(
-                          "px-2.5 py-1 text-xs rounded-md whitespace-nowrap transition-colors border",
+                          "flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md whitespace-nowrap transition-all border font-medium",
                           isActive
-                            ? "bg-blue-500 text-white border-blue-600"
+                            ? cn(bgColor, color, "border-current ring-2 ring-offset-1", color.replace('text-', 'ring-'))
                             : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700"
                         )}
                       >
-                        {group} ({count})
+                        <span className={isActive ? color : "text-slate-500 dark:text-slate-500"}>
+                          {icon}
+                        </span>
+                        <span>{group}</span>
+                        <span className="opacity-60">({count})</span>
                       </button>
                     );
                   })}
                 </div>
               )}
 
-              <Command.List className="max-h-[400px] overflow-y-auto overflow-x-hidden p-2 bg-white dark:bg-slate-900">
+              <Command.List className="max-h-[500px] overflow-y-auto overflow-x-hidden p-3 bg-white dark:bg-slate-900">
                 <Command.Empty className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
                   {emptyMessage}
                 </Command.Empty>
 
+                {/* Suggested Commands Group */}
+                {!search && suggestedItems.length > 0 && (
+                  <Command.Group
+                    heading={
+                      <div className="flex items-center gap-1.5">
+                        <Zap className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+                        <span>Suggested for you</span>
+                      </div>
+                    }
+                    className="[&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-slate-500 dark:[&_[cmdk-group-heading]]:text-slate-400 mb-2"
+                  >
+                    {suggestedItems.map((item) => (
+                      <Command.Item
+                        key={`suggested-${item.id}`}
+                        value={`${item.label} ${item.description || ""} ${item.keywords?.join(" ") || ""}`}
+                        onSelect={() => handleSelect(item)}
+                        className={cn(
+                          "relative flex cursor-pointer select-none items-center rounded-lg px-2 py-2.5 text-sm outline-none group",
+                          "aria-selected:bg-slate-100 dark:aria-selected:bg-slate-800",
+                          "hover:bg-slate-50 dark:hover:bg-slate-800/50",
+                          "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+                          "transition-colors border-l-2 border-amber-400"
+                        )}
+                      >
+                        {item.icon && (
+                          <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400">
+                            {item.icon}
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-slate-900 dark:text-slate-100">
+                              {item.label}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                              Suggested
+                            </span>
+                          </div>
+                          {item.description && (
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                              {item.description}
+                            </div>
+                          )}
+                        </div>
+                        {item.shortcut && (
+                          <kbd className="ml-2 pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-1.5 font-mono text-[10px] font-medium text-slate-600 dark:text-slate-400">
+                            {item.shortcut}
+                          </kbd>
+                        )}
+                      </Command.Item>
+                    ))}
+                  </Command.Group>
+                )}
+
                 {/* Recent Commands Group */}
                 {!search && recentItems.length > 0 && (
                   <Command.Group
-                    heading="Recent"
+                    heading={
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                        <span>Recent</span>
+                      </div>
+                    }
                     className="[&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-slate-500 dark:[&_[cmdk-group-heading]]:text-slate-400 mb-2"
                   >
                     {recentItems.map((item) => {
                       const recentData = recentCommands.find((r) => r.id === item.id);
                       const timeAgo = recentData ? getTimeAgo(recentData.timestamp) : "";
+                      const trending = isTrending(item.id);
+                      const mostUsed = getMostUsedCommand === item.id;
                       return (
                         <Command.Item
                           key={`recent-${item.id}`}
                           value={`${item.label} ${item.description || ""} ${item.keywords?.join(" ") || ""}`}
                           onSelect={() => handleSelect(item)}
                           className={cn(
-                            "relative flex cursor-pointer select-none items-center rounded-lg px-2 py-2.5 text-sm outline-none",
+                            "relative flex cursor-pointer select-none items-center rounded-lg px-2 py-2.5 text-sm outline-none group",
                             "aria-selected:bg-slate-100 dark:aria-selected:bg-slate-800",
                             "hover:bg-slate-50 dark:hover:bg-slate-800/50",
                             "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
@@ -274,6 +549,17 @@ export function CommandPalette({
                               <span className="font-medium text-slate-900 dark:text-slate-100">
                                 {item.label}
                               </span>
+                              {mostUsed && (
+                                <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 font-semibold">
+                                  🔥 Most Used
+                                </span>
+                              )}
+                              {trending && !mostUsed && (
+                                <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300">
+                                  <TrendingUp className="w-2.5 h-2.5" />
+                                  Trending
+                                </span>
+                              )}
                               <Clock className="w-3 h-3 text-slate-400" />
                               <span className="text-xs text-slate-400">{timeAgo}</span>
                             </div>
@@ -283,12 +569,10 @@ export function CommandPalette({
                               </div>
                             )}
                           </div>
-                          {item.shortcut ? (
-                            <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-1.5 font-mono text-[10px] font-medium text-slate-600 dark:text-slate-400">
+                          {item.shortcut && (
+                            <kbd className="ml-2 pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-1.5 font-mono text-[10px] font-medium text-slate-600 dark:text-slate-400">
                               {item.shortcut}
                             </kbd>
-                          ) : (
-                            <ArrowRight className="w-4 h-4 opacity-0 group-aria-selected:opacity-50" />
                           )}
                         </Command.Item>
                       );
@@ -296,10 +580,19 @@ export function CommandPalette({
                   </Command.Group>
                 )}
 
-                {Object.entries(groupedItems).map(([group, groupItems]) => (
+                {Object.entries(groupedItems).map(([group, groupItems]) => {
+                  const groupConfig = (GROUP_CONFIG as Record<string, { icon: React.ReactNode; color: string; bgColor: string }>)[group] || GROUP_CONFIG["Commands"];
+                  if (!groupConfig) return null;
+                  const { icon, color } = groupConfig;
+                  return (
                   <Command.Group
                     key={group}
-                    heading={group}
+                    heading={
+                      <div className="flex items-center gap-1.5">
+                        <span className={color}>{icon}</span>
+                        <span>{group}</span>
+                      </div>
+                    }
                     className="[&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-slate-500 dark:[&_[cmdk-group-heading]]:text-slate-400"
                   >
                     {groupItems.map((item) => {
@@ -311,7 +604,7 @@ export function CommandPalette({
                           value={`${item.label} ${item.description || ""} ${item.keywords?.join(" ") || ""}`}
                           onSelect={() => handleSelect(item)}
                           className={cn(
-                            "relative flex cursor-pointer select-none items-center rounded-lg px-2 py-2.5 text-sm outline-none",
+                            "relative flex cursor-pointer select-none items-center rounded-lg px-2 py-2.5 text-sm outline-none group",
                             "aria-selected:bg-slate-100 dark:aria-selected:bg-slate-800",
                             "hover:bg-slate-50 dark:hover:bg-slate-800/50",
                             "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
@@ -340,18 +633,17 @@ export function CommandPalette({
                               </div>
                             )}
                           </div>
-                          {item.shortcut ? (
-                            <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-1.5 font-mono text-[10px] font-medium text-slate-600 dark:text-slate-400">
+                          {item.shortcut && (
+                            <kbd className="ml-2 pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-1.5 font-mono text-[10px] font-medium text-slate-600 dark:text-slate-400">
                               {item.shortcut}
                             </kbd>
-                          ) : (
-                            <ArrowRight className="w-4 h-4 opacity-0 group-aria-selected:opacity-50" />
                           )}
                         </Command.Item>
                       );
                     })}
                   </Command.Group>
-                ))}
+                  );
+                })}
               </Command.List>
             </Command>
           </DialogContent>
