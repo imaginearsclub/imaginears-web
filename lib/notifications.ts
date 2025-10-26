@@ -38,15 +38,37 @@ export async function createNotification(input: CreateNotificationInput): Promis
       type: input.type,
       priority: input.priority || "normal",
       category: input.category,
-      actionUrl: input.actionUrl,
-      actionText: input.actionText,
-      metadata: input.metadata as any,
-      expiresAt: input.expiresAt,
+      actionUrl: input.actionUrl ?? null,
+      actionText: input.actionText ?? null,
+      metadata: (input.metadata as any) ?? null,
+      expiresAt: input.expiresAt ?? null,
       deliveredVia: ["in_app"], // Start with in-app, can add email later
     },
   });
 
-  // TODO: Send real-time notification via WebSocket/SSE
+  // Real-time notification broadcast (if WebSocket is enabled)
+  if (process.env['ENABLE_REALTIME_NOTIFICATIONS'] === "true") {
+    try {
+      const { broadcast, CHANNELS } = await import("./websocket-server");
+      broadcast("notification:new", {
+        id: notification.id,
+        title: notification.title,
+        message: notification.message,
+        type: notification.type,
+        priority: notification.priority,
+        category: notification.category,
+        ...(notification.actionUrl && { actionUrl: notification.actionUrl }),
+        ...(notification.actionText && { actionText: notification.actionText }),
+        createdAt: notification.createdAt.toISOString(),
+      }, {
+        userId: input.userId,
+        channel: CHANNELS.NOTIFICATIONS,
+      });
+    } catch (error) {
+      console.error("[Notifications] Failed to broadcast:", error);
+    }
+  }
+
   // TODO: Send email notification if user preferences allow
 
   return notification;
@@ -72,10 +94,10 @@ export async function createBulkNotifications(
           type: input.type,
           priority: input.priority || "normal",
           category: input.category,
-          actionUrl: input.actionUrl,
-          actionText: input.actionText,
-          metadata: input.metadata as any,
-          expiresAt: input.expiresAt,
+          actionUrl: input.actionUrl ?? null,
+          actionText: input.actionText ?? null,
+          metadata: (input.metadata as any) ?? null,
+          expiresAt: input.expiresAt ?? null,
           deliveredVia: ["in_app"],
         },
       })
