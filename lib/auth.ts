@@ -4,7 +4,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "@/lib/prisma";
 import { organization } from "better-auth/plugins";
 import { env } from "@/lib/env";
-import { hashPasswordArgon2, verifyAndMigratePassword } from "@/lib/password-migration";
+import { hashPasswordArgon2, verifyPassword } from "@/lib/password-migration";
 
 // Build a safe baseURL. In production, require a valid HTTPS origin.
 const baseURL: string | undefined = (() => {
@@ -66,12 +66,8 @@ export const auth = betterAuth({
     // Custom password hashing with Argon2id (OWASP 2023 recommendation)
     // Supports automatic migration from legacy bcrypt hashes
     password: {
-      hash: async (password: string) => {
-        return await hashPasswordArgon2(password);
-      },
+      hash: hashPasswordArgon2,
       verify: async (data: { hash: string; password: string }) => {
-        // Basic verification (migration happens during login flow via Better-Auth)
-        const { verifyPassword } = await import("@/lib/password-migration");
         return await verifyPassword(data.hash, data.password);
       },
     },
