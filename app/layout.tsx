@@ -5,7 +5,7 @@ import Footer from "@/components/Footer";
 import Script from "next/script";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/common/Tooltip";
-import { CookieConsent } from "@/components/common";
+import { CookieConsent, ToastContainer } from "@/components/common";
 
 // Force Node.js runtime at the root to avoid accidental Edge usage by children that depend on Node-only modules.
 export const runtime = "nodejs";
@@ -207,6 +207,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               },
             }}
           />
+          
+          {/* Enhanced Toast Container with actions & progress */}
+          <ToastContainer position="top-right" />
           
           {/* GDPR Cookie Consent */}
           <CookieConsent />
