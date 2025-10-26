@@ -251,7 +251,7 @@ export default async function AdminSessionsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Device Breakdown */}
-        <Card>
+        <Card accent="primary" variant="elevated">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
               <Monitor className="w-4 h-4" />
@@ -291,7 +291,7 @@ export default async function AdminSessionsPage() {
         </Card>
 
         {/* Trust Levels */}
-        <Card>
+        <Card accent="success" variant="elevated">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4" />
@@ -335,7 +335,7 @@ export default async function AdminSessionsPage() {
       </div>
 
       {/* Geographic Distribution */}
-      <Card>
+      <Card accent="info" variant="elevated">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4" />
@@ -362,7 +362,7 @@ export default async function AdminSessionsPage() {
       </Card>
 
       {/* Activity Breakdown */}
-      <Card>
+      <Card accent="purple" variant="elevated">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4" />
@@ -387,7 +387,7 @@ export default async function AdminSessionsPage() {
 
       {/* Recent Suspicious Activity */}
       {recentSuspicious.length > 0 && (
-        <Card className="border-l-4 border-l-red-500">
+        <Card accent="danger" variant="elevated" className="bg-red-50/50 dark:bg-red-950/10">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
@@ -420,7 +420,7 @@ export default async function AdminSessionsPage() {
       )}
 
       {/* Recent Activity Log */}
-      <Card>
+      <Card accent="info" variant="elevated">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4" />

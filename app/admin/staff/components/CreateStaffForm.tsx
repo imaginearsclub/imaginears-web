@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Button, Input, Label } from "@/components/common";
-import { AlertCircle, CheckCircle, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Button, Input, Alert } from "@/components/common";
+import { User, Mail, Gamepad2, Shield, Key, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CreateStaffFormProps {
@@ -19,7 +19,6 @@ const ROLES = [
 export function CreateStaffForm({ action }: CreateStaffFormProps) {
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<{ success: boolean; message?: string } | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState("");
   const [minecraftName, setMinecraftName] = useState("");
 
@@ -65,163 +64,139 @@ export function CreateStaffForm({ action }: CreateStaffFormProps) {
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Result Message */}
       {result && (
-        <div
-          className={cn(
-            "flex items-start gap-3 p-4 rounded-lg border-2",
-            result.success
-              ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
-              : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
-          )}
+        <Alert 
+          variant={result.success ? "success" : "error"}
+          dismissible
+          onDismiss={() => setResult(null)}
         >
-          {result.success ? (
-            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
-          ) : (
-            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-          )}
-          <p
-            className={cn(
-              "text-sm font-medium",
-              result.success
-                ? "text-green-800 dark:text-green-200"
-                : "text-red-800 dark:text-red-200"
-            )}
-          >
-            {result.message}
-          </p>
-        </div>
+          {result.message}
+        </Alert>
       )}
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Name */}
-        <div className="space-y-2">
-          <Label htmlFor="name" required>
-            Full Name
-          </Label>
-          <Input
-            id="name"
-            name="name"
-            type="text"
-            placeholder="John Doe"
-            required
-            disabled={isPending}
-          />
-        </div>
+        <Input
+          id="name"
+          name="name"
+          type="text"
+          label="Full Name"
+          placeholder="John Doe"
+          leftIcon={<User />}
+          required
+          disabled={isPending}
+          helperText="Staff member's legal or display name"
+        />
 
         {/* Email */}
-        <div className="space-y-2">
-          <Label htmlFor="email" required>
-            Email Address
-          </Label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            placeholder="john.doe@imaginears.club"
-            required
-            disabled={isPending}
-          />
-        </div>
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          label="Email Address"
+          placeholder="john.doe@imaginears.club"
+          leftIcon={<Mail />}
+          required
+          disabled={isPending}
+          helperText="Used for login and notifications"
+        />
 
         {/* Minecraft Username */}
-        <div className="space-y-2">
-          <Label htmlFor="minecraftName">
-            Minecraft Username
-          </Label>
-          <Input
-            id="minecraftName"
-            name="minecraftName"
-            type="text"
-            placeholder="Steve123"
-            value={minecraftName}
-            onChange={(e) => setMinecraftName(e.target.value)}
-            disabled={isPending}
-            pattern="[a-zA-Z0-9_]{3,16}"
-            title="3-16 characters, alphanumeric and underscores only"
-          />
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            3-16 characters, alphanumeric and underscores only
-          </p>
-        </div>
+        <Input
+          id="minecraftName"
+          name="minecraftName"
+          type="text"
+          label="Minecraft Username"
+          placeholder="Steve123"
+          leftIcon={<Gamepad2 />}
+          value={minecraftName}
+          onChange={(e) => setMinecraftName(e.target.value)}
+          disabled={isPending}
+          pattern="[a-zA-Z0-9_]{3,16}"
+          helperText="3-16 characters, alphanumeric and underscores only"
+        />
 
         {/* Role */}
         <div className="space-y-2">
-          <Label htmlFor="role" required>
-            Role
-          </Label>
-          <select
-            id="role"
-            name="role"
-            required
-            disabled={isPending}
-            className={cn(
-              "w-full rounded-xl border-2 px-4 py-2.5 outline-none transition-all duration-200",
-              "bg-white dark:bg-slate-900",
-              "border-slate-300 dark:border-slate-700",
-              "text-slate-700 dark:text-slate-300",
-              "hover:border-slate-400 dark:hover:border-slate-600",
-              "focus:ring-2 focus:ring-blue-500/50",
-              "disabled:opacity-50 disabled:cursor-not-allowed"
-            )}
-          >
-            {ROLES.map((role) => (
-              <option key={role.value} value={role.value}>
-                {role.label}
-              </option>
-            ))}
-          </select>
+          <label htmlFor="role" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+            Role <span className="text-red-500 ml-1">*</span>
+          </label>
+          <div className="relative">
+            <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
+            <select
+              id="role"
+              name="role"
+              required
+              disabled={isPending}
+              className={cn(
+                "w-full rounded-xl border-2 pl-10 pr-4 py-2.5 outline-none transition-all duration-200",
+                "bg-white dark:bg-slate-900",
+                "border-slate-300 dark:border-slate-700",
+                "text-slate-700 dark:text-slate-300",
+                "hover:border-slate-400 dark:hover:border-slate-600",
+                "focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500",
+                "disabled:opacity-50 disabled:cursor-not-allowed"
+              )}
+            >
+              {ROLES.map((role) => (
+                <option key={role.value} value={role.value}>
+                  {role.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Determines permissions and access level
+          </p>
         </div>
       </div>
 
       {/* Password */}
-      <div className="space-y-2">
-        <Label htmlFor="password" required>
-          Initial Password
-        </Label>
+      <div className="space-y-3">
+        <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+          Initial Password <span className="text-red-500 ml-1">*</span>
+        </label>
         <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Input
-              id="password"
-              name="password"
-              type={showPassword ? "text" : "password"}
-              placeholder="Minimum 8 characters"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              disabled={isPending}
-              className="pr-10"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-              tabIndex={-1}
-            >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            placeholder="Minimum 8 characters"
+            leftIcon={<Key />}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={8}
+            disabled={isPending}
+            containerClassName="flex-1"
+          />
           <Button
             type="button"
             variant="outline"
             onClick={generatePassword}
             disabled={isPending}
+            ariaLabel="Generate secure random password"
           >
             Generate
           </Button>
         </div>
         {password && (
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center gap-2">
             <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
               <div
                 className={cn(
                   "h-full transition-all duration-300",
                   passwordStrength === "strong" && "w-full bg-green-500",
-                  passwordStrength === "medium" && "w-2/3 bg-yellow-500",
+                  passwordStrength === "medium" && "w-2/3 bg-amber-500",
                   passwordStrength === "weak" && "w-1/3 bg-red-500"
                 )}
               />
             </div>
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 capitalize">
+            <span className={cn(
+              "text-xs font-medium capitalize",
+              passwordStrength === "strong" && "text-green-600 dark:text-green-400",
+              passwordStrength === "medium" && "text-amber-600 dark:text-amber-400",
+              passwordStrength === "weak" && "text-red-600 dark:text-red-400"
+            )}>
               {passwordStrength}
             </span>
           </div>
@@ -246,15 +221,16 @@ export function CreateStaffForm({ action }: CreateStaffFormProps) {
 
       {/* Submit Button */}
       <div className="flex justify-end">
-        <Button type="submit" disabled={isPending} size="lg">
-          {isPending ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Creating...
-            </>
-          ) : (
-            "Create Cast Member"
-          )}
+        <Button 
+          type="submit" 
+          variant="primary"
+          size="lg"
+          isLoading={isPending}
+          loadingText="Creating Staff Member..."
+          leftIcon={<UserPlus />}
+          ariaLabel="Create new staff member"
+        >
+          Create Staff Member
         </Button>
       </div>
     </form>

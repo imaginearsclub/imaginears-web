@@ -166,11 +166,13 @@ export default function DashboardPage() {
                 {/* KPI Cards */}
                 {kpis && (
                     <>
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            {cards.map((card) => (
+                        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                            {cards.map((card, index) => (
                                 <Card 
-                                    key={card.title} 
-                                    className="hover:shadow-lg transition-shadow"
+                                    key={card.title}
+                                    accent={index === 0 ? "primary" : index === 1 ? "purple" : "success"}
+                                    variant="elevated"
+                                    interactive
                                     aria-label={card.ariaLabel}
                                 >
                                     <CardContent className="flex flex-col gap-3 p-6">
@@ -178,14 +180,9 @@ export default function DashboardPage() {
                                             <div className={`p-2 rounded-lg ${card.bgColor}`} aria-hidden="true">
                                                 {card.icon}
                                             </div>
-                                            <span 
-                                                className="text-xs"
-                                                aria-label={`7-day trend: ${card.trend}`}
-                                            >
-                                                <Badge variant="default">
-                                                    {card.trend}
-                                                </Badge>
-                                            </span>
+                                            <Badge variant="info" ariaLabel={`7-day trend: ${card.trend}`}>
+                                                {card.trend}
+                                            </Badge>
                                         </div>
                                         <div>
                                             <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{card.title}</p>
@@ -197,11 +194,13 @@ export default function DashboardPage() {
                         </div>
 
                         {/* Server Status Card */}
-                        <Card className={`hover:shadow-lg transition-all ${
-                            kpis.server?.online 
-                                ? "border-green-500/50 bg-gradient-to-br from-green-50/50 to-transparent dark:from-green-950/20 dark:to-transparent" 
-                                : "border-red-500/50 bg-gradient-to-br from-red-50/50 to-transparent dark:from-red-950/20 dark:to-transparent"
-                        }`}>
+                        <Card 
+                            accent={kpis.server?.online ? "success" : "danger"}
+                            variant="elevated"
+                            className={kpis.server?.online 
+                                ? "bg-gradient-to-br from-green-50/30 to-transparent dark:from-green-950/10 dark:to-transparent" 
+                                : "bg-gradient-to-br from-red-50/30 to-transparent dark:from-red-950/10 dark:to-transparent"
+                        }>
                             <CardContent className="p-6">
                                 <div className="flex flex-col lg:flex-row gap-6">
                                     {/* Left: Server Info */}
@@ -364,10 +363,10 @@ export default function DashboardPage() {
                             <TabsTrigger value="activity">Recent Activity</TabsTrigger>
                         </TabsList>
 
-                        <TabsContent value="charts" className="space-y-4">
-                            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                        <TabsContent value="charts" className="space-y-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                                 {/* Area chart: Events last 30 days */}
-                                <Card className="lg:col-span-3">
+                                <Card className="lg:col-span-3" accent="purple" variant="elevated">
                                     <CardHeader>
                                         <CardTitle className="flex items-center justify-between">
                                             <span>Events (last 30 days)</span>
@@ -407,7 +406,7 @@ export default function DashboardPage() {
                                 </Card>
 
                                 {/* Bar chart: Applications by Status */}
-                                <Card className="lg:col-span-2">
+                                <Card className="lg:col-span-2" accent="primary" variant="elevated">
                                     <CardHeader>
                                         <CardTitle className="flex items-center justify-between">
                                             <span>Applications</span>
@@ -443,7 +442,7 @@ export default function DashboardPage() {
                         </TabsContent>
 
                         <TabsContent value="activity">
-                            <Card>
+                            <Card accent="info" variant="elevated">
                                 <CardHeader>
                                     <CardTitle>Recent Activity</CardTitle>
                                 </CardHeader>
@@ -511,21 +510,33 @@ export default function DashboardPage() {
 
                 {/* Quick Actions */}
                 {kpis && (
-                    <Card>
+                    <Card variant="elevated">
                         <CardHeader>
                             <CardTitle>Quick Actions</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                <a href="/admin/events" className="btn btn-primary justify-center">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <a 
+                                    href="/admin/events" 
+                                    className="btn btn-primary justify-center"
+                                    aria-label="Navigate to events management page"
+                                >
                                     <CalendarRange className="w-4 h-4" />
                                     View Events
                                 </a>
-                                <a href="/admin/applications" className="btn btn-muted justify-center">
+                                <a 
+                                    href="/admin/applications" 
+                                    className="btn btn-muted justify-center"
+                                    aria-label="Navigate to applications management page"
+                                >
                                     <FileText className="w-4 h-4" />
                                     View Applications
                                 </a>
-                                <a href="/admin/players" className="btn btn-muted justify-center">
+                                <a 
+                                    href="/admin/players" 
+                                    className="btn btn-muted justify-center"
+                                    aria-label="Navigate to players management page"
+                                >
                                     <Users className="w-4 h-4" />
                                     View Players
                                 </a>

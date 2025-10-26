@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import EditEventDrawer, { type EditableEvent } from "@/components/admin/events/EditEventDrawer";
 import CreateEventDrawer from "@/components/admin/events/CreateEventDrawer";
 import EventsTable, { type AdminEventRow } from "@/components/admin/EventsTable";
+import { Button, Card, CardContent } from "@/components/common";
+import { Calendar, Plus, RefreshCw } from "lucide-react";
 
 export default function AdminEventsPage() {
     const [rows, setRows] = useState<AdminEventRow[]>([]);
@@ -89,32 +91,71 @@ export default function AdminEventsPage() {
     }
 
     return (
-        <div className="p-4 space-y-4">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold">Events</h1>
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                        <Calendar className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                            Events
+                        </h1>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
+                            Manage server events, schedules, and recurring activities
+                        </p>
+                    </div>
+                </div>
                 <div className="flex gap-2">
-                    {errorMsg && <span className="text-sm text-rose-600">{errorMsg}</span>}
-                    <button className="btn btn-muted" onClick={load} disabled={loading}>
-                        {loading ? "Loading…" : "Refresh"}
-                    </button>
-                    <button className="btn btn-primary" onClick={() => setCreateOpen(true)}>
-                        + New Event
-                    </button>
+                    <Button 
+                        variant="outline" 
+                        size="md"
+                        onClick={load} 
+                        isLoading={loading}
+                        loadingText="Refreshing..."
+                        leftIcon={<RefreshCw />}
+                        ariaLabel="Refresh events list"
+                    >
+                        Refresh
+                    </Button>
+                    <Button 
+                        variant="primary" 
+                        size="md"
+                        onClick={() => setCreateOpen(true)}
+                        leftIcon={<Plus />}
+                        ariaLabel="Create new event"
+                    >
+                        Create Event
+                    </Button>
                 </div>
             </div>
 
-            <EventsTable
-                rows={rows}
-                onEdit={openEditById}
-                onStatusChange={async (id, status) => {
-                    await fetch(`/api/events/${id}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ status }),
-                    });
-                    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status } : r)));
-                }}
-            />
+            {/* Error Message */}
+            {errorMsg && (
+                <div className="p-4 rounded-xl border-2 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 text-sm">
+                    {errorMsg}
+                </div>
+            )}
+
+            {/* Events Table Card */}
+            <Card accent="primary" variant="elevated">
+                <CardContent className="p-0">
+                    <EventsTable
+                        rows={rows}
+                        onEdit={openEditById}
+                        onStatusChange={async (id, status) => {
+                            await fetch(`/api/events/${id}`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ status }),
+                            });
+                            setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status } : r)));
+                        }}
+                        isLoading={loading}
+                    />
+                </CardContent>
+            </Card>
 
             {/* Create Drawer */}
             <CreateEventDrawer

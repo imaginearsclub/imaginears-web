@@ -2,16 +2,20 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import Link from "next/link";
 import {
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
+  Button,
+  Badge,
 } from "@/components/common";
 import { UsersList } from "./components/UsersList";
 import { getRoleDescription, getRoleLabel } from "@/lib/rbac";
 import type { UserRole } from "@prisma/client";
+import { Shield, Settings } from "lucide-react";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -135,26 +139,46 @@ export default async function RolesPage() {
 
   const roles = ["OWNER", "ADMIN", "MODERATOR", "STAFF", "USER"] as const;
 
+  // Role variant mapping for visual consistency
+  const roleVariants = {
+    OWNER: "danger",
+    ADMIN: "warning",
+    MODERATOR: "success",
+    STAFF: "primary",
+    USER: "default",
+  } as const;
+
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">User Roles & Permissions</h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-2">
-            Manage user roles and configure custom permissions for fine-grained access control.
-          </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+            <Shield className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              User Roles & Permissions
+            </h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
+              Manage user roles and configure custom permissions for fine-grained access control.
+            </p>
+          </div>
         </div>
-        <a
-          href="/admin/roles/configure"
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-        >
-          Configure Roles
-        </a>
+        <Link href="/admin/roles/configure">
+          <Button 
+            variant="primary" 
+            size="md"
+            leftIcon={<Settings />}
+            ariaLabel="Configure roles and permissions"
+          >
+            Configure Roles
+          </Button>
+        </Link>
       </div>
 
       {/* Role Overview */}
-      <Card>
+      <Card accent="purple" variant="elevated">
         <CardHeader>
           <CardTitle>Role Hierarchy</CardTitle>
           <CardDescription>
@@ -163,28 +187,40 @@ export default async function RolesPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {roles.map((role) => (
-              <div
-                key={role}
-                className="p-4 rounded-lg border border-slate-200/60 dark:border-slate-800/60 hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-semibold text-lg">{getRoleLabel(role)}</h3>
-                  <span className="text-sm font-medium text-slate-500">
-                    {roleCountsMap[role] || 0} {roleCountsMap[role] === 1 ? "user" : "users"}
-                  </span>
+            {roles.map((role) => {
+              const count = roleCountsMap[role] || 0;
+              return (
+                <div
+                  key={role}
+                  className="p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-900 hover:shadow-md transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                      <h3 className="font-semibold text-base text-slate-900 dark:text-white">
+                        {getRoleLabel(role)}
+                      </h3>
+                    </div>
+                    <Badge 
+                      variant={roleVariants[role as keyof typeof roleVariants]}
+                      size="sm"
+                      ariaLabel={`${count} ${count === 1 ? "user" : "users"} with ${role} role`}
+                    >
+                      {count}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                    {getRoleDescription(role)}
+                  </p>
                 </div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  {getRoleDescription(role)}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>
 
       {/* Users List */}
-      <Card>
+      <Card accent="primary" variant="elevated">
         <CardHeader>
           <CardTitle>All Users</CardTitle>
           <CardDescription>

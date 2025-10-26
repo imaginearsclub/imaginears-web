@@ -83,7 +83,7 @@ export async function verifyPassword(
       return false;
     }
   } else {
-    console.error("[Password Verification] Unknown hash format:", storedHash.substring(0, 10));
+    console.error("[Password Verification] Unknown hash format");
     return false;
   }
 }
