@@ -69,14 +69,10 @@ export const auth = betterAuth({
       hash: async (password: string) => {
         return await hashPasswordArgon2(password);
       },
-      verify: async (hash: string, password: string, userId?: string) => {
-        // If userId is available, use migration-aware verification
-        if (userId) {
-          return await verifyAndMigratePassword(hash, password, userId);
-        }
-        // Fallback to basic verification (no migration)
+      verify: async (data: { hash: string; password: string }) => {
+        // Basic verification (migration happens during login flow via Better-Auth)
         const { verifyPassword } = await import("@/lib/password-migration");
-        return await verifyPassword(hash, password);
+        return await verifyPassword(data.hash, data.password);
       },
     },
   },
