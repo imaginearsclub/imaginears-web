@@ -35,6 +35,7 @@ export type AdminEventRow = {
     title: string;
     server: string;
     category: string;
+    visibility?: "PUBLIC" | "MEMBERS_ONLY" | "STAFF_ONLY" | "HIDDEN";
     status: "Draft" | "Published" | "Cancelled";
     startAt: string;         // ISO
     endAt: string;           // ISO
@@ -131,7 +132,7 @@ export default function EventsTable({
 
     // Loading state
     if (isLoading) {
-        return <TableSkeleton columns={7} rows={5} />;
+        return <TableSkeleton columns={8} rows={5} />;
     }
 
     // Empty state
@@ -183,6 +184,9 @@ export default function EventsTable({
                         <th scope="col" className={thClass} onClick={() => requestSort("category")}>
                             Category{getSortIndicator("category")}
                         </th>
+                        <th scope="col" className={thClass} onClick={() => requestSort("visibility")}>
+                            Visibility{getSortIndicator("visibility")}
+                        </th>
                         <th scope="col" className={thClass} onClick={() => requestSort("status")}>
                             Status{getSortIndicator("status")}
                         </th>
@@ -200,7 +204,7 @@ export default function EventsTable({
                     <tbody className="bg-white dark:bg-slate-900">
                     {filteredData.length === 0 ? (
                         <tr>
-                            <td colSpan={7} className="py-12 text-center">
+                            <td colSpan={8} className="py-12 text-center">
                                 <div className="flex flex-col items-center gap-2">
                                     <CalendarRange className="w-8 h-8 text-slate-400 dark:text-slate-600" />
                                     <p className="text-slate-500 dark:text-slate-400">
@@ -272,6 +276,21 @@ export default function EventsTable({
                                         </td>
                                         <td className="py-3.5 pr-4">{r.server}</td>
                                         <td className="py-3.5 pr-4">{r.category}</td>
+                                        <td className="py-3.5 pr-4" data-tour="events-visibility">
+                                            <Badge
+                                                variant={
+                                                    r.visibility === "PUBLIC" ? "success" :
+                                                    r.visibility === "MEMBERS_ONLY" ? "info" :
+                                                    r.visibility === "STAFF_ONLY" ? "warning" :
+                                                    "default"
+                                                }
+                                            >
+                                                {r.visibility === "PUBLIC" ? "🌍 Public" :
+                                                 r.visibility === "MEMBERS_ONLY" ? "👥 Members" :
+                                                 r.visibility === "STAFF_ONLY" ? "👔 Staff" :
+                                                 "🔒 Hidden"}
+                                            </Badge>
+                                        </td>
                                         <td className="py-3.5 pr-4">
                                             <Badge
                                                 variant={
