@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { MarkdownEditor, Input, Separator } from "@/components/common";
 import RecurrenceEditor, { type RecurrenceValue } from "./RecurrenceEditor";
+import { ContextualHelp } from "@/components/onboarding/ContextualHelp";
 
 type Props = {
     open: boolean;
@@ -18,6 +19,7 @@ export default function CreateEventDrawer({ open, onOpenChange, onCreated }: Pro
     const [title, setTitle] = useState("");
     const [world, setWorld] = useState("");
     const [category, setCategory] = useState<"Fireworks" | "Seasonal" | "MeetAndGreet" | "Parade" | "Other">("Other");
+    const [visibility, setVisibility] = useState<"PUBLIC" | "MEMBERS_ONLY" | "STAFF_ONLY" | "HIDDEN">("PUBLIC");
     const [details, setDetails] = useState("");
     const [shortDesc, setShortDesc] = useState("");
 
@@ -62,6 +64,7 @@ export default function CreateEventDrawer({ open, onOpenChange, onCreated }: Pro
                     title,
                     world,
                     category,
+                    visibility,
                     details,
                     shortDescription: shortDesc,
                     startAt,
@@ -216,6 +219,37 @@ export default function CreateEventDrawer({ open, onOpenChange, onCreated }: Pro
                                 <option value="MeetAndGreet">Meet & Greet</option>
                                 <option value="Parade">Parade</option>
                                 <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <div data-tour="events-visibility">
+                            <label className="text-sm font-medium text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                                Visibility
+                                <ContextualHelp
+                                    title="Event Visibility"
+                                    content={
+                                        <>
+                                            Control who can see this event:
+                                            <ul className="list-disc list-inside mt-1 space-y-0.5">
+                                                <li><strong>Public:</strong> Everyone can see</li>
+                                                <li><strong>Members Only:</strong> Logged-in users</li>
+                                                <li><strong>Staff Only:</strong> STAFF+ roles</li>
+                                                <li><strong>Hidden:</strong> OWNER/ADMIN only</li>
+                                            </ul>
+                                        </>
+                                    }
+                                />
+                            </label>
+                            <select
+                                className={selectClass}
+                                value={visibility}
+                                onChange={(e) => setVisibility(e.target.value as any)}
+                                disabled={submitting}
+                            >
+                                <option value="PUBLIC">🌍 Public - Anyone can see</option>
+                                <option value="MEMBERS_ONLY">👥 Members Only - Logged-in users</option>
+                                <option value="STAFF_ONLY">👔 Staff Only - STAFF+ roles</option>
+                                <option value="HIDDEN">🔒 Hidden - OWNER/ADMIN only</option>
                             </select>
                         </div>
 
