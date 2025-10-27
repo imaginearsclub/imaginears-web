@@ -172,12 +172,12 @@ const EventCard = memo(({
     return (
         <article 
             className={cn(
-                "rounded-2xl border-2 p-5 shadow-sm transition-all duration-200",
+                "rounded-2xl border-2 p-5 shadow-sm transition-all duration-300",
                 "border-slate-300 dark:border-slate-700",
                 "bg-white dark:bg-slate-900",
-                "hover:shadow-lg hover:-translate-y-0.5",
-                "hover:border-slate-400 dark:hover:border-slate-600",
-                "flex flex-col"
+                "hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02]",
+                "hover:border-blue-400 dark:hover:border-blue-600",
+                "flex flex-col group"
             )}
         >
             {/* Countdown badge */}
@@ -241,13 +241,14 @@ const EventCard = memo(({
             <Link 
                 href={`/events/${event.id}`} 
                 className={cn(
-                    "inline-flex items-center gap-1 text-sm font-semibold transition-colors",
+                    "inline-flex items-center gap-1 text-sm font-semibold transition-all duration-200",
                     "text-blue-600 dark:text-blue-400",
-                    "hover:text-blue-700 dark:hover:text-blue-300"
+                    "hover:text-blue-700 dark:hover:text-blue-300",
+                    "hover:gap-2 group-hover:underline"
                 )}
             >
                 View details
-                <span aria-hidden="true">→</span>
+                <span className="transition-transform group-hover:translate-x-1" aria-hidden="true">→</span>
             </Link>
         </article>
     );
@@ -428,7 +429,7 @@ export default function EventsPublicFilter({ events, userTimezone }: { events: E
 
     return (
         <div className={cn(
-            "rounded-2xl border-2 p-6 shadow-sm",
+            "rounded-2xl border-2 p-6 shadow-lg",
             "border-slate-300 dark:border-slate-700",
             "bg-white dark:bg-slate-900"
         )}>
@@ -514,9 +515,9 @@ export default function EventsPublicFilter({ events, userTimezone }: { events: E
                     <button
                         onClick={() => setViewMode("list")}
                         className={cn(
-                            "px-3 py-1.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2",
+                            "px-3 py-2 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center gap-2 active:scale-95",
                             viewMode === "list"
-                                ? "bg-blue-500 text-white shadow-md"
+                                ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/30"
                                 : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                         )}
                         aria-label="List view"
@@ -528,9 +529,9 @@ export default function EventsPublicFilter({ events, userTimezone }: { events: E
                     <button
                         onClick={() => setViewMode("calendar")}
                         className={cn(
-                            "px-3 py-1.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2",
+                            "px-3 py-2 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center gap-2 active:scale-95",
                             viewMode === "calendar"
-                                ? "bg-blue-500 text-white shadow-md"
+                                ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/30"
                                 : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                         )}
                         aria-label="Calendar view"
