@@ -162,6 +162,7 @@ export function NotificationCenter() {
           size="md"
           className="relative"
           ariaLabel={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
+          data-tour="notification-bell"
         >
           <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
