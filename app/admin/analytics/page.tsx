@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import { Metadata } from "next";
 import { AnalyticsDashboard } from "@/components/admin/analytics/AnalyticsDashboard";
 import { Skeleton } from "@/components/common/Skeleton";
+import { PageHeader } from "@/components/admin/PageHeader";
+import { BarChart3 } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Analytics Dashboard | Admin",
@@ -11,12 +13,16 @@ export const metadata: Metadata = {
 export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Analytics Dashboard</h1>
-        <p className="text-muted-foreground mt-2">
-          Insights and metrics for your platform
-        </p>
-      </div>
+      <PageHeader
+        title="Analytics Dashboard"
+        description="Insights and metrics for your platform • Real-time data"
+        icon={<BarChart3 className="w-6 h-6" />}
+        badge={{ label: "Live Data", variant: "success" }}
+        breadcrumbs={[
+          { label: "Dashboard", href: "/admin/dashboard" },
+          { label: "Analytics" }
+        ]}
+      />
 
       <Suspense fallback={<AnalyticsLoading />}>
         <AnalyticsDashboard />
