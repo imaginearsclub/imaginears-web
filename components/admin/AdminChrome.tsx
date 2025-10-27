@@ -7,11 +7,15 @@ import { SidebarDesktop, SidebarDrawer } from "@/components/admin/Sidebar";
 import { CommandPalette, Badge } from "@/components/common";
 import type { CommandItem } from "@/components/common";
 import { NotificationCenter } from "@/components/NotificationCenter";
+import { TourLauncher } from "@/components/onboarding/TourLauncher";
+import { HelpCenter } from "@/components/onboarding/HelpCenter";
+import { NewFeatureBadge } from "@/components/onboarding/FeatureSpotlight";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 export default function AdminChrome({ children }: { children: ReactNode }) {
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [helpOpen, setHelpOpen] = useState(false);
     const router = useRouter();
 
     // TODO: Get user permissions from session in production
@@ -315,8 +319,28 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
                             </Badge>
                         </div>
                     </div>
-                    {/* Notifications & Command Palette */}
+                    {/* Tours, Notifications & Command Palette */}
                     <div className="flex items-center gap-2">
+                        {/* Help Center */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setHelpOpen(true)}
+                                className={cn(
+                                    "p-2.5 rounded-lg transition-colors relative",
+                                    "text-slate-700 dark:text-slate-300",
+                                    "hover:bg-slate-100 dark:hover:bg-slate-800"
+                                )}
+                                aria-label="Help Center"
+                                title="Help Center"
+                            >
+                                <BookOpen className="w-5 h-5" />
+                            </button>
+                            <div className="absolute -top-1 -right-1">
+                                <NewFeatureBadge featureId="help-center" />
+                            </div>
+                        </div>
+                        
+                        <TourLauncher />
                         <NotificationCenter />
                         <CommandPalette items={commandItems} userPermissions={userPermissions} />
                     </div>
@@ -335,6 +359,9 @@ export default function AdminChrome({ children }: { children: ReactNode }) {
 
             {/* Mobile drawer (separate component) */}
             <SidebarDrawer open={mobileOpen} onCloseAction={() => setMobileOpen(false)} />
+            
+            {/* Help Center Dialog */}
+            <HelpCenter open={helpOpen} onOpenChange={setHelpOpen} />
         </div>
     );
 }
