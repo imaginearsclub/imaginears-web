@@ -41,21 +41,21 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     children, 
     ...props 
   }, ref) => {
-    const baseStyles = "inline-flex items-center justify-center gap-2 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 rounded-lg";
+    const baseStyles = "group inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 rounded-lg active:scale-[0.98] disabled:scale-100";
     
     const variants = {
-      default: "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 focus-visible:ring-slate-500",
-      primary: "bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 focus-visible:ring-blue-500",
-      success: "bg-green-600 text-white hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 focus-visible:ring-green-500",
-      danger: "bg-red-600 text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 focus-visible:ring-red-500",
-      outline: "border-2 border-slate-300 dark:border-slate-700 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-900 dark:text-slate-100 focus-visible:ring-slate-500",
+      default: "bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 focus-visible:ring-slate-500 shadow-sm hover:shadow-md",
+      primary: "bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 focus-visible:ring-blue-500 shadow-sm hover:shadow-md hover:shadow-blue-500/30",
+      success: "bg-green-600 text-white hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 focus-visible:ring-green-500 shadow-sm hover:shadow-md hover:shadow-green-500/30",
+      danger: "bg-red-600 text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 focus-visible:ring-red-500 shadow-sm hover:shadow-md hover:shadow-red-500/30",
+      outline: "border-2 border-slate-300 dark:border-slate-700 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-900 dark:text-slate-100 focus-visible:ring-slate-500 hover:border-slate-400 dark:hover:border-slate-600",
       ghost: "bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-900 dark:text-slate-100 focus-visible:ring-slate-500",
     };
     
     const sizes = {
-      sm: "text-sm px-3 py-1.5",
-      md: "text-base px-4 py-2",
-      lg: "text-lg px-6 py-3",
+      sm: "text-sm px-3 py-1.5 h-8",
+      md: "text-base px-4 py-2 h-10",
+      lg: "text-lg px-6 py-3 h-12",
     };
 
     const iconSizes = {
@@ -80,13 +80,15 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           <Loader2 className={cn("animate-spin", iconSizes[size])} aria-hidden="true" />
         )}
         {!isLoading && leftIcon && (
-          <span className={cn(iconSizes[size], "flex-shrink-0")} aria-hidden="true">
+          <span className={cn(iconSizes[size], "flex-shrink-0 transition-transform group-hover:scale-110")} aria-hidden="true">
             {leftIcon}
           </span>
         )}
-        <span>{isLoading && loadingText ? loadingText : children}</span>
+        <span className="relative">
+          {isLoading && loadingText ? loadingText : children}
+        </span>
         {!isLoading && rightIcon && (
-          <span className={cn(iconSizes[size], "flex-shrink-0")} aria-hidden="true">
+          <span className={cn(iconSizes[size], "flex-shrink-0 transition-transform group-hover:scale-110 group-hover:translate-x-0.5")} aria-hidden="true">
             {rightIcon}
           </span>
         )}
