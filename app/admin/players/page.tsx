@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import PlayerTable, { type Player } from "@/components/admin/PlayerTable";
 import { Button, Card, CardContent, Badge } from "@/components/common";
+import { PageHeader } from "@/components/admin/PageHeader";
 import { Users, UserCheck, UserX, Activity, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -190,23 +191,18 @@ export default function PlayersPage() {
     const staffCount = players.filter(p => p.rank === "Staff" || p.rank === "Creator").length;
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+        <div className="space-y-6">
             {/* Header */}
-            <div className="space-y-6">
-                <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
-                            <Users className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                                Players
-                            </h1>
-                            <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
-                                Monitor and manage online players • Updates every 30s
-                            </p>
-                        </div>
-                    </div>
+            <PageHeader
+                title="Minecraft Players"
+                description="Monitor and manage online players • Updates every 30s"
+                icon={<Users className="w-6 h-6" />}
+                badge={{ label: `${totalPlayers} Players`, variant: "success" }}
+                breadcrumbs={[
+                    { label: "Dashboard", href: "/admin/dashboard" },
+                    { label: "Players" }
+                ]}
+                actions={
                     <Button 
                         variant="primary" 
                         size="md"
@@ -218,7 +214,10 @@ export default function PlayersPage() {
                     >
                         Refresh
                     </Button>
-                </div>
+                }
+            />
+
+            <div className="space-y-6">
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -269,6 +268,6 @@ export default function PlayersPage() {
                     </CardContent>
                 </Card>
             </div>
-        </div>
+        </div>        
     );
 }
