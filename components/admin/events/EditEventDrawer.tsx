@@ -6,12 +6,14 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { MarkdownEditor, Input, Separator } from "@/components/common";
 import RecurrenceEditor, { type RecurrenceValue } from "./RecurrenceEditor";
+import { ContextualHelp } from "@/components/onboarding/ContextualHelp";
 
 export type EditableEvent = {
     id: string;
     title: string;
     world: string;
     category: "Fireworks" | "Seasonal" | "MeetAndGreet" | "Parade" | "Other";
+    visibility?: "PUBLIC" | "MEMBERS_ONLY" | "STAFF_ONLY" | "HIDDEN";
     details?: string | null;
     shortDescription?: string | null;
     startAt: string; // ISO
@@ -84,6 +86,7 @@ export default function EditEventDrawer({
                     title: form.title,
                     world: form.world,
                     category: form.category,
+                    visibility: form.visibility || "PUBLIC",
                     details: form.details || "",
                     shortDescription: form.shortDescription || "",
                     startAt: form.startAt,
@@ -239,6 +242,37 @@ export default function EditEventDrawer({
                                 <option value="MeetAndGreet">Meet & Greet</option>
                                 <option value="Parade">Parade</option>
                                 <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <div data-tour="events-visibility">
+                            <label className="text-sm font-medium text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                                Visibility
+                                <ContextualHelp
+                                    title="Event Visibility"
+                                    content={
+                                        <>
+                                            Control who can see this event:
+                                            <ul className="list-disc list-inside mt-1 space-y-0.5">
+                                                <li><strong>Public:</strong> Everyone can see</li>
+                                                <li><strong>Members Only:</strong> Logged-in users</li>
+                                                <li><strong>Staff Only:</strong> STAFF+ roles</li>
+                                                <li><strong>Hidden:</strong> OWNER/ADMIN only</li>
+                                            </ul>
+                                        </>
+                                    }
+                                />
+                            </label>
+                            <select
+                                className={selectClass}
+                                value={form.visibility || "PUBLIC"}
+                                onChange={(e) => setForm({ ...form, visibility: e.target.value as any })}
+                                disabled={submitting}
+                            >
+                                <option value="PUBLIC">🌍 Public - Anyone can see</option>
+                                <option value="MEMBERS_ONLY">👥 Members Only - Logged-in users</option>
+                                <option value="STAFF_ONLY">👔 Staff Only - STAFF+ roles</option>
+                                <option value="HIDDEN">🔒 Hidden - OWNER/ADMIN only</option>
                             </select>
                         </div>
 
