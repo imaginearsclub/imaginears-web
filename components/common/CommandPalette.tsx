@@ -345,6 +345,7 @@ export function CommandPalette({
       {/* Trigger Button */}
       <button
         onClick={() => setOpen(true)}
+        data-tour="command-palette-button"
         className={cn(
           "flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800",
           "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400",
