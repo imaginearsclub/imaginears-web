@@ -1,16 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/common/Card";
 import { Button } from "@/components/common/Button";
 import { Badge } from "@/components/common/Badge";
 import { Alert } from "@/components/common/Alert";
+import { Tooltip } from "@/components/common/Tooltip";
 import { Gamepad2, RefreshCw, CheckCircle2, AlertCircle, Wifi } from "lucide-react";
+
+// Helper function to get relative time
+function getRelativeTime(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins === 1) return "1 minute ago";
+  if (diffMins < 60) return `${diffMins} minutes ago`;
+  if (diffHours === 1) return "1 hour ago";
+  if (diffHours < 24) return `${diffHours} hours ago`;
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return date.toLocaleDateString();
+}
 
 export function MinecraftSyncPanel() {
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+
+  // Load last sync time from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('lastMinecraftSync');
+    if (stored) {
+      setLastSyncTime(new Date(stored));
+    }
+  }, []);
   const [testResult, setTestResult] = useState<{
     success: boolean;
     message: string;
@@ -54,9 +81,11 @@ export function MinecraftSyncPanel() {
       setSyncResult(data);
       
       if (data.success) {
-        setLastSyncTime(new Date());
+        const now = new Date();
+        setLastSyncTime(now);
+        localStorage.setItem('lastMinecraftSync', now.toISOString());
         // Refresh the page data after successful sync
-        window.location.reload();
+        setTimeout(() => window.location.reload(), 1500);
       }
     } catch (error) {
       setSyncResult({
@@ -86,34 +115,44 @@ export function MinecraftSyncPanel() {
           </div>
         </div>
         {lastSyncTime && (
-          <Badge variant="success" className="text-xs">
-            Last synced: {lastSyncTime.toLocaleTimeString()}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-green-500" />
+            <div className="text-right">
+              <p className="text-xs font-medium text-green-600 dark:text-green-400">
+                Last synced
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {getRelativeTime(lastSyncTime)}
+              </p>
+            </div>
+          </div>
         )}
       </div>
 
       {/* Test Connection */}
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <Button
-            onClick={handleTest}
-            disabled={testing}
-            variant="outline"
-            size="sm"
-          >
-            <Wifi className="w-4 h-4 mr-2" />
-            {testing ? "Testing..." : "Test Connection"}
-          </Button>
+          <Tooltip content={testing ? "Testing..." : "Test Connection"} side="top">
+            <Button
+              onClick={handleTest}
+              disabled={testing}
+              variant="outline"
+              size="sm"
+            >
+              <Wifi className="w-4 h-4" />
+            </Button>
+          </Tooltip>
 
-          <Button
-            onClick={handleSync}
-            disabled={syncing}
-            variant="default"
-            size="sm"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Syncing..." : "Sync Now"}
-          </Button>
+          <Tooltip content={syncing ? "Syncing..." : "Sync Players Now"} side="top">
+            <Button
+              onClick={handleSync}
+              disabled={syncing}
+              variant="default"
+              size="sm"
+            >
+              <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
+            </Button>
+          </Tooltip>
         </div>
 
         {/* Test Result */}
@@ -158,42 +197,6 @@ export function MinecraftSyncPanel() {
             </div>
           </Alert>
         )}
-
-        {/* Setup Instructions */}
-        <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-          <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
-            <span>Plan Player Analytics Setup</span>
-            <Badge variant="info" className="text-xs">Cookie Auth</Badge>
-          </h4>
-          <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-            <li>
-              Create a web user in Plan:
-              <code className="block ml-5 mt-1 text-xs bg-muted px-2 py-1 rounded">
-                /plan register username password
-              </code>
-            </li>
-            <li>Add to your <code className="text-xs bg-muted px-1 py-0.5 rounded">.env</code>:</li>
-          </ol>
-          <pre className="mt-2 p-2 bg-black/5 dark:bg-white/5 rounded text-xs overflow-x-auto">
-{`# Plan Player Analytics (Cookie-based Auth)
-PLAN_API_URL=https://your-server.com:8804
-PLAN_USERNAME=your-plan-username
-PLAN_PASSWORD=your-plan-password
-PLAN_SERVER_IDENTIFIER=Server 1  # Optional`}
-          </pre>
-          <div className="mt-3 space-y-1">
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <span className="font-medium">Common URLs:</span>
-            </p>
-            <ul className="text-xs text-muted-foreground ml-4 space-y-0.5">
-              <li>• Direct: <code className="bg-muted px-1 py-0.5 rounded">https://server.com:8804</code></li>
-              <li>• Proxied: <code className="bg-muted px-1 py-0.5 rounded">https://domain.com/plan</code></li>
-            </ul>
-            <p className="text-xs text-muted-foreground mt-2">
-              Uses cookie-based authentication (Set-Cookie) - Plan will auto-renew sessions
-            </p>
-          </div>
-        </div>
       </div>
     </Card>
   );
