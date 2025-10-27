@@ -4,7 +4,7 @@ import { headers as nextHeaders } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import AdminChrome from "@/components/admin/AdminChrome";
 import { redirect } from "next/navigation";
-import { TooltipProvider } from "@/components/common/Tooltip";
+import AdminProviders from "@/components/admin/AdminProviders";
 
 export const runtime = "nodejs";
 
@@ -200,10 +200,10 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     await ensureUserOrganization(hdrs, session);
 
     return (
-        <TooltipProvider delayDuration={300} skipDelayDuration={100}>
+        <AdminProviders>
             <AdminChrome>
                 {children}
             </AdminChrome>
-        </TooltipProvider>
+        </AdminProviders>
     );
 }
