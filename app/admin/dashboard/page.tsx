@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, CartesianGrid
 } from "recharts";
-import { CalendarRange, Users, FileText, Clock, CalendarCheck2, UserSquare2, TrendingUp, Server, Wifi, Activity as ActivityIcon } from "lucide-react";
+import { CalendarRange, Users, FileText, Clock, CalendarCheck2, UserSquare2, Server, Wifi, Activity as ActivityIcon, LayoutDashboard } from "lucide-react";
 import {
     Card,
     CardHeader,
@@ -19,6 +19,8 @@ import {
     TabsTrigger,
     TabsContent,
 } from "@/components/common";
+import { PageHeader } from "@/components/admin/PageHeader";
+import { OnboardingProgress } from "@/components/onboarding/OnboardingProgress";
 
 type Kpi = { 
     totalPlayers: number; 
@@ -130,77 +132,83 @@ export default function DashboardPage() {
     );
 
     return (
-        <section className="band">
-            <div className="container py-6 space-y-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="section-title text-2xl md:text-3xl mb-2">Dashboard Overview</h1>
-                        <p className="text-slate-600 dark:text-slate-400">
-                            Real-time insights into your community • Auto-refreshes every 30s
-                        </p>
+        <div className="space-y-6">
+            {/* Header */}
+            <div data-tour="dashboard-overview">
+                <PageHeader
+                    title="Dashboard Overview"
+                    description="Real-time insights into your community • Auto-refreshes every 30s"
+                    icon={<LayoutDashboard className="w-6 h-6" />}
+                    badge={{ 
+                        label: "Live", 
+                        variant: "success" 
+                    }}
+                />
+            </div>
+
+            {/* Loading State */}
+            {loading && !kpis && (
+                <div className="flex items-center justify-center py-24 animate-in fade-in duration-300">
+                    <div className="text-center space-y-4">
+                        <Spinner size="lg" />
+                        <p className="text-sm text-slate-600 dark:text-slate-400">Loading dashboard data...</p>
                     </div>
-                    <Badge variant="success" className="hidden sm:inline-flex animate-pulse">
-                        <TrendingUp className="w-3 h-3 mr-1" />
-                        Live
-                    </Badge>
                 </div>
+            )}
 
-                {/* Loading State */}
-                {loading && !kpis && (
-                    <div className="flex items-center justify-center py-12">
-                        <div className="text-center space-y-3">
-                            <Spinner size="lg" />
-                            <p className="text-sm text-slate-600 dark:text-slate-400">Loading dashboard...</p>
-                        </div>
+            {/* Error State */}
+            {err && (
+                <Alert variant="error" dismissible onDismiss={() => setErr(null)}>
+                    <strong>Error:</strong> {err}
+                </Alert>
+            )}
+
+            {/* KPI Cards */}
+            {kpis && (
+                <>
+                    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 animate-in fade-in slide-in-from-bottom-4 duration-500" data-tour="kpi-cards">
+                        {cards.map((card, index) => (
+                            <Card 
+                                key={card.title}
+                                accent={index === 0 ? "primary" : index === 1 ? "purple" : "success"}
+                                variant="elevated"
+                                interactive
+                                aria-label={card.ariaLabel}
+                            >
+                                <CardContent className="flex flex-col gap-3 p-6">
+                                    <div className="flex items-center justify-between">
+                                        <div className={`p-2 rounded-lg ${card.bgColor} transition-transform hover:scale-110 duration-200`} aria-hidden="true">
+                                            {card.icon}
+                                        </div>
+                                        <Badge variant="info" ariaLabel={`7-day trend: ${card.trend}`}>
+                                            {card.trend}
+                                        </Badge>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{card.title}</p>
+                                        <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1 transition-all duration-300">{card.value}</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
                     </div>
-                )}
 
-                {/* Error State */}
-                {err && (
-                    <Alert variant="error" dismissible onDismiss={() => setErr(null)}>
-                        <strong>Error:</strong> {err}
-                    </Alert>
-                )}
+                    {/* Onboarding Progress Widget */}
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
+                        <OnboardingProgress showDetails={true} />
+                    </div>
 
-                {/* KPI Cards */}
-                {kpis && (
-                    <>
-                        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                            {cards.map((card, index) => (
-                                <Card 
-                                    key={card.title}
-                                    accent={index === 0 ? "primary" : index === 1 ? "purple" : "success"}
-                                    variant="elevated"
-                                    interactive
-                                    aria-label={card.ariaLabel}
-                                >
-                                    <CardContent className="flex flex-col gap-3 p-6">
-                                        <div className="flex items-center justify-between">
-                                            <div className={`p-2 rounded-lg ${card.bgColor}`} aria-hidden="true">
-                                                {card.icon}
-                                            </div>
-                                            <Badge variant="info" ariaLabel={`7-day trend: ${card.trend}`}>
-                                                {card.trend}
-                                            </Badge>
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{card.title}</p>
-                                            <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1">{card.value}</p>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </div>
-
-                        {/* Server Status Card */}
-                        <Card 
-                            accent={kpis.server?.online ? "success" : "danger"}
-                            variant="elevated"
-                            className={kpis.server?.online 
+                    {/* Server Status Card */}
+                    <Card 
+                        accent={kpis.server?.online ? "success" : "danger"}
+                        variant="elevated"
+                        className={`animate-in fade-in slide-in-from-bottom-4 duration-500 ${
+                            kpis.server?.online 
                                 ? "bg-gradient-to-br from-green-50/30 to-transparent dark:from-green-950/10 dark:to-transparent" 
                                 : "bg-gradient-to-br from-red-50/30 to-transparent dark:from-red-950/10 dark:to-transparent"
-                        }>
+                        }`}
+                        data-tour="server-status"
+                    >
                             <CardContent className="p-6">
                                 <div className="flex flex-col lg:flex-row gap-6">
                                     {/* Left: Server Info */}
@@ -355,18 +363,26 @@ export default function DashboardPage() {
                     </>
                 )}
 
-                {/* Charts */}
-                {kpis && (
-                    <Tabs defaultValue="activity" className="w-full">
-                        <TabsList>
-                            <TabsTrigger value="charts">Analytics</TabsTrigger>
-                            <TabsTrigger value="activity">Recent Activity</TabsTrigger>
-                        </TabsList>
+            {/* Charts & Activity */}
+            {kpis && (
+                <Tabs 
+                    defaultValue="activity" 
+                    className="w-full animate-in fade-in duration-500" 
+                    data-tour="dashboard-tabs"
+                >
+                    <TabsList>
+                        <TabsTrigger value="charts">Analytics</TabsTrigger>
+                        <TabsTrigger value="activity">Recent Activity</TabsTrigger>
+                    </TabsList>
 
-                        <TabsContent value="charts" className="space-y-6">
-                            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                                {/* Area chart: Events last 30 days */}
-                                <Card className="lg:col-span-3" accent="purple" variant="elevated">
+                    <TabsContent value="charts" className="space-y-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                            {/* Area chart: Events last 30 days */}
+                            <Card 
+                                className="lg:col-span-3 animate-in fade-in duration-300" 
+                                accent="purple" 
+                                variant="elevated"
+                            >
                                     <CardHeader>
                                         <CardTitle className="flex items-center justify-between">
                                             <span>Events (last 30 days)</span>
@@ -406,7 +422,11 @@ export default function DashboardPage() {
                                 </Card>
 
                                 {/* Bar chart: Applications by Status */}
-                                <Card className="lg:col-span-2" accent="primary" variant="elevated">
+                                <Card 
+                                    className="lg:col-span-2 animate-in fade-in duration-300" 
+                                    accent="primary" 
+                                    variant="elevated"
+                                >
                                     <CardHeader>
                                         <CardTitle className="flex items-center justify-between">
                                             <span>Applications</span>
@@ -441,12 +461,19 @@ export default function DashboardPage() {
                             </div>
                         </TabsContent>
 
-                        <TabsContent value="activity">
-                            <Card accent="info" variant="elevated">
-                                <CardHeader>
-                                    <CardTitle>Recent Activity</CardTitle>
-                                </CardHeader>
-                                <CardContent>
+                    <TabsContent value="activity">
+                        <Card 
+                            accent="info" 
+                            variant="elevated"
+                            className="animate-in fade-in duration-300"
+                        >
+                            <CardHeader>
+                                <CardTitle className="flex items-center justify-between">
+                                    <span>Recent Activity</span>
+                                    <Badge variant="info">{activity.length} items</Badge>
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
                                     {activity.length === 0 ? (
                                         <EmptyState
                                             icon={<Clock className="w-12 h-12" />}
@@ -508,14 +535,18 @@ export default function DashboardPage() {
                     </Tabs>
                 )}
 
-                {/* Quick Actions */}
-                {kpis && (
-                    <Card variant="elevated">
-                        <CardHeader>
-                            <CardTitle>Quick Actions</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Quick Actions */}
+            {kpis && (
+                <Card 
+                    variant="elevated" 
+                    data-tour="quick-actions"
+                    className="animate-in fade-in duration-500"
+                >
+                    <CardHeader>
+                        <CardTitle>Quick Actions</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <a 
                                     href="/admin/events" 
                                     className="btn btn-primary justify-center"
@@ -540,11 +571,10 @@ export default function DashboardPage() {
                                     <Users className="w-4 h-4" />
                                     View Players
                                 </a>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-            </div>
-        </section>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+        </div>
     );
 }
