@@ -196,65 +196,73 @@ export default function ApplyPage() {
     );
 
     return (
-        <div className="max-w-3xl mx-auto px-4 py-8">
-            {/* Breadcrumb Navigation */}
-            <Breadcrumb
-                items={[
-                    { label: "Apply" },
-                ]}
-            />
+        <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900">
+            <div className="max-w-3xl mx-auto px-4 py-8">
+                {/* Breadcrumb Navigation */}
+                <div className="mb-6 animate-in fade-in duration-300">
+                    <Breadcrumb
+                        items={[
+                            { label: "Apply" },
+                        ]}
+                    />
+                </div>
 
-            {/* Header */}
-            <div className="mb-6">
-                <div className="flex items-center gap-3 mb-2">
-                    <div className={cn(
-                        "flex items-center justify-center w-12 h-12 rounded-xl",
-                        "bg-gradient-to-br from-blue-500 to-purple-500",
-                        "shadow-lg"
-                    )}>
-                        <Sparkles className="w-6 h-6 text-white" aria-hidden="true" />
-                    </div>
-                    <div>
-                        <h1 className={cn(
-                            "text-3xl md:text-4xl font-bold",
-                            "text-slate-900 dark:text-white"
-                        )}>
-                            Join the Imaginears Team
-                        </h1>
-                        <Badge variant="primary" size="sm" className="mt-1">
-                            Now Hiring
-                        </Badge>
+                {/* Header */}
+                <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border-2 border-slate-300 dark:border-slate-700 shadow-xl p-6">
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className={cn(
+                                "flex items-center justify-center w-16 h-16 rounded-2xl",
+                                "bg-gradient-to-br from-blue-500 to-purple-500",
+                                "shadow-lg shadow-blue-500/30"
+                            )}>
+                                <Sparkles className="w-8 h-8 text-white" aria-hidden="true" />
+                            </div>
+                            <div className="flex-1">
+                                <h1 className={cn(
+                                    "text-3xl md:text-4xl font-bold",
+                                    "text-slate-900 dark:text-white mb-2"
+                                )}>
+                                    Join the Imaginears Team
+                                </h1>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <Badge variant="primary" size="sm">
+                                        Now Hiring
+                                    </Badge>
+                                    <Badge variant="success" size="sm">
+                                        Rolling Applications
+                                    </Badge>
+                                </div>
+                            </div>
+                        </div>
+                        <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+                            Help us craft magical memories and dream up new adventures for guests around the world.
+                        </p>
+                        
+                        {/* Privacy Disclaimer */}
+                        <Alert variant="info" className="mt-6">
+                            <div className="flex items-start gap-3">
+                                <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" aria-hidden="true" />
+                                <div className="flex-1">
+                                    <p className="font-semibold text-slate-900 dark:text-white mb-1">
+                                        Your Privacy is Protected
+                                    </p>
+                                    <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                                        All information you provide is kept strictly confidential and will only be used for 
+                                        application review purposes. We never share your personal details with third parties 
+                                        and store your data securely in compliance with privacy regulations.
+                                    </p>
+                                </div>
+                            </div>
+                        </Alert>
                     </div>
                 </div>
-                <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
-                    Help us craft magical memories and dream up new adventures for guests around the world.
-                </p>
-                
-                {/* Privacy Disclaimer */}
-                <Alert variant="info" className="mt-4">
-                    <div className="flex items-start gap-3">
-                        <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" aria-hidden="true" />
-                        <div className="flex-1">
-                            <p className="font-semibold text-slate-900 dark:text-white mb-1">
-                                Your Privacy is Protected
-                            </p>
-                            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                                All information you provide is kept strictly confidential and will only be used for 
-                                application review purposes. We never share your personal details with third parties 
-                                and store your data securely in compliance with privacy regulations.
-                            </p>
-                        </div>
-                    </div>
-                </Alert>
-            </div>
 
-            <Separator className="my-6" />
-
-            <div className={cn(
-                "rounded-2xl border-2 p-4 sm:p-6 shadow-lg",
-                "border-slate-300 dark:border-slate-700",
-                "bg-white dark:bg-slate-900"
-            )}>
+                <div className={cn(
+                    "rounded-2xl border-2 p-4 sm:p-6 shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100",
+                    "border-slate-300 dark:border-slate-700",
+                    "bg-white dark:bg-slate-900"
+                )}>
                 <FormProvider {...methods}>
                     <form onSubmit={handleSubmit(onSubmit)} noValidate>
                         {/* Honeypot (hidden from sighted users) */}
@@ -489,13 +497,13 @@ export default function ApplyPage() {
                                         if (ok) next();
                                     }}
                                     className={cn(
-                                        "inline-flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all duration-200",
-                                        "bg-blue-600 dark:bg-blue-500",
+                                        "inline-flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold transition-all duration-200 active:scale-95",
+                                        "bg-gradient-to-r from-blue-600 to-blue-500",
                                         "text-white",
-                                        "hover:bg-blue-700 dark:hover:bg-blue-600",
+                                        "hover:from-blue-700 hover:to-blue-600",
                                         "disabled:opacity-50 disabled:cursor-not-allowed",
                                         "border-2 border-transparent",
-                                        "shadow-md hover:shadow-lg"
+                                        "shadow-lg hover:shadow-xl shadow-blue-500/30"
                                     )}
                                 >
                                     Continue
@@ -506,13 +514,13 @@ export default function ApplyPage() {
                                     type="submit"
                                     disabled={isSubmitting || !tsToken}
                                     className={cn(
-                                        "inline-flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all duration-200",
+                                        "inline-flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold transition-all duration-200 active:scale-95",
                                         "bg-gradient-to-r from-blue-600 to-purple-600",
                                         "hover:from-blue-700 hover:to-purple-700",
                                         "text-white",
-                                        "disabled:opacity-50 disabled:cursor-not-allowed",
+                                        "disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100",
                                         "border-2 border-transparent",
-                                        "shadow-md hover:shadow-lg"
+                                        "shadow-lg hover:shadow-xl shadow-blue-500/30"
                                     )}
                                 >
                                     {isSubmitting ? (
@@ -531,6 +539,7 @@ export default function ApplyPage() {
                         </div>
                     </form>
                 </FormProvider>
+                </div>
             </div>
         </div>
     );
