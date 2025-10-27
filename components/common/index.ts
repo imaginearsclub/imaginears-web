@@ -146,3 +146,6 @@ export { CookieConsent } from "./CookieConsent";
 // Toast Notifications
 export { ToastContainer, toast } from "./Toast";
 export type { Toast, ToastType, ToastPosition, ToastAction } from "./Toast";
+
+// File Upload
+export { FileUpload } from "./FileUpload";
