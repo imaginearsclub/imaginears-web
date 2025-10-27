@@ -13,6 +13,8 @@ import {
 import { Badge } from "@/components/common/Badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/common";
 import { Spinner } from "@/components/common/Spinner";
+import { Tooltip } from "@/components/common/Tooltip";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/common";
 import {
   AreaChart,
   Area,
@@ -26,7 +28,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
   Legend,
   ResponsiveContainer,
 } from "recharts";
@@ -34,13 +35,15 @@ import {
   TrendingUp,
   Users,
   Eye,
-  Activity,
   Calendar,
   Download,
   Gamepad2,
   MousePointer,
+  FileText,
+  FileSpreadsheet,
 } from "lucide-react";
 import { MinecraftSyncPanel } from "./MinecraftSyncPanel";
+import { PlayerAnalyticsTable } from "./PlayerAnalyticsTable";
 
 interface AnalyticsOverview {
   period: string;
@@ -94,6 +97,7 @@ export function AnalyticsDashboard() {
   const [eventData, setEventData] = useState<EventAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetchAnalytics();
@@ -115,6 +119,39 @@ export function AnalyticsDashboard() {
       console.error("Failed to fetch analytics:", error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleExport(format: "csv" | "excel" | "pdf", type: "players" | "sync-history") {
+    setExporting(true);
+    try {
+      const days = period === "today" ? 1 : period === "week" ? 7 : period === "month" ? 30 : period === "quarter" ? 90 : 365;
+      const response = await fetch(`/api/admin/export/${type}?format=${format}&days=${days}`);
+      
+      if (!response.ok) {
+        throw new Error("Export failed");
+      }
+
+      // Get the filename from Content-Disposition header
+      const contentDisposition = response.headers.get("Content-Disposition");
+      const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
+      const filename = filenameMatch ? filenameMatch[1] : `export-${type}-${Date.now()}.${format === "excel" ? "xlsx" : format}`;
+
+      // Download the file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename || `export-${Date.now()}.${format === "excel" ? "xlsx" : format}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Export failed:", error);
+      alert("Failed to export data. Please try again.");
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -145,10 +182,48 @@ export function AnalyticsDashboard() {
           </SelectContent>
         </Select>
 
-        <Button variant="outline" size="sm">
-          <Download className="w-4 h-4 mr-2" />
-          Export Report
-        </Button>
+        <DropdownMenu>
+          <Tooltip content={exporting ? "Exporting..." : "Export Analytics Data"} side="top">
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={exporting}>
+                <Download className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+          </Tooltip>
+          <DropdownMenuContent align="end" className="w-56">
+            <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+              Export Players Data
+            </div>
+            <DropdownMenuItem onClick={() => handleExport("csv", "players")}>
+              <FileText className="w-4 h-4 mr-2" />
+              CSV Format
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("excel", "players")}>
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Excel Format
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("pdf", "players")}>
+              <FileText className="w-4 h-4 mr-2" />
+              PDF Format
+            </DropdownMenuItem>
+            <div className="my-1 h-px bg-border" />
+            <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+              Export Sync History
+            </div>
+            <DropdownMenuItem onClick={() => handleExport("csv", "sync-history")}>
+              <FileText className="w-4 h-4 mr-2" />
+              CSV Format
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("excel", "sync-history")}>
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Excel Format
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("pdf", "sync-history")}>
+              <FileText className="w-4 h-4 mr-2" />
+              PDF Format
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Tabs */}
@@ -346,58 +421,63 @@ export function AnalyticsDashboard() {
           )}
 
           {playerData && (
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Top Players */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Top Players by Playtime</h3>
-              <div className="space-y-4">
-                {playerData.topPlayers.slice(0, 10).map((player, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Badge variant="default">{index + 1}</Badge>
-                      <Gamepad2 className="w-4 h-4 text-purple-500" />
-                      <span className="font-medium">{player.minecraftName || "Unknown"}</span>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold">
-                        {Math.round(player.totalMinecraftTime / 60)}h
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {player.totalMinecraftJoins} joins
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
+            <>
+              {/* Player Data Table with Search and Filters */}
+              <PlayerAnalyticsTable players={playerData.activePlayers} />
 
-            {/* Active Players */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Recently Active Players</h3>
-              <div className="space-y-4">
-                {playerData.activePlayers.slice(0, 10).map((player) => (
-                  <div key={player.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Activity className="w-4 h-4 text-green-500" />
-                      <span className="font-medium">
-                        {player.minecraftName || "Unknown"}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <Badge
-                        variant={player.overallEngagement > 70 ? "success" : player.overallEngagement > 40 ? "info" : "default"}
-                      >
-                        {Math.round(player.overallEngagement)}% engaged
-                      </Badge>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(player.lastActiveAt).toLocaleDateString()}
-                      </p>
-                    </div>
+              {/* Summary Cards */}
+              <div className="grid gap-6 lg:grid-cols-2">
+                {/* Top Players */}
+                <Card className="p-6">
+                  <h3 className="text-lg font-semibold mb-4">Top Players by Playtime</h3>
+                  <div className="space-y-4">
+                    {playerData.topPlayers.slice(0, 5).map((player, index) => (
+                      <div key={index} className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="default">{index + 1}</Badge>
+                          <Gamepad2 className="w-4 h-4 text-purple-500" />
+                          <span className="font-medium">{player.minecraftName || "Unknown"}</span>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">
+                            {Math.round(player.totalMinecraftTime / 60)}h
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {player.totalMinecraftJoins} joins
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </Card>
+
+                {/* Player Retention Chart */}
+                <Card className="p-6">
+                  <h3 className="text-lg font-semibold mb-4">Player Retention</h3>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart
+                      data={Object.entries(playerData.retention).map(([period, data]) => ({
+                        period,
+                        retention: Math.round(data.retention),
+                        active: data.active,
+                      }))}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="period" className="text-xs" />
+                      <YAxis className="text-xs" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                      <Bar dataKey="retention" fill="#10b981" name="Retention %" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Card>
               </div>
-            </Card>
-          </div>
+            </>
           )}
         </div>
       )}
