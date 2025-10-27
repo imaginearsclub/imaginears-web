@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import type { Notification, NotificationPreferences } from "@prisma/client";
+import { triggerWebhook, WEBHOOK_EVENTS } from "./webhooks";
 
 /**
  * Notification Types
@@ -70,6 +71,17 @@ export async function createNotification(input: CreateNotificationInput): Promis
   }
 
   // TODO: Send email notification if user preferences allow
+
+  // Trigger webhook
+  triggerWebhook(WEBHOOK_EVENTS.NOTIFICATION_CREATED, {
+    id: notification.id,
+    title: notification.title,
+    message: notification.message,
+    type: notification.type,
+    priority: notification.priority,
+    category: notification.category,
+    userId: input.userId,
+  }).catch(err => console.error("[Notifications] Webhook trigger failed:", err));
 
   return notification;
 }
