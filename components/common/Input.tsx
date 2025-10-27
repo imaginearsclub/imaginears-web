@@ -1,6 +1,6 @@
 "use client";
 import { cn } from "@/lib/utils";
-import { type ComponentPropsWithoutRef, type ElementRef, forwardRef } from "react";
+import { type ComponentPropsWithoutRef, type ElementRef, forwardRef, useId } from "react";
 
 export interface InputProps extends Omit<ComponentPropsWithoutRef<"input">, "size"> {
   /**
@@ -67,8 +67,9 @@ export const Input = forwardRef<ElementRef<"input">, InputProps>(
     id,
     ...props 
   }, ref) => {
-    // Generate unique ID if not provided
-    const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`;
+    // Generate stable unique ID if not provided (SSR-safe)
+    const generatedId = useId();
+    const inputId = id || `input-${generatedId}`;
     const errorId = `${inputId}-error`;
     const helperId = `${inputId}-helper`;
 
