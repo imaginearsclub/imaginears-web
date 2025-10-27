@@ -15,6 +15,7 @@ interface GeneralSectionProps {
     emailVerified: boolean | null;
     timezone: string | null;
     createdAt: Date;
+    image?: string | null;
   };
 }
 
