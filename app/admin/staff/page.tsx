@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { StaffList } from "./components/StaffList";
 import { CreateStaffForm } from "./components/CreateStaffForm";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/common";
+import { PageHeader } from "@/components/admin/PageHeader";
 import { Users, UserPlus, Shield } from "lucide-react";
 import { validateMinecraftUsernameDb } from "@/lib/luckperms";
 import {
@@ -450,21 +451,18 @@ export default async function StaffManagementPage() {
   };
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
+    <div className="space-y-6">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-3 mb-2">
-          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/30">
-            <Shield className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Cast Member Management</h1>
-            <p className="text-slate-600 dark:text-slate-400">
-              Create and manage staff accounts with Minecraft username linking
-            </p>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Cast Member Management"
+        description="Create and manage staff accounts with Minecraft username linking"
+        icon={<Shield className="w-6 h-6" />}
+        badge={{ label: `${stats.total} Staff Members`, variant: "purple" }}
+        breadcrumbs={[
+          { label: "Dashboard", href: "/admin/dashboard" },
+          { label: "Staff" }
+        ]}
+      />
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
