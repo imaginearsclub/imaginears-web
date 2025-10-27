@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/admin/PageHeader";
+import { FileText, Download, RefreshCw } from "lucide-react";
+import { Button } from "@/components/common";
 import ApplicationTable, {
     type ApplicationRow,
     exportApplicationsCSV,
@@ -156,50 +159,76 @@ export default function AdminApplicationsPage() {
     }
 
     return (
-        <div className="p-4 space-y-4">
+        <div className="space-y-6">
+            {/* Header */}
+            <PageHeader
+                title="Applications Management"
+                description="Review and manage staff applications • Filter by status and search"
+                icon={<FileText className="w-6 h-6" />}
+                badge={{ label: `${rows.length} Applications`, variant: "info" }}
+                breadcrumbs={[
+                    { label: "Dashboard", href: "/admin/dashboard" },
+                    { label: "Applications" }
+                ]}
+                actions={
+                    <Button
+                        variant="outline"
+                        onClick={() => exportApplicationsCSV(rows, `applications-${new Date().toISOString().split('T')[0]}.csv`)}
+                        leftIcon={<Download />}
+                        ariaLabel="Export applications to CSV"
+                    >
+                        Export CSV
+                    </Button>
+                }
+            />
+
             {/* Toolbar */}
             <div className={cn(
-                "flex flex-col sm:flex-row gap-2",
-                "items-stretch sm:items-center justify-between"
+                "flex flex-col sm:flex-row gap-3 p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800",
+                "items-stretch sm:items-center"
             )}>
-                <div className="flex gap-2">
-                    <input
-                        value={q}
-                        onChange={(e) => setQ(e.target.value.slice(0, 200))}
-                        placeholder="Search name, email, MC, Discord…"
-                        className={cn(
-                            "rounded-2xl border px-4 py-2 w-64",
-                            "border-slate-300 dark:border-slate-700",
-                            "bg-white dark:bg-slate-900",
-                            "text-slate-900 dark:text-white",
-                            "placeholder:text-slate-400 dark:placeholder:text-slate-500",
-                            "focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                        )}
-                        aria-label="Search applications"
-                    />
-                    <select
-                        value={status ?? ""}
-                        onChange={(e) => setStatus((e.target.value as Query["status"]) ?? "")}
-                        className={cn(
-                            "rounded-2xl border px-3 py-2",
-                            "border-slate-300 dark:border-slate-700",
-                            "bg-white dark:bg-slate-900",
-                            "text-slate-900 dark:text-white"
-                        )}
-                        aria-label="Filter by status"
-                    >
-                        <option value="">All statuses</option>
-                        <option value="New">New</option>
-                        <option value="InReview">In review</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Rejected">Rejected</option>
-                    </select>
-                    <button className="btn btn-muted" onClick={load} disabled={loading}>
-                        {loading ? "Loading…" : "Refresh"}
-                    </button>
-                </div>
+                <input
+                    value={q}
+                    onChange={(e) => setQ(e.target.value.slice(0, 200))}
+                    placeholder="Search name, email, MC, Discord…"
+                    className={cn(
+                        "flex-1 rounded-lg border px-4 py-2",
+                        "border-slate-300 dark:border-slate-700",
+                        "bg-white dark:bg-slate-900",
+                        "text-slate-900 dark:text-white",
+                        "placeholder:text-slate-400 dark:placeholder:text-slate-500",
+                        "focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    )}
+                    aria-label="Search applications"
+                />
+                <select
+                    value={status ?? ""}
+                    onChange={(e) => setStatus((e.target.value as Query["status"]) ?? "")}
+                    className={cn(
+                        "rounded-lg border px-3 py-2",
+                        "border-slate-300 dark:border-slate-700",
+                        "bg-white dark:bg-slate-900",
+                        "text-slate-900 dark:text-white"
+                    )}
+                    aria-label="Filter by status"
+                >
+                    <option value="">All statuses</option>
+                    <option value="New">New</option>
+                    <option value="InReview">In review</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                </select>
+                <Button 
+                    variant="outline"
+                    onClick={load} 
+                    isLoading={loading}
+                    leftIcon={<RefreshCw />}
+                    ariaLabel="Refresh applications list"
+                >
+                    Refresh
+                </Button>
                 {error && (
-                    <div className="text-sm text-red-600 dark:text-red-400" role="alert" aria-live="polite">
+                    <div className="w-full text-sm text-red-600 dark:text-red-400" role="alert" aria-live="polite">
                         {error}
                     </div>
                 )}
