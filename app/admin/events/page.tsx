@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import EditEventDrawer, { type EditableEvent } from "@/components/admin/events/EditEventDrawer";
 import CreateEventDrawer from "@/components/admin/events/CreateEventDrawer";
 import EventsTable, { type AdminEventRow } from "@/components/admin/EventsTable";
-import { Button, Card, CardContent } from "@/components/common";
-import { Calendar, Plus, RefreshCw } from "lucide-react";
+import EventsCalendarView from "@/components/admin/events/EventsCalendarView";
+import { Button, Card, CardContent, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/common";
+import { PageHeader } from "@/components/admin/PageHeader";
+import { NewFeatureBadge } from "@/components/onboarding/FeatureSpotlight";
+import { Calendar, Plus, RefreshCw, Table } from "lucide-react";
 
 export default function AdminEventsPage() {
     const [rows, setRows] = useState<AdminEventRow[]>([]);
@@ -36,6 +39,7 @@ export default function AdminEventsPage() {
                     title: it.title,
                     server: it.world,
                     category: it.category,
+                    visibility: it.visibility || "PUBLIC",
                     status: it.status,
                     startAt: it.startAt,
                     endAt: it.endAt,
@@ -76,6 +80,7 @@ export default function AdminEventsPage() {
             title: r.title,
             world: r.server,
             category: r.category as any,
+            visibility: r.visibility || "PUBLIC",
             details: r.details ?? "",
             shortDescription: r.shortDescription ?? "",
             startAt: toLocalInputValue(r.startAt),
@@ -93,43 +98,40 @@ export default function AdminEventsPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-                        <Calendar className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                            Events
-                        </h1>
-                        <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
-                            Manage server events, schedules, and recurring activities
-                        </p>
-                    </div>
-                </div>
-                <div className="flex gap-2">
-                    <Button 
-                        variant="outline" 
-                        size="md"
-                        onClick={load} 
-                        isLoading={loading}
-                        loadingText="Refreshing..."
-                        leftIcon={<RefreshCw />}
-                        ariaLabel="Refresh events list"
-                    >
-                        Refresh
-                    </Button>
-                    <Button 
-                        variant="primary" 
-                        size="md"
-                        onClick={() => setCreateOpen(true)}
-                        leftIcon={<Plus />}
-                        ariaLabel="Create new event"
-                    >
-                        Create Event
-                    </Button>
-                </div>
-            </div>
+            <PageHeader
+                title="Events Management"
+                description="Manage server events, schedules, and recurring activities"
+                icon={<Calendar className="w-6 h-6" />}
+                badge={{ label: `${rows.length} Events`, variant: "info" }}
+                breadcrumbs={[
+                    { label: "Dashboard", href: "/admin/dashboard" },
+                    { label: "Events" }
+                ]}
+                actions={
+                    <>
+                        <Button 
+                            variant="outline" 
+                            size="md"
+                            onClick={load} 
+                            isLoading={loading}
+                            loadingText="Refreshing..."
+                            leftIcon={<RefreshCw />}
+                            ariaLabel="Refresh events list"
+                        >
+                            Refresh
+                        </Button>
+                        <Button 
+                            variant="primary" 
+                            size="md"
+                            onClick={() => setCreateOpen(true)}
+                            leftIcon={<Plus />}
+                            ariaLabel="Create new event"
+                        >
+                            Create Event
+                        </Button>
+                    </>
+                }
+            />
 
             {/* Error Message */}
             {errorMsg && (
@@ -138,24 +140,60 @@ export default function AdminEventsPage() {
                 </div>
             )}
 
-            {/* Events Table Card */}
-            <Card accent="primary" variant="elevated">
-                <CardContent className="p-0">
-                    <EventsTable
-                        rows={rows}
-                        onEdit={openEditById}
-                        onStatusChange={async (id, status) => {
-                            await fetch(`/api/events/${id}`, {
-                                method: "PATCH",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ status }),
-                            });
-                            setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status } : r)));
-                        }}
-                        isLoading={loading}
+            {/* Events Views */}
+            <Tabs defaultValue="table" className="w-full">
+                <TabsList className="mb-4">
+                    <TabsTrigger value="table" className="flex items-center gap-2">
+                        <Table className="w-4 h-4" />
+                        Table View
+                    </TabsTrigger>
+                    <TabsTrigger value="calendar" className="flex items-center gap-2" data-tour="events-table">
+                        <Calendar className="w-4 h-4" />
+                        Calendar View
+                        <NewFeatureBadge featureId="events-calendar-view" />
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="table">
+                    <Card accent="primary" variant="elevated">
+                        <CardContent className="p-0">
+                            <EventsTable
+                                rows={rows}
+                                onEdit={openEditById}
+                                onStatusChange={async (id, status) => {
+                                    await fetch(`/api/events/${id}`, {
+                                        method: "PATCH",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ status }),
+                                    });
+                                    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status } : r)));
+                                }}
+                                isLoading={loading}
+                            />
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="calendar">
+                    <EventsCalendarView
+                        events={rows.map(r => ({
+                            id: r.id,
+                            title: r.title,
+                            startAt: r.startAt,
+                            endAt: r.endAt,
+                            category: r.category,
+                            status: r.status as any,
+                            visibility: r.visibility || "PUBLIC",
+                            recurrenceFreq: r.recurrenceFreq || "NONE",
+                            byWeekdayJson: r.byWeekday || [],
+                            timesJson: r.times || [],
+                            timezone: r.timezone || null,
+                            recurrenceUntil: r.recurrenceUntil || null,
+                        }))}
+                        onEventClick={openEditById}
                     />
-                </CardContent>
-            </Card>
+                </TabsContent>
+            </Tabs>
 
             {/* Create Drawer */}
             <CreateEventDrawer
