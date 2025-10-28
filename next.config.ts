@@ -15,6 +15,9 @@ const nextConfig: NextConfig = {
         contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     },
     
+    // Turbopack: Empty config to enable Turbopack (Next.js 16 default)
+    turbopack: {},
+    
     // Performance: Enable optimized package imports
     experimental: { 
         optimizePackageImports: ['lucide-react', 'framer-motion', 'recharts']
