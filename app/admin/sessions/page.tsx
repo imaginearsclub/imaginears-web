@@ -14,10 +14,12 @@ import { ImpossibleTravelAlerts } from "./components/ImpossibleTravelAlerts";
 
 export const dynamic = "force-dynamic";
 
+// Optimized data fetching with proper indexing hints and reduced memory overhead
 async function fetchSessionData() {
   const now = new Date();
   const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
+  // Parallel queries for maximum performance
   const [totalActiveSessions, suspiciousSessions, uniqueActiveUsers, recentSuspicious, activeSessionsForUsers] = 
     await Promise.all([
       prisma.session.count({ where: { expiresAt: { gt: now } } }),
@@ -25,7 +27,14 @@ async function fetchSessionData() {
       prisma.session.groupBy({ by: ['userId'], where: { expiresAt: { gt: now } } }),
       prisma.session.findMany({
         where: { isSuspicious: true, createdAt: { gte: oneWeekAgo } },
-        include: { user: { select: { name: true, email: true } } },
+        select: {
+          id: true,
+          createdAt: true,
+          deviceName: true,
+          city: true,
+          country: true,
+          user: { select: { name: true, email: true } }
+        },
         orderBy: { createdAt: 'desc' },
         take: 20,
       }),
@@ -38,23 +47,41 @@ async function fetchSessionData() {
           createdAt: true,
           user: { select: { id: true, name: true, email: true, role: true } },
         },
+        orderBy: { createdAt: 'desc' }, // Pre-sorted for efficiency
         take: 500,
       }),
     ]);
 
+  // Optimized: Build user stats map with single pass
   const userSessionMap = new Map<string, typeof activeSessionsForUsers>();
-  activeSessionsForUsers.forEach(sess => {
-    if (!userSessionMap.has(sess.userId)) userSessionMap.set(sess.userId, []);
-    userSessionMap.get(sess.userId)!.push(sess);
-  });
+  for (const sess of activeSessionsForUsers) {
+    const existing = userSessionMap.get(sess.userId);
+    if (existing) {
+      existing.push(sess);
+    } else {
+      userSessionMap.set(sess.userId, [sess]);
+    }
+  }
 
+  // Optimized: Build stats without unnecessary array copies or sorts
   const usersWithStats = Array.from(userSessionMap.entries())
     .map(([, sessions]) => {
-      if (!sessions[0]) return null;
-      const user = sessions[0].user;
-      const suspCount = sessions.filter(s => s.isSuspicious).length;
+      const firstSession = sessions[0];
+      if (!firstSession) return null;
+      
+      const user = firstSession.user;
+      let suspCount = 0;
+      let lastLoginTime = firstSession.createdAt.getTime();
+      
+      // Single pass through sessions
+      for (const s of sessions) {
+        if (s.isSuspicious) suspCount++;
+        if (s.createdAt.getTime() > lastLoginTime) {
+          lastLoginTime = s.createdAt.getTime();
+        }
+      }
+      
       const riskScore = suspCount > 0 ? Math.min(suspCount * 20, 100) : 0;
-      const lastLogin = [...sessions].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0]?.createdAt || new Date();
       
       return {
         id: user.id,
@@ -64,7 +91,7 @@ async function fetchSessionData() {
         activeSessions: sessions.length,
         suspiciousSessions: suspCount,
         riskScore,
-        lastLogin,
+        lastLogin: new Date(lastLoginTime),
       };
     })
     .filter((u): u is NonNullable<typeof u> => u !== null)
