@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import ActionBar from "@/components/admin/applications/ApplicationApproveBar";
+import type { Application } from "@prisma/client";
 
 export const runtime = "nodejs";
 
@@ -40,45 +41,8 @@ export default async function ApplicationDetailPage({
                 <Row label="Age Range" value={app.ageRange} />
             </section>
 
-            {/* Experience */}
-            <section className="mt-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 p-4 sm:p-6 space-y-3">
-                <h2 className="text-lg font-semibold mb-2">Experience</h2>
-                <Row label="Can use Discord" value={app.canDiscord ? "Yes" : "No"} />
-                {app.canDiscord && <Row label="Discord" value={app.discordUser || "—"} />}
-                <Row label="Prior staff" value={app.priorStaff ? "Yes" : "No"} />
-                {app.priorStaff && <Row label="Servers/IPs" value={app.priorServers || "—"} />}
-                <Row label="Visited Disney" value={app.visitedDisney ? "Yes" : "No"} />
-                {app.visitedDisney && <Row label="Details" value={app.visitedDetails || "—"} />}
-            </section>
-
-            {/* Role-specific */}
-            <section className="mt-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 p-4 sm:p-6 space-y-3">
-                <h2 className="text-lg font-semibold mb-2">Role-Specific</h2>
-
-                {app.role === "Developer" && (
-                    <>
-                        <Row label="Portfolio/GitHub" value={linkOrDash(app.devPortfolioUrl)} />
-                        <Row label="Specialty" value={app.devSpecialty || "—"} />
-                        <Row label="Languages" value={app.devLanguages || "—"} />
-                    </>
-                )}
-
-                {app.role === "Imaginear" && (
-                    <>
-                        <Row label="Portfolio/Showcase" value={linkOrDash(app.imgPortfolioUrl)} />
-                        <Row label="WorldEdit" value={app.imgWorldEditLevel || "—"} />
-                        <Row label="Plugin Familiarity" value={app.imgPluginFamiliar || "—"} />
-                    </>
-                )}
-
-                {app.role === "GuestServices" && (
-                    <>
-                        <Row label="Above & Beyond Story" value={<PreWrap text={app.grStory || "—"} />} />
-                        <Row label="Value to Team" value={<PreWrap text={app.grValue || "—"} />} />
-                        <Row label="Suggestions" value={<PreWrap text={app.grSuggestions || "—"} />} />
-                    </>
-                )}
-            </section>
+            <ExperienceSection app={app} />
+            <RoleSpecificSection app={app} />
 
             {/* Internal notes */}
             <section className="mt-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 p-4 sm:p-6 space-y-3">
@@ -92,6 +56,52 @@ export default async function ApplicationDetailPage({
     );
 }
 
+function ExperienceSection({ app }: { app: Application }) {
+    return (
+        <section className="mt-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 p-4 sm:p-6 space-y-3">
+            <h2 className="text-lg font-semibold mb-2">Experience</h2>
+            <Row label="Can use Discord" value={app.canDiscord ? "Yes" : "No"} />
+            {app.canDiscord && <Row label="Discord" value={app.discordUser || "—"} />}
+            <Row label="Prior staff" value={app.priorStaff ? "Yes" : "No"} />
+            {app.priorStaff && <Row label="Servers/IPs" value={app.priorServers || "—"} />}
+            <Row label="Visited Disney" value={app.visitedDisney ? "Yes" : "No"} />
+            {app.visitedDisney && <Row label="Details" value={app.visitedDetails || "—"} />}
+        </section>
+    );
+}
+
+function RoleSpecificSection({ app }: { app: Application }) {
+    return (
+        <section className="mt-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 p-4 sm:p-6 space-y-3">
+            <h2 className="text-lg font-semibold mb-2">Role-Specific</h2>
+
+            {app.role === "Developer" && (
+                <>
+                    <Row label="Portfolio/GitHub" value={linkOrDash(app.devPortfolioUrl)} />
+                    <Row label="Specialty" value={app.devSpecialty || "—"} />
+                    <Row label="Languages" value={app.devLanguages || "—"} />
+                </>
+            )}
+
+            {app.role === "Imaginear" && (
+                <>
+                    <Row label="Portfolio/Showcase" value={linkOrDash(app.imgPortfolioUrl)} />
+                    <Row label="WorldEdit" value={app.imgWorldEditLevel || "—"} />
+                    <Row label="Plugin Familiarity" value={app.imgPluginFamiliar || "—"} />
+                </>
+            )}
+
+            {app.role === "GuestServices" && (
+                <>
+                    <Row label="Above & Beyond Story" value={<PreWrap text={app.grStory || "—"} />} />
+                    <Row label="Value to Team" value={<PreWrap text={app.grValue || "—"} />} />
+                    <Row label="Suggestions" value={<PreWrap text={app.grSuggestions || "—"} />} />
+                </>
+            )}
+        </section>
+    );
+}
+
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
     return (
         <div className="grid grid-cols-3 gap-3">
@@ -100,9 +110,11 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
         </div>
     );
 }
+
 function PreWrap({ text }: { text: string }) {
     return <div className="whitespace-pre-wrap text-sm leading-6">{text}</div>;
 }
+
 function linkOrDash(url?: string | null) {
     if (!url) return "—";
     return (
