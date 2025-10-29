@@ -19,7 +19,7 @@ export function ContextMenuCard() {
               </div>
             </div>
           </ContextMenuTrigger>
-          <ContextMenuContent className="w-64">
+          <ContextMenuContent className={cn("w-64")}>
             <ContextMenuLabel>Actions</ContextMenuLabel>
             <ContextMenuSeparator />
             <ContextMenuItem>
