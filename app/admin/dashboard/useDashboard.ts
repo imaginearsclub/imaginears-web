@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { log } from "@/lib/logger";
+import { clientLog as log } from "@/lib/client-logger";
 
 export type Kpi = { 
     totalPlayers: number; 
