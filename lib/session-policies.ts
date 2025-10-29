@@ -10,6 +10,8 @@
  */
 
 import { prisma } from './prisma';
+import IPCIDR from 'ip-cidr';
+import { log } from './logger';
 
 export interface SessionPolicy {
   id: string;
@@ -60,7 +62,7 @@ export async function getUserSessionPolicy(userId: string): Promise<SessionPolic
     // In the future, store in database
     return getDefaultPolicy(userId);
   } catch (error) {
-    console.error('[Session Policy] Error fetching policy:', error);
+    log.error('Session Policy: Error fetching policy', { userId, error });
     return null;
   }
 }
@@ -168,9 +170,9 @@ export function isTimeAllowed(policy: SessionPolicy): boolean {
     return true; // 24/7 access
   }
   
-  const [currentHour, currentMinute] = timeStr.split(':').map(Number);
-  const [startHour, startMinute] = policy.allowedTimeStart.split(':').map(Number);
-  const [endHour, endMinute] = policy.allowedTimeEnd.split(':').map(Number);
+  const [currentHour = 0, currentMinute = 0] = timeStr.split(':').map(Number);
+  const [startHour = 0, startMinute = 0] = policy.allowedTimeStart.split(':').map(Number);
+  const [endHour = 23, endMinute = 59] = policy.allowedTimeEnd.split(':').map(Number);
   
   const currentMinutes = currentHour * 60 + currentMinute;
   const startMinutes = startHour * 60 + startMinute;
@@ -215,6 +217,24 @@ export interface PolicyValidation {
   notificationReason?: string;
 }
 
+/**
+ * Check notification requirements
+ */
+function checkNotifications(
+  policy: SessionPolicy,
+  sessionData: { isNewDevice: boolean; isNewLocation: boolean }
+): { shouldNotify: boolean; notificationReason?: string } {
+  if (policy.notifyOnNewDevice && sessionData.isNewDevice) {
+    return { shouldNotify: true, notificationReason: 'New device detected' };
+  }
+  
+  if (policy.notifyOnNewLocation && sessionData.isNewLocation) {
+    return { shouldNotify: true, notificationReason: 'New location detected' };
+  }
+  
+  return { shouldNotify: false };
+}
+
 export async function validateSessionPolicy(
   userId: string,
   sessionData: {
@@ -244,8 +264,6 @@ export async function validateSessionPolicy(
   let allowed = true;
   let requiresStepUp = false;
   let shouldLogout = false;
-  let shouldNotify = false;
-  let notificationReason: string | undefined;
   
   // Check IP restrictions
   if (!isIPAllowed(sessionData.ip, policy)) {
@@ -287,56 +305,37 @@ export async function validateSessionPolicy(
     reasons.push('IP address changed - auto logout');
   }
   
-  // Check if should notify
-  if (policy.notifyOnNewDevice && sessionData.isNewDevice) {
-    shouldNotify = true;
-    notificationReason = 'New device detected';
-  }
-  
-  if (policy.notifyOnNewLocation && sessionData.isNewLocation) {
-    shouldNotify = true;
-    notificationReason = 'New location detected';
-  }
+  // Check notification requirements
+  const notifications = checkNotifications(policy, sessionData);
   
   return {
     allowed,
     reasons,
     requiresStepUp,
     shouldLogout,
-    shouldNotify,
-    notificationReason,
+    ...notifications,
   };
 }
 
 /**
- * Check if IP matches any CIDR ranges
+ * Check if IP matches any CIDR range
+ * Uses ip-cidr library for proper CIDR matching
  */
 function matchCIDR(ip: string, cidrs: string[]): boolean {
-  // Simplified CIDR matching
-  // In production, use a proper IP library like 'ip' or 'ipaddr.js'
-  for (const cidr of cidrs) {
-    if (cidr.includes('/')) {
-      const [network, bits] = cidr.split('/');
-      const networkParts = network.split('.');
-      const ipParts = ip.split('.');
-      
-      const bitsNum = parseInt(bits);
-      const bytes = Math.floor(bitsNum / 8);
-      
-      // Check full bytes
-      let match = true;
-      for (let i = 0; i < bytes; i++) {
-        if (networkParts[i] !== ipParts[i]) {
-          match = false;
-          break;
+  try {
+    for (const cidr of cidrs) {
+      if (cidr.includes('/')) {
+        const ipcidr = new IPCIDR(cidr);
+        if (ipcidr.contains(ip)) {
+          return true;
         }
       }
-      
-      if (match) return true;
     }
+    return false;
+  } catch (error) {
+    log.error('Session Policy: CIDR match error', { ip, cidrs, error });
+    return false;
   }
-  
-  return false;
 }
 
 /**
