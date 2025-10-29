@@ -10,37 +10,71 @@ permissions:
   contents: read
   pull-requests: write
 
+concurrency:
+  group: copilot-review-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   copilot_review:
-    if: github.event.pull_request.draft == false
+    # Run only when PR is not a draft AND either:
+    # - we're running as pull_request_target (so the workflow can post comments using the repo token), or
+    # - the PR head repo is the same repository (non-fork), so checking out head is safe.
+    if: ${{ github.event.pull_request.draft == false && (github.event_name == 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Checkout PR HEAD (read-only)
-        uses: actions/checkout@v4
+      - name: Checkout PR HEAD (read-only) for non-fork PRs
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Ensure GitHub CLI is available
-        run: gh --version
+      - name: Checkout base (safe) when running as pull_request_target
+        if: ${{ github.event_name == 'pull_request_target' }}
+        uses: actions/checkout@v5
+        with:
+          # Use the base commit of the target repository (trusted)
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 0
 
-      - name: Install Copilot GH CLI extension
-        run: gh extension install github/gh-copilot
+      - name: Ensure GitHub CLI is available or install it
+        run: |
+          if ! command -v gh >/dev/null; then
+            echo "gh not found, installing..."
+            # Official repository install steps for Ubuntu runner
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+              && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+              && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+              && sudo apt-get update \
+              && sudo apt-get install gh -y
+          else
+            gh --version
+          fi
+
+      - name: Authenticate GitHub CLI with the token
+        run: |
+          echo "$GH_TOKEN" | gh auth login --with-token
+
+      - name: Install/upgrade Copilot GH CLI extension
+        run: |
+          gh extension install github/gh-copilot --force || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate Copilot review
         id: review
         shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Generate a markdown review using Copilot
           gh copilot review \
             --pr ${{ github.event.pull_request.number }} \
             --output markdown > review.md
-          # Fallback message if Copilot is not enabled
+          # Fallback message if Copilot is not enabled or produced no output
           if [ ! -s review.md ]; then
             echo "⚠️ Copilot review could not be generated. Ensure GitHub Copilot is enabled for this repository/organization and the workflow has permissions to use it." > review.md
           fi
