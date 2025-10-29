@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, memo } from "react";
 import type { Metadata } from "next";
 import { AnalyticsDashboard } from "@/components/admin/analytics/AnalyticsDashboard";
 import { Skeleton } from "@/components/common/Skeleton";
@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   title: "Analytics Dashboard | Admin",
   description: "Analytics and insights for Imaginears",
 };
+
+// Move outside component to avoid recreation on every render
+const SKELETON_CARDS = ['card-1', 'card-2', 'card-3', 'card-4'] as const;
 
 export default function AnalyticsPage() {
   return (
@@ -31,12 +34,13 @@ export default function AnalyticsPage() {
   );
 }
 
-function AnalyticsLoading() {
+// Memoize loading component to prevent unnecessary re-renders
+const AnalyticsLoading = memo(function AnalyticsLoading() {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
-          <Skeleton key={i} className="h-32" />
+        {SKELETON_CARDS.map((id) => (
+          <Skeleton key={id} className="h-32" />
         ))}
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
@@ -45,5 +49,5 @@ function AnalyticsLoading() {
       </div>
     </div>
   );
-}
+});
 
