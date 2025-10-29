@@ -22,16 +22,6 @@ const activityRequests = new Map<string, { count: number; resetTime: number }>()
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
 const MAX_ACTIVITY_REQUESTS = 30; // Max 30 requests per minute per user
 
-// Cleanup old rate limit entries periodically to prevent memory leaks
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, value] of activityRequests.entries()) {
-        if (now > value.resetTime) {
-            activityRequests.delete(key);
-        }
-    }
-}, 60000); // Clean up every minute
-
 type ActivityItem = {
     id: string;
     kind: "event" | "application";
@@ -42,11 +32,18 @@ type ActivityItem = {
 };
 
 /**
- * Security: Check rate limiting
+ * Security: Check rate limiting with auto-cleanup
  */
 function isRateLimited(identifier: string): boolean {
     const now = Date.now();
     const record = activityRequests.get(identifier);
+    
+    // Cleanup expired entries on-demand (no setInterval memory leak)
+    if (activityRequests.size > 1000) {
+        for (const [key, value] of activityRequests.entries()) {
+            if (now > value.resetTime) activityRequests.delete(key);
+        }
+    }
     
     if (!record || now > record.resetTime) {
         activityRequests.set(identifier, {
@@ -87,6 +84,103 @@ function sanitizeForDisplay(str: string | null, maxLength: number = 100): string
 }
 
 /**
+ * Helper: Get display name for user (prefer minecraft name)
+ */
+function getUserDisplayName(user: { minecraftName: string | null; name: string | null } | null): string | undefined {
+    if (!user) return undefined;
+    return user.minecraftName || user.name || undefined;
+}
+
+/**
+ * Performance: Fetch activity data in parallel
+ */
+async function fetchActivityData() {
+    return Promise.all([
+        prisma.event.findMany({
+            select: { 
+                id: true, 
+                title: true, 
+                updatedAt: true, 
+                status: true, 
+                category: true,
+                updatedBy: {
+                    select: {
+                        minecraftName: true,
+                        name: true,
+                    }
+                }
+            },
+            orderBy: { updatedAt: "desc" },
+            take: MAX_ITEMS_PER_TYPE,
+        }),
+        prisma.application.findMany({
+            select: { 
+                id: true, 
+                name: true, 
+                email: true, 
+                status: true, 
+                updatedAt: true, 
+                role: true,
+                updatedBy: {
+                    select: {
+                        minecraftName: true,
+                        name: true,
+                    }
+                }
+            },
+            orderBy: { updatedAt: "desc" },
+            take: MAX_ITEMS_PER_TYPE,
+        }),
+    ]);
+}
+
+type EventRecord = {
+    id: string;
+    title: string;
+    updatedAt: Date;
+    status: string;
+    category: string;
+    updatedBy: { minecraftName: string | null; name: string | null } | null;
+};
+
+type AppRecord = {
+    id: string;
+    name: string;
+    email: string | null;
+    status: string;
+    updatedAt: Date;
+    role: string;
+    updatedBy: { minecraftName: string | null; name: string | null } | null;
+};
+
+/**
+ * Map database records to activity items
+ */
+function mapToActivityItems(events: EventRecord[], apps: AppRecord[]): ActivityItem[] {
+    const eItems: ActivityItem[] = events.map((e) => ({
+        id: e.id,
+        kind: "event" as const,
+        title: sanitizeForDisplay(e.title, 80),
+        sub: `${e.status} • ${e.category}`,
+        when: e.updatedAt.toISOString(),
+        updatedBy: getUserDisplayName(e.updatedBy),
+    }));
+
+    const aItems: ActivityItem[] = apps.map((a) => ({
+        id: a.id,
+        kind: "application" as const,
+        title: sanitizeForDisplay(a.name, 80),
+        sub: `${a.status} • ${a.role} • ${maskEmail(a.email)}`,
+        when: a.updatedAt.toISOString(),
+        updatedBy: getUserDisplayName(a.updatedBy),
+    }));
+
+    return [...eItems, ...aItems]
+        .sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime())
+        .slice(0, MAX_TOTAL_ITEMS);
+}
+
+/**
  * GET /api/admin/activity
  * 
  * Returns recent activity feed for admin dashboard.
@@ -107,30 +201,21 @@ function sanitizeForDisplay(str: string | null, maxLength: number = 100): string
  */
 export async function GET() {
     try {
-        // Security: Require admin authentication
         const session = await requireAdmin();
-        
-        // requireAdmin() returns null if unauthorized (doesn't throw)
         if (!session) {
             return NextResponse.json(
                 { error: "Unauthorized" },
-                { 
-                    status: 401,
-                    headers: { "Content-Type": "application/json; charset=utf-8" },
-                }
+                { status: 401, headers: { "Content-Type": "application/json; charset=utf-8" } }
             );
         }
         
         const userId = session.user?.id || 'unknown';
-        
-        // Security: Get client IP for rate limiting (fallback to user ID)
         const h = await nextHeaders();
         const forwardedFor = h.get("x-forwarded-for");
         const clientIP = (forwardedFor ? forwardedFor.split(",")[0]?.trim() : null) || 
                         h.get("x-real-ip") || 
                         `user:${userId}`;
         
-        // Security: Rate limiting
         if (isRateLimited(clientIP)) {
             console.warn(`[Admin Activity] Rate limit exceeded for user: ${userId}`);
             return NextResponse.json(
@@ -145,103 +230,21 @@ export async function GET() {
             );
         }
 
-        // Performance: Parallel queries with limited results
-        const [events, apps] = await Promise.all([
-            prisma.event.findMany({
-                select: { 
-                    id: true, 
-                    title: true, 
-                    updatedAt: true, 
-                    status: true, 
-                    category: true,
-                    updatedBy: {
-                        select: {
-                            minecraftName: true,
-                            name: true,
-                        }
-                    }
-                },
-                orderBy: { updatedAt: "desc" },
-                take: MAX_ITEMS_PER_TYPE,
-            }),
-            prisma.application.findMany({
-                select: { 
-                    id: true, 
-                    name: true, 
-                    email: true, 
-                    status: true, 
-                    updatedAt: true, 
-                    role: true,
-                    updatedBy: {
-                        select: {
-                            minecraftName: true,
-                            name: true,
-                        }
-                    }
-                },
-                orderBy: { updatedAt: "desc" },
-                take: MAX_ITEMS_PER_TYPE,
-            }),
-        ]);
+        const [events, apps] = await fetchActivityData();
+        const merged = mapToActivityItems(events, apps);
 
-        // Helper: Get display name for user (prefer minecraft name)
-        const getUserDisplayName = (user: { minecraftName: string | null; name: string | null } | null): string | undefined => {
-            if (!user) return undefined;
-            return user.minecraftName || user.name || undefined;
-        };
-
-        // Map events to activity items (with sanitization)
-        const eItems: ActivityItem[] = events.map((e) => ({
-            id: e.id,
-            kind: "event" as const,
-            title: sanitizeForDisplay(e.title, 80),
-            sub: `${e.status} • ${e.category}`,
-            when: e.updatedAt.toISOString(),
-            updatedBy: getUserDisplayName(e.updatedBy),
-        }));
-
-        // Map applications to activity items (with masked emails and sanitization)
-        const aItems: ActivityItem[] = apps.map((a) => ({
-            id: a.id,
-            kind: "application" as const,
-            title: sanitizeForDisplay(a.name, 80),
-            // Security: Mask email address for privacy
-            sub: `${a.status} • ${a.role} • ${maskEmail(a.email)}`,
-            when: a.updatedAt.toISOString(),
-            updatedBy: getUserDisplayName(a.updatedBy),
-        }));
-
-        // Merge, sort by date (most recent first), and limit
-        const merged = [...eItems, ...aItems]
-            .sort((a, b) => {
-                // Sort descending by date (newest first)
-                const dateA = new Date(a.when).getTime();
-                const dateB = new Date(b.when).getTime();
-                return dateB - dateA;
-            })
-            .slice(0, MAX_TOTAL_ITEMS);
-
-        return NextResponse.json(
-            merged,
-            {
-                headers: {
-                    // Performance: Cache for 30 seconds (near real-time for admins)
-                    "Cache-Control": `private, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 2}`,
-                    "Content-Type": "application/json; charset=utf-8",
-                    "X-Content-Type-Options": "nosniff",
-                },
-            }
-        );
-    } catch (e: any) {
+        return NextResponse.json(merged, {
+            headers: {
+                "Cache-Control": `private, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 2}`,
+                "Content-Type": "application/json; charset=utf-8",
+                "X-Content-Type-Options": "nosniff",
+            },
+        });
+    } catch (e) {
         console.error("[Admin Activity] Error:", e instanceof Error ? e.message : "Unknown error");
-        
-        // Security: Don't expose internal error details
         return NextResponse.json(
             { error: "Failed to load activity feed" },
-            { 
-                status: 500,
-                headers: { "Content-Type": "application/json; charset=utf-8" },
-            }
+            { status: 500, headers: { "Content-Type": "application/json; charset=utf-8" } }
         );
     }
 }
