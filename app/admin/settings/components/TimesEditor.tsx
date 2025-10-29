@@ -4,6 +4,7 @@ import { inputClass } from "./SettingsComponents";
 
 interface TimesEditorProps {
   times: string[];
+  /* eslint-disable-next-line no-unused-vars */
   onChange: (times: string[]) => void;
 }
 
@@ -14,8 +15,7 @@ export const TimesEditor = memo(function TimesEditor({ times, onChange }: TimesE
   }
 
   function update(i: number, t: string) {
-    const next = [...times];
-    next[i] = t;
+    const next = times.map((time, idx) => idx === i ? t : time);
     onChange(next.sort());
   }
 
@@ -28,7 +28,7 @@ export const TimesEditor = memo(function TimesEditor({ times, onChange }: TimesE
   return (
     <div className="space-y-2">
       {displayTimes.map((t, i) => (
-        <div key={i} className="flex items-center gap-2">
+        <div key={`time-${t}`} className="flex items-center gap-2">
           <input
             type="time"
             value={t}
