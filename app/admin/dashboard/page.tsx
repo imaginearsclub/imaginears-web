@@ -1,19 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { LayoutDashboard } from "lucide-react";
 import {
-    AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, CartesianGrid
-} from "recharts";
-import { CalendarRange, Users, FileText, Clock, CalendarCheck2, UserSquare2, Server, Wifi, Activity as ActivityIcon, LayoutDashboard } from "lucide-react";
-import {
-    Card,
-    CardHeader,
-    CardTitle,
-    CardContent,
-    Badge,
     Alert,
     Spinner,
-    EmptyState,
     Tabs,
     TabsList,
     TabsTrigger,
@@ -21,115 +11,15 @@ import {
 } from "@/components/common";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { OnboardingProgress } from "@/components/onboarding/OnboardingProgress";
-
-type Kpi = { 
-    totalPlayers: number; 
-    totalEvents: number; 
-    activeApplications: number; 
-    apiUptime: string;
-    trends: {
-        players: string;
-        events: string;
-        applications: string;
-    };
-    server: {
-        address: string;
-        online: boolean;
-        version?: string;
-        players: {
-            online: number;
-            max: number;
-        };
-        latency?: number;
-        uptimePercentage: number | null;
-        playerHistory: { timestamp: number; count: number }[];
-        error?: string;
-    };
-};
-type ActivityItem = { id: string; kind: "event" | "application"; title: string; sub: string; when: string; updatedBy?: string };
+import { useDashboard } from "./useDashboard";
+import { KPICards } from "./KPICards";
+import { ServerStatusCard } from "./ServerStatusCard";
+import { DashboardCharts } from "./DashboardCharts";
+import { ActivityList } from "./ActivityList";
+import { QuickActions } from "./QuickActions";
 
 export default function DashboardPage() {
-    const [kpis, setKpis] = useState<Kpi | null>(null);
-    const [events30d, setEvents30d] = useState<{ date: string; count: number }[]>([]);
-    const [appsByStatus, setAppsByStatus] = useState<{ status: string; count: number }[]>([]);
-    const [activity, setActivity] = useState<ActivityItem[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [err, setErr] = useState<string | null>(null);
-
-    useEffect(() => {
-        const loadDashboard = async () => {
-            try {
-                setLoading(true);
-                setErr(null);
-                
-                const [kRes, eRes, aRes, actRes] = await Promise.all([
-                    fetch("/api/admin/kpis", { credentials: "include" }),
-                    fetch("/api/admin/stats/events?range=30", { credentials: "include" }),
-                    fetch("/api/admin/stats/applications-by-status", { credentials: "include" }),
-                    fetch("/api/admin/activity", { credentials: "include" }),
-                ]);
-
-                // Parse JSON responses
-                const k = kRes.ok ? await kRes.json() : null;
-                const e = eRes.ok ? await eRes.json() : [];
-                const a = aRes.ok ? await aRes.json() : [];
-                const act = actRes.ok ? await actRes.json() : [];
-
-                // Log any API failures
-                if (!actRes.ok) {
-                    console.error("[Dashboard] Activity API failed:", actRes.status, actRes.statusText);
-                }
-                
-                setKpis(k);
-                setEvents30d(Array.isArray(e) ? e : []);
-                setAppsByStatus(Array.isArray(a) ? a : []);
-                setActivity(Array.isArray(act) ? act : []);
-            } catch (error) {
-                console.error("[Dashboard] Load error:", error);
-                setErr("Failed to load stats.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        // Initial load
-        loadDashboard();
-
-        // Auto-refresh every 30 seconds (matches API cache)
-        const interval = setInterval(loadDashboard, 30000);
-
-        return () => clearInterval(interval);
-    }, []);
-
-    const cards = useMemo(
-        () => [
-            { 
-                title: "Total Players", 
-                value: kpis?.totalPlayers ?? "—", 
-                icon: <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />,
-                trend: kpis?.trends?.players ?? "—",
-                bgColor: "bg-blue-50 dark:bg-blue-950/30",
-                ariaLabel: "Total players registered"
-            },
-            { 
-                title: "Total Events", 
-                value: kpis?.totalEvents ?? "—", 
-                icon: <CalendarRange className="h-5 w-5 text-violet-600 dark:text-violet-400" />,
-                trend: kpis?.trends?.events ?? "—",
-                bgColor: "bg-violet-50 dark:bg-violet-950/30",
-                ariaLabel: "Total events created"
-            },
-            { 
-                title: "Active Applications", 
-                value: kpis?.activeApplications ?? "—", 
-                icon: <FileText className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />,
-                trend: kpis?.trends?.applications ?? "—",
-                bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
-                ariaLabel: "Active application submissions"
-            },
-        ],
-        [kpis]
-    );
+    const { kpis, events30d, appsByStatus, activity, loading, err, setErr } = useDashboard();
 
     return (
         <div className="space-y-6">
@@ -166,32 +56,7 @@ export default function DashboardPage() {
             {/* KPI Cards */}
             {kpis && (
                 <>
-                    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 animate-in fade-in slide-in-from-bottom-4 duration-500" data-tour="kpi-cards">
-                        {cards.map((card, index) => (
-                            <Card 
-                                key={card.title}
-                                accent={index === 0 ? "primary" : index === 1 ? "purple" : "success"}
-                                variant="elevated"
-                                interactive
-                                aria-label={card.ariaLabel}
-                            >
-                                <CardContent className="flex flex-col gap-3 p-6">
-                                    <div className="flex items-center justify-between">
-                                        <div className={`p-2 rounded-lg ${card.bgColor} transition-transform hover:scale-110 duration-200`} aria-hidden="true">
-                                            {card.icon}
-                                        </div>
-                                        <Badge variant="info" ariaLabel={`7-day trend: ${card.trend}`}>
-                                            {card.trend}
-                                        </Badge>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{card.title}</p>
-                                        <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1 transition-all duration-300">{card.value}</p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
+                    <KPICards kpis={kpis} />
 
                     {/* Onboarding Progress Widget */}
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
@@ -199,169 +64,9 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Server Status Card */}
-                    <Card 
-                        accent={kpis.server?.online ? "success" : "danger"}
-                        variant="elevated"
-                        className={`animate-in fade-in slide-in-from-bottom-4 duration-500 ${
-                            kpis.server?.online 
-                                ? "bg-gradient-to-br from-green-50/30 to-transparent dark:from-green-950/10 dark:to-transparent" 
-                                : "bg-gradient-to-br from-red-50/30 to-transparent dark:from-red-950/10 dark:to-transparent"
-                        }`}
-                        data-tour="server-status"
-                    >
-                            <CardContent className="p-6">
-                                <div className="flex flex-col lg:flex-row gap-6">
-                                    {/* Left: Server Info */}
-                                    <div className="flex-1 space-y-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`p-3 rounded-xl ${
-                                                kpis.server?.online 
-                                                    ? "bg-green-100 dark:bg-green-950/30" 
-                                                    : "bg-red-100 dark:bg-red-950/30"
-                                            }`}>
-                                                <Server className={`h-6 w-6 ${
-                                                    kpis.server?.online 
-                                                        ? "text-green-600 dark:text-green-400" 
-                                                        : "text-red-600 dark:text-red-400"
-                                                }`} />
-                                            </div>
-                                            <div className="flex-1">
-                                                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                                                    {kpis.server?.address || "Minecraft Server"}
-                                                </h3>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <Badge 
-                                                        variant={kpis.server?.online ? "success" : "danger"}
-                                                        className="text-xs"
-                                                    >
-                                                        {kpis.server?.online ? "Online" : "Offline"}
-                                                    </Badge>
-                                                    {kpis.server?.version && (
-                                                        <span className="text-xs text-slate-600 dark:text-slate-400">
-                                                            {kpis.server.version}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Stats Grid */}
-                                        <div className="grid grid-cols-3 gap-4">
-                                            <div className="space-y-1">
-                                                <div className="flex items-center gap-1.5">
-                                                    <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                                    <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                                                        Players
-                                                    </p>
-                                                </div>
-                                                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                                                    {kpis.server?.players?.online ?? 0}/{kpis.server?.players?.max ?? 0}
-                                                </p>
-                                            </div>
-
-                                            <div className="space-y-1">
-                                                <div className="flex items-center gap-1.5">
-                                                    <ActivityIcon className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-                                                    <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                                                        Latency
-                                                    </p>
-                                                </div>
-                                                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                                                    {kpis.server?.online 
-                                                        ? (kpis.server.latency ? `${kpis.server.latency}ms` : "—")
-                                                        : "N/A"}
-                                                </p>
-                                            </div>
-
-                                            <div className="space-y-1">
-                                                <div className="flex items-center gap-1.5">
-                                                    <Wifi className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                                    <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                                                        Uptime
-                                                    </p>
-                                                </div>
-                                                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                                                    {kpis.server?.uptimePercentage !== null && kpis.server?.uptimePercentage !== undefined
-                                                        ? `${kpis.server.uptimePercentage}%`
-                                                        : "—"}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Right: Player Count Graph */}
-                                    <div className="lg:w-1/2">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                                Player Activity
-                                            </p>
-                                            <Badge variant="info" className="text-xs">
-                                                Last {kpis.server?.playerHistory?.length ?? 0} checks
-                                            </Badge>
-                                        </div>
-                                        
-                                        {kpis.server?.playerHistory && kpis.server.playerHistory.length > 0 ? (
-                                            <div className="h-32">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <AreaChart 
-                                                        data={kpis.server.playerHistory.map((point, idx) => ({
-                                                            index: idx,
-                                                            count: point.count,
-                                                        }))}
-                                                        margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
-                                                    >
-                                                        <defs>
-                                                            <linearGradient id="playerGradient" x1="0" y1="0" x2="0" y2="1">
-                                                                <stop offset="0%" stopColor={kpis.server.online ? "#10b981" : "#ef4444"} stopOpacity={0.8} />
-                                                                <stop offset="100%" stopColor={kpis.server.online ? "#10b981" : "#ef4444"} stopOpacity={0.1} />
-                                                            </linearGradient>
-                                                        </defs>
-                                                        <CartesianGrid 
-                                                            strokeDasharray="3 3" 
-                                                            className="stroke-slate-200 dark:stroke-slate-700" 
-                                                            vertical={false}
-                                                        />
-                                                        <XAxis 
-                                                            dataKey="index" 
-                                                            hide 
-                                                        />
-                                                        <YAxis 
-                                                            allowDecimals={false} 
-                                                            tick={{ fontSize: 11 }}
-                                                            width={30}
-                                                        />
-                                                        <Tooltip
-                                                            contentStyle={{ 
-                                                                background: "var(--bg-light)", 
-                                                                border: "1px solid rgba(148,163,184,.35)", 
-                                                                borderRadius: "8px",
-                                                                fontSize: "12px"
-                                                            }}
-                                                            labelFormatter={() => "Players"}
-                                                        />
-                                                        <Area 
-                                                            type="monotone" 
-                                                            dataKey="count" 
-                                                            stroke={kpis.server.online ? "#10b981" : "#ef4444"}
-                                                            strokeWidth={2} 
-                                                            fill="url(#playerGradient)" 
-                                                        />
-                                                    </AreaChart>
-                                                </ResponsiveContainer>
-                                            </div>
-                                        ) : (
-                                            <div className="h-32 flex items-center justify-center border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg">
-                                                <p className="text-sm text-slate-500 dark:text-slate-400">
-                                                    Collecting player data...
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </>
-                )}
+                    <ServerStatusCard server={kpis.server} />
+                </>
+            )}
 
             {/* Charts & Activity */}
             {kpis && (
@@ -376,205 +81,17 @@ export default function DashboardPage() {
                     </TabsList>
 
                     <TabsContent value="charts" className="space-y-6">
-                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                            {/* Area chart: Events last 30 days */}
-                            <Card 
-                                className="lg:col-span-3 animate-in fade-in duration-300" 
-                                accent="purple" 
-                                variant="elevated"
-                            >
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center justify-between">
-                                            <span>Events (last 30 days)</span>
-                                            <Badge variant="info">Trend</Badge>
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {events30d.length === 0 ? (
-                                            <EmptyState
-                                                icon={<CalendarRange className="w-12 h-12" />}
-                                                title="No event data"
-                                                description="Event statistics will appear here once you create events."
-                                            />
-                                        ) : (
-                                            <div className="h-64">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <AreaChart data={events30d} margin={{ left: 8, right: 8 }}>
-                                                        <defs>
-                                                            <linearGradient id="evGradient" x1="0" y1="0" x2="0" y2="1">
-                                                                <stop offset="0%" stopColor="var(--brand-end)" stopOpacity={0.8} />
-                                                                <stop offset="100%" stopColor="var(--brand-end)" stopOpacity={0.1} />
-                                                            </linearGradient>
-                                                        </defs>
-                                                        <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
-                                                        <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                                                        <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-                                                        <Tooltip
-                                                            contentStyle={{ background: "var(--bg-light)", border: "1px solid rgba(148,163,184,.35)", borderRadius: "12px" }}
-                                                            labelStyle={{ fontWeight: 600 }}
-                                                        />
-                                                        <Area type="monotone" dataKey="count" stroke="var(--brand-end)" strokeWidth={2} fill="url(#evGradient)" />
-                                                    </AreaChart>
-                                                </ResponsiveContainer>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-
-                                {/* Bar chart: Applications by Status */}
-                                <Card 
-                                    className="lg:col-span-2 animate-in fade-in duration-300" 
-                                    accent="primary" 
-                                    variant="elevated"
-                                >
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center justify-between">
-                                            <span>Applications</span>
-                                            <Badge variant="primary">By Status</Badge>
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {appsByStatus.length === 0 ? (
-                                            <EmptyState
-                                                icon={<FileText className="w-12 h-12" />}
-                                                title="No applications yet"
-                                                description="Application statistics will appear here."
-                                            />
-                                        ) : (
-                                            <div className="h-64">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <BarChart data={appsByStatus} margin={{ left: 8, right: 8 }}>
-                                                        <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
-                                                        <XAxis dataKey="status" tick={{ fontSize: 12 }} />
-                                                        <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-                                                        <Tooltip
-                                                            contentStyle={{ background: "var(--bg-light)", border: "1px solid rgba(148,163,184,.35)", borderRadius: "12px" }}
-                                                            labelStyle={{ fontWeight: 600 }}
-                                                        />
-                                                        <Bar dataKey="count" fill="var(--brand-end)" radius={[8, 8, 0, 0]} />
-                                                    </BarChart>
-                                                </ResponsiveContainer>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </div>
-                        </TabsContent>
+                        <DashboardCharts events30d={events30d} appsByStatus={appsByStatus} />
+                    </TabsContent>
 
                     <TabsContent value="activity">
-                        <Card 
-                            accent="info" 
-                            variant="elevated"
-                            className="animate-in fade-in duration-300"
-                        >
-                            <CardHeader>
-                                <CardTitle className="flex items-center justify-between">
-                                    <span>Recent Activity</span>
-                                    <Badge variant="info">{activity.length} items</Badge>
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                    {activity.length === 0 ? (
-                                        <EmptyState
-                                            icon={<Clock className="w-12 h-12" />}
-                                            title="No recent activity"
-                                            description="Activity will appear here as events and applications are created."
-                                        />
-                                    ) : (
-                                        <ul className="divide-y divide-slate-200 dark:divide-slate-800">
-                                            {activity.map((item, idx) => (
-                                                <li key={`${item.kind}:${item.id}`} className="py-4 flex items-start gap-4">
-                                                    <div
-                                                        className={`mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                                                            item.kind === "event"
-                                                                ? "bg-violet-100 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400"
-                                                                : "bg-blue-100 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400"
-                                                        }`}
-                                                        title={item.kind}
-                                                    >
-                                                        {item.kind === "event" ? (
-                                                            <CalendarCheck2 className="h-5 w-5" />
-                                                        ) : (
-                                                            <UserSquare2 className="h-5 w-5" />
-                                                        )}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                                                            <p className="font-semibold text-slate-900 dark:text-slate-100 truncate">
-                                                                {item.title}
-                                                            </p>
-                                                            <Badge variant={item.kind === "event" ? "primary" : "info"} className="text-xs">
-                                                                {item.kind}
-                                                            </Badge>
-                                                        </div>
-                                                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">
-                                                            {item.sub}
-                                                        </p>
-                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                            <p className="text-xs text-slate-500 dark:text-slate-500">
-                                                                {new Date(item.when).toLocaleString()}
-                                                            </p>
-                                                            {item.updatedBy && (
-                                                                <>
-                                                                    <span className="text-xs text-slate-400">•</span>
-                                                                    <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
-                                                                        by {item.updatedBy}
-                                                                    </p>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    {idx < 3 && <Badge variant="success" className="text-xs">New</Badge>}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
+                        <ActivityList activity={activity} />
+                    </TabsContent>
                     </Tabs>
                 )}
 
             {/* Quick Actions */}
-            {kpis && (
-                <Card 
-                    variant="elevated" 
-                    data-tour="quick-actions"
-                    className="animate-in fade-in duration-500"
-                >
-                    <CardHeader>
-                        <CardTitle>Quick Actions</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                <a 
-                                    href="/admin/events" 
-                                    className="btn btn-primary justify-center"
-                                    aria-label="Navigate to events management page"
-                                >
-                                    <CalendarRange className="w-4 h-4" />
-                                    View Events
-                                </a>
-                                <a 
-                                    href="/admin/applications" 
-                                    className="btn btn-muted justify-center"
-                                    aria-label="Navigate to applications management page"
-                                >
-                                    <FileText className="w-4 h-4" />
-                                    View Applications
-                                </a>
-                                <a 
-                                    href="/admin/players" 
-                                    className="btn btn-muted justify-center"
-                                    aria-label="Navigate to players management page"
-                                >
-                                    <Users className="w-4 h-4" />
-                                    View Players
-                                </a>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
+            {kpis && <QuickActions />}
         </div>
     );
 }
