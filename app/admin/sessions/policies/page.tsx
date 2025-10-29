@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/session";
 import { SessionPoliciesClient } from "./components/SessionPoliciesClient";
+import { prisma } from "@/lib/prisma";
+import type { SessionPolicies } from "./components/types";
 
 export const dynamic = "force-dynamic";
 
@@ -11,39 +13,44 @@ export default async function SessionPoliciesPage() {
     redirect("/login");
   }
 
-  // Fetch current policies (in production, these would come from a policies table)
-  // For now, we'll use default values that can be configured
-  // Note: Site operates 24/7 - maintenance mode is handled separately
-  const defaultPolicies = {
-    maxConcurrentSessions: 5,
-    sessionIdleTimeout: 30, // minutes
-    rememberMeDuration: 30, // days
-    requireStepUpFor: ['delete_account', 'change_password'],
-    ipRestrictions: {
-      enabled: false,
-      whitelist: [] as string[],
-      blacklist: [] as string[],
-    },
-    geoFencing: {
-      enabled: false,
-      allowedCountries: [] as string[],
-      blockedCountries: [] as string[],
-    },
-    securityFeatures: {
-      autoBlockSuspicious: true,
-      requireReauthAfterSuspicious: true,
-      enableVpnDetection: true,
-      enableImpossibleTravelDetection: true,
-      maxFailedLogins: 5,
-      failedLoginWindow: 15, // minutes
-    },
-    notifications: {
-      emailOnNewDevice: true,
-      emailOnSuspicious: true,
-      emailOnPolicyViolation: true,
-      notifyAdminsOnCritical: true,
-    },
-  };
+  // Fetch current policies from database
+  let policies = await prisma.sessionPolicies.findFirst();
+
+  // If no policies exist, create default ones
+  if (!policies) {
+    policies = await prisma.sessionPolicies.create({
+      data: {
+        maxConcurrentSessions: 5,
+        sessionIdleTimeout: 30,
+        rememberMeDuration: 30,
+        requireStepUpFor: ['delete_account', 'change_password'],
+        ipRestrictions: {
+          enabled: false,
+          whitelist: [],
+          blacklist: [],
+        },
+        geoFencing: {
+          enabled: false,
+          allowedCountries: [],
+          blockedCountries: [],
+        },
+        securityFeatures: {
+          autoBlockSuspicious: true,
+          requireReauthAfterSuspicious: true,
+          enableVpnDetection: true,
+          enableImpossibleTravelDetection: true,
+          maxFailedLogins: 5,
+          failedLoginWindow: 15,
+        },
+        notifications: {
+          emailOnNewDevice: true,
+          emailOnSuspicious: true,
+          emailOnPolicyViolation: true,
+          notifyAdminsOnCritical: true,
+        },
+      },
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -65,7 +72,7 @@ export default async function SessionPoliciesPage() {
       </div>
 
       {/* Client Component */}
-      <SessionPoliciesClient initialPolicies={defaultPolicies} />
+      <SessionPoliciesClient initialPolicies={policies as unknown as SessionPolicies} />
     </div>
   );
 }
