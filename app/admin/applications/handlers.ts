@@ -3,13 +3,11 @@ import { toast } from "sonner";
 import type { ApplicationRow } from "@/components/admin/applications/ApplicationTable";
 import type { AppStatus, AppRole } from "@prisma/client";
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
 export function createHandlers(
     patch: (id: string, body: unknown) => Promise<unknown>,
     updateRowLocal: (id: string, patch: Partial<ApplicationRow>) => void,
     setRows: (updater: (rows: ApplicationRow[]) => ApplicationRow[]) => void
 ) {
-/* eslint-enable @typescript-eslint/no-unused-vars */
     const handleChangeStatus = async (id: string, status: AppStatus) => {
         const updatePromise = (async () => {
             await patch(id, { status });
