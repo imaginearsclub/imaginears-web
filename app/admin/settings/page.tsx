@@ -557,13 +557,14 @@ export default function SettingsPage() {
                                         Public key for Cloudflare Turnstile CAPTCHA
                                     </p>
                                 </Field>
-                                <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30">
+                                <div className="flex items-center justify-between p-5 rounded-xl border-2 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 shadow-sm">
                                     <div>
-                                        <label className="text-sm font-medium text-slate-900 dark:text-white">
+                                        <label className="text-sm font-semibold text-amber-900 dark:text-amber-100 flex items-center gap-2">
+                                            <UserPlus className="w-4 h-4" aria-hidden="true" />
                                             Allow Applications
                                         </label>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                            Enable or disable the public application form
+                                        <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                                            When disabled, the public application page will show an "Applications Closed" message
                                         </p>
                                     </div>
                                     <Switch
@@ -572,6 +573,7 @@ export default function SettingsPage() {
                                             ...settings, 
                                             applications: {...settings.applications, allowApplications: checked}
                                         })}
+                                        aria-label="Toggle applications on or off"
                                     />
                                 </div>
                             </div>
