@@ -13,6 +13,7 @@ export default async function SessionPoliciesPage() {
 
   // Fetch current policies (in production, these would come from a policies table)
   // For now, we'll use default values that can be configured
+  // Note: Site operates 24/7 - maintenance mode is handled separately
   const defaultPolicies = {
     maxConcurrentSessions: 5,
     sessionIdleTimeout: 30, // minutes
@@ -27,16 +28,6 @@ export default async function SessionPoliciesPage() {
       enabled: false,
       allowedCountries: [] as string[],
       blockedCountries: [] as string[],
-    },
-    timeBasedAccess: {
-      enabled: false,
-      allowedHours: { start: 0, end: 24 },
-      timezone: 'UTC',
-    },
-    deviceRestrictions: {
-      enabled: false,
-      allowedTypes: ['desktop', 'mobile', 'tablet'],
-      requireTrustedDevice: false,
     },
     securityFeatures: {
       autoBlockSuspicious: true,
