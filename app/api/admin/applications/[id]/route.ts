@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { AppRole, AppStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
-import { rateLimit } from "@/lib/rate-limiter";
 import { log } from "@/lib/logger";
 import { logAudit } from "@/lib/audit-logger";
-import { headers as nextHeaders } from "next/headers";
+import { createApiHandler } from "@/lib/api-middleware";
+import { getClientIp, getUserAgent } from "@/lib/middleware/shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -125,164 +124,149 @@ function validateApplicationUpdate(body: Record<string, unknown>): ValidationRes
   return { valid: true, data: patch };
 }
 
-export async function PATCH(
-    req: Request,
-    { params }: { params: Promise<{ id: string }> }
-) {
-    try {
-        const session = await requireAdmin();
-        if (!session?.user?.id) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
+/**
+ * PATCH /api/admin/applications/[id]
+ * Update an application
+ * 
+ * Security: Admin authentication and rate limiting handled by middleware
+ */
+export const PATCH = createApiHandler(
+  {
+    auth: "admin",
+    rateLimit: {
+      key: "admin:applications:update",
+      limit: 30,
+      window: 60,
+      strategy: "sliding-window",
+    },
+    maxBodySize: 10000, // 10KB max
+  },
+  async (req, { userId, params }) => {
+    const id = params!['id']!;
+    const body = await req.json();
 
-        // Rate limiting
-        const h = await nextHeaders();
-        const forwardedFor = h.get("x-forwarded-for");
-        const clientIP = (forwardedFor ? forwardedFor.split(",")[0]?.trim() : null) || 
-                        h.get("x-real-ip") || 
-                        `user:${session.user.id}`;
-
-        const rateLimitResult = await rateLimit(clientIP, {
-            key: "admin:applications:update",
-            limit: 30,
-            window: 60,
-            strategy: "sliding-window",
-        });
-
-        if (!rateLimitResult.allowed) {
-            return NextResponse.json(
-                { error: "Too many requests" },
-                { 
-                    status: 429,
-                    headers: {
-                        "Retry-After": rateLimitResult.resetAfter.toString(),
-                        "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-                        "X-RateLimit-Remaining": "0",
-                    },
-                }
-            );
-        }
-
-        const { id } = await params;
-        const body = await req.json();
-
-        // Validate all fields
-        const validation = validateApplicationUpdate(body);
-        if (!validation.valid) {
-            return NextResponse.json({ error: validation.error }, { status: 400 });
-        }
-
-        const updated = await prisma.application.update({
-            where: { id },
-            data: validation.data,
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                mcUsername: true,
-                role: true,
-                status: true,
-                notes: true,
-                updatedAt: true,
-            },
-        });
-
-        // Security: Audit log
-        logAudit({
-            timestamp: new Date().toISOString(),
-            action: "user.updated",
-            actor: { id: session.user.id, email: session.user.email },
-            target: { id, type: "application", name: updated.name },
-            details: { fields: Object.keys(validation.data), status: updated.status },
-            ipAddress: clientIP,
-            userAgent: h.get("user-agent") || "Unknown",
-            success: true,
-        });
-
-        return NextResponse.json(updated, {
-            headers: {
-                "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-                "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
-            },
-        });
-    } catch (e) {
-        log.error("Application update failed", { error: e, applicationId: (await params).id });
-        return NextResponse.json({ error: "Failed to update application" }, { status: 500 });
+    // Validate all fields
+    const validation = validateApplicationUpdate(body);
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
-}
 
-export async function DELETE(
-    _req: Request,
-    { params }: { params: Promise<{ id: string }> }
-) {
     try {
-        const session = await requireAdmin();
-        if (!session?.user?.id) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
+      const updated = await prisma.application.update({
+        where: { id },
+        data: validation.data,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          mcUsername: true,
+          role: true,
+          status: true,
+          notes: true,
+          updatedAt: true,
+        },
+      });
 
-        // Rate limiting (stricter for deletions)
-        const h = await nextHeaders();
-        const forwardedFor = h.get("x-forwarded-for");
-        const clientIP = (forwardedFor ? forwardedFor.split(",")[0]?.trim() : null) || 
-                        h.get("x-real-ip") || 
-                        `user:${session.user.id}`;
+      // Security: Audit log
+      const clientIP = getClientIp(req.headers);
+      const userAgent = getUserAgent(req.headers);
+      
+      logAudit({
+        timestamp: new Date().toISOString(),
+        action: "user.updated",
+        actor: { id: userId! },
+        target: { id, type: "application", name: updated.name },
+        details: { fields: Object.keys(validation.data), status: updated.status },
+        ipAddress: clientIP,
+        userAgent: userAgent || "Unknown",
+        success: true,
+      });
 
-        const rateLimitResult = await rateLimit(clientIP, {
-            key: "admin:applications:delete",
-            limit: 10,
-            window: 60,
-            strategy: "sliding-window",
-        });
+      log.info("Application updated", { 
+        userId, 
+        applicationId: id, 
+        fields: Object.keys(validation.data) 
+      });
 
-        if (!rateLimitResult.allowed) {
-            return NextResponse.json(
-                { error: "Too many requests" },
-                { 
-                    status: 429,
-                    headers: {
-                        "Retry-After": rateLimitResult.resetAfter.toString(),
-                        "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-                        "X-RateLimit-Remaining": "0",
-                    },
-                }
-            );
-        }
-
-        const { id } = await params;
-        
-        // Get application info before deleting for audit log
-        const app = await prisma.application.findUnique({
-            where: { id },
-            select: { name: true, email: true, status: true }
-        });
-        
-        if (!app) {
-            return NextResponse.json({ error: "Application not found" }, { status: 404 });
-        }
-        
-        await prisma.application.delete({ where: { id } });
-        
-        // Security: Audit log (deletions are critical actions)
-        logAudit({
-            timestamp: new Date().toISOString(),
-            action: "user.deleted",
-            actor: { id: session.user.id, email: session.user.email },
-            target: { id, type: "application", name: app.name },
-            details: { email: app.email, status: app.status },
-            ipAddress: clientIP,
-            userAgent: h.get("user-agent") || "Unknown",
-            success: true,
-        });
-        
-        return NextResponse.json({ ok: true }, {
-            headers: {
-                "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-                "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
-            },
-        });
-    } catch (e) {
-        log.error("Application deletion failed", { error: e, applicationId: (await params).id });
-        return NextResponse.json({ error: "Failed to delete application" }, { status: 500 });
+      return NextResponse.json(updated);
+    } catch (error) {
+      log.error("Application update failed", { error, applicationId: id, userId });
+      
+      // Handle Prisma errors
+      const err = error as { code?: string };
+      if (err.code === "P2025") {
+        return NextResponse.json({ error: "Application not found" }, { status: 404 });
+      }
+      
+      throw error; // Let middleware handle other errors
     }
-}
+  }
+);
+
+/**
+ * DELETE /api/admin/applications/[id]
+ * Delete an application
+ * 
+ * Security: Admin authentication and rate limiting handled by middleware
+ */
+export const DELETE = createApiHandler(
+  {
+    auth: "admin",
+    rateLimit: {
+      key: "admin:applications:delete",
+      limit: 10, // Strict limit for deletions
+      window: 60,
+      strategy: "sliding-window",
+    },
+  },
+  async (req, { userId, params }) => {
+    const id = params!['id']!;
+    
+    // Get application info before deleting for audit log
+    const app = await prisma.application.findUnique({
+      where: { id },
+      select: { name: true, email: true, status: true }
+    });
+    
+    if (!app) {
+      return NextResponse.json({ error: "Application not found" }, { status: 404 });
+    }
+    
+    try {
+      await prisma.application.delete({ where: { id } });
+      
+      // Security: Audit log (deletions are critical actions)
+      const clientIP = getClientIp(req.headers);
+      const userAgent = getUserAgent(req.headers);
+      
+      logAudit({
+        timestamp: new Date().toISOString(),
+        action: "user.deleted",
+        actor: { id: userId! },
+        target: { id, type: "application", name: app.name },
+        details: { email: app.email, status: app.status },
+        ipAddress: clientIP,
+        userAgent: userAgent || "Unknown",
+        success: true,
+      });
+      
+      log.info("Application deleted", { 
+        userId, 
+        applicationId: id, 
+        name: app.name 
+      });
+      
+      return NextResponse.json({ ok: true });
+    } catch (error) {
+      log.error("Application deletion failed", { error, applicationId: id, userId });
+      
+      // Handle Prisma errors
+      const err = error as { code?: string };
+      if (err.code === "P2025") {
+        return NextResponse.json({ error: "Application not found" }, { status: 404 });
+      }
+      
+      throw error; // Let middleware handle other errors
+    }
+  }
+);
