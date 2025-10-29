@@ -5,6 +5,7 @@
  */
 
 import { z } from 'zod';
+import IPCIDR from 'ip-cidr';
 
 /**
  * Hex color validation
@@ -67,7 +68,7 @@ const VALID_TIMEZONES = [
 ] as const;
 
 const timezoneSchema = z.enum(VALID_TIMEZONES, {
-  errorMap: () => ({ message: 'Must be a valid IANA timezone' }),
+  message: 'Must be a valid IANA timezone',
 });
 
 /**
@@ -76,7 +77,7 @@ const timezoneSchema = z.enum(VALID_TIMEZONES, {
 const twitterCardSchema = z.enum(
   ['summary', 'summary_large_image', 'app', 'player'],
   {
-    errorMap: () => ({ message: 'Must be a valid Twitter card type' }),
+    message: 'Must be a valid Twitter card type',
   }
 );
 
@@ -84,22 +85,27 @@ const twitterCardSchema = z.enum(
  * Recurrence frequency for events
  */
 const recurrenceFreqSchema = z.enum(['NONE', 'DAILY', 'WEEKLY', 'MONTHLY'], {
-  errorMap: () => ({ message: 'Must be NONE, DAILY, WEEKLY, or MONTHLY' }),
+  message: 'Must be NONE, DAILY, WEEKLY, or MONTHLY',
 });
 
 /**
- * IP address validation
+ * IP address validation using ip-cidr library
+ * Supports both IPv4 and IPv6 formats
  */
 const ipAddressSchema = z
   .string()
   .refine(
     (val) => {
-      // IPv4 or IPv6 validation
-      const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-      const ipv6Regex = /^([0-9a-fA-F]{0,4}:){7}[0-9a-fA-F]{0,4}$/;
-      return ipv4Regex.test(val) || ipv6Regex.test(val);
+      try {
+        // ip-cidr constructor throws if invalid
+        // Accepts CIDR notation (192.168.1.0/24) or plain IPs (192.168.1.1)
+        new IPCIDR(val);
+        return true;
+      } catch {
+        return false;
+      }
     },
-    { message: 'Must be a valid IP address' }
+    { message: 'Must be a valid IPv4 or IPv6 address' }
   );
 
 /**
