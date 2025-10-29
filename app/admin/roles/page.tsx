@@ -14,11 +14,95 @@ import {
 } from "@/components/common";
 import { UsersList } from "./components/UsersList";
 import { getRoleDescription, getRoleLabel } from "@/lib/rbac";
-import type { UserRole } from "@prisma/client";
+import { Prisma, type UserRole } from "@prisma/client";
 import { Shield, Settings } from "lucide-react";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function PageHeader() {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+          <Shield className="w-6 h-6 text-white" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            User Roles & Permissions
+          </h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
+            Manage user roles and configure custom permissions for fine-grained access control.
+          </p>
+        </div>
+      </div>
+      <Link href="/admin/roles/configure">
+        <Button 
+          variant="primary" 
+          size="md"
+          leftIcon={<Settings />}
+          ariaLabel="Configure roles and permissions"
+        >
+          Configure Roles
+        </Button>
+      </Link>
+    </div>
+  );
+}
+
+function RoleOverviewCard({ roleCountsMap }: { roleCountsMap: Record<string, number> }) {
+  const roles = ["OWNER", "ADMIN", "MODERATOR", "STAFF", "USER"] as const;
+  const roleVariants = {
+    OWNER: "danger",
+    ADMIN: "warning",
+    MODERATOR: "success",
+    STAFF: "primary",
+    USER: "default",
+  } as const;
+
+  return (
+    <Card accent="purple" variant="elevated">
+      <CardHeader>
+        <CardTitle>Role Hierarchy</CardTitle>
+        <CardDescription>
+          Overview of available roles and their capabilities
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {roles.map((role) => {
+            const count = roleCountsMap[role as string] ?? 0;
+            return (
+              <div
+                key={role}
+                className="p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-900 hover:shadow-md transition-all duration-200"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                    <h3 className="font-semibold text-base text-slate-900 dark:text-white">
+                      {getRoleLabel(role)}
+                    </h3>
+                  </div>
+                  <Badge 
+                    variant={roleVariants[role as keyof typeof roleVariants]}
+                    size="sm"
+                    ariaLabel={`${count} ${count === 1 ? "user" : "users"} with ${role} role`}
+                  >
+                    {count}
+                  </Badge>
+                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                  {getRoleDescription(role)}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 // Server Actions
 export async function updateUserRoleAction(formData: FormData) {
@@ -42,9 +126,9 @@ export async function updateUserRoleAction(formData: FormData) {
     select: { id: true, role: true },
   });
 
-  if (currentUser?.id === userId && (currentUser as any).role === "OWNER") {
+  if (currentUser?.id === userId && currentUser.role === "OWNER") {
     const ownerCount = await prisma.user.count({
-      where: { role: "OWNER" as any },
+      where: { role: "OWNER" as UserRole },
     });
 
     if (ownerCount <= 1) {
@@ -55,7 +139,7 @@ export async function updateUserRoleAction(formData: FormData) {
   // Update the user's role
   await prisma.user.update({
     where: { id: userId },
-    data: { role: newRole } as any,
+    data: { role: newRole },
   });
 
   revalidatePath("/admin/roles");
@@ -90,7 +174,7 @@ export async function updateUserPermissionsAction(formData: FormData) {
   // Update the user's custom permissions
   await prisma.user.update({
     where: { id: userId },
-    data: { permissions: permissions ? JSON.stringify(permissions) : null } as any,
+    data: { permissions: permissions ? JSON.stringify(permissions) : Prisma.JsonNull },
   });
 
   revalidatePath("/admin/roles");
@@ -120,7 +204,7 @@ export default async function RolesPage() {
           sessions: true,
         },
       },
-    } as any,
+    },
     orderBy: [
       { role: "asc" },
       { name: "asc" },
@@ -137,89 +221,11 @@ export default async function RolesPage() {
     roleCounts.map((rc) => [rc.role, rc._count])
   );
 
-  const roles = ["OWNER", "ADMIN", "MODERATOR", "STAFF", "USER"] as const;
-
-  // Role variant mapping for visual consistency
-  const roleVariants = {
-    OWNER: "danger",
-    ADMIN: "warning",
-    MODERATOR: "success",
-    STAFF: "primary",
-    USER: "default",
-  } as const;
-
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-            <Shield className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              User Roles & Permissions
-            </h1>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
-              Manage user roles and configure custom permissions for fine-grained access control.
-            </p>
-          </div>
-        </div>
-        <Link href="/admin/roles/configure">
-          <Button 
-            variant="primary" 
-            size="md"
-            leftIcon={<Settings />}
-            ariaLabel="Configure roles and permissions"
-          >
-            Configure Roles
-          </Button>
-        </Link>
-      </div>
-
-      {/* Role Overview */}
-      <Card accent="purple" variant="elevated">
-        <CardHeader>
-          <CardTitle>Role Hierarchy</CardTitle>
-          <CardDescription>
-            Overview of available roles and their capabilities
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {roles.map((role) => {
-              const count = roleCountsMap[role] || 0;
-              return (
-                <div
-                  key={role}
-                  className="p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-900 hover:shadow-md transition-all duration-200"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-                      <h3 className="font-semibold text-base text-slate-900 dark:text-white">
-                        {getRoleLabel(role)}
-                      </h3>
-                    </div>
-                    <Badge 
-                      variant={roleVariants[role as keyof typeof roleVariants]}
-                      size="sm"
-                      ariaLabel={`${count} ${count === 1 ? "user" : "users"} with ${role} role`}
-                    >
-                      {count}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                    {getRoleDescription(role)}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Users List */}
+      <PageHeader />
+      <RoleOverviewCard roleCountsMap={roleCountsMap} />
+      
       <Card accent="primary" variant="elevated">
         <CardHeader>
           <CardTitle>All Users</CardTitle>
@@ -229,10 +235,12 @@ export default async function RolesPage() {
         </CardHeader>
         <CardContent>
           <UsersList
-            users={users as any}
+            users={users.map(u => ({
+              ...u,
+              permissions: u.permissions as Record<string, unknown>,
+            }))}
             currentUserId={session.user?.id || ""}
             updateRoleAction={updateUserRoleAction}
-            updatePermissionsAction={updateUserPermissionsAction}
           />
         </CardContent>
       </Card>
