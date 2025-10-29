@@ -11,7 +11,7 @@ import { Spinner } from "@/components/common/Spinner";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import type { Permission } from "@/lib/rbac";
 import { Pencil, Trash2, Shield } from "lucide-react";
-import { log } from "@/lib/logger";
+import { clientLog as log } from "@/lib/client-logger";
 
 interface Role {
   id: string;
