@@ -6,7 +6,7 @@ import { Button, Tooltip } from '@/components/common';
 import { clientLog } from '@/lib/client-logger';
 import { IpRestrictionsCard } from './IpRestrictionsCard';
 import { GeoRestrictionsCard } from './GeoRestrictionsCard';
-import { TimeBasedAccessCard, DeviceRestrictionsCard, SecurityFeaturesCard, NotificationsCard } from './PolicyCards';
+import { SecurityFeaturesCard, NotificationsCard } from './PolicyCards';
 import type { SessionPolicies } from './types';
 
 interface Props {
@@ -67,8 +67,6 @@ export function SessionPoliciesClient({ initialPolicies }: Props) {
 
       <IpRestrictionsCard policies={policies} setPolicies={setPolicies} />
       <GeoRestrictionsCard policies={policies} setPolicies={setPolicies} />
-      <TimeBasedAccessCard policies={policies} setPolicies={setPolicies} />
-      <DeviceRestrictionsCard policies={policies} setPolicies={setPolicies} />
       <SecurityFeaturesCard policies={policies} setPolicies={setPolicies} />
       <NotificationsCard policies={policies} setPolicies={setPolicies} />
 

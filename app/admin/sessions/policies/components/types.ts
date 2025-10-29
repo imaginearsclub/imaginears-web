@@ -13,16 +13,6 @@ export interface SessionPolicies {
     allowedCountries: string[];
     blockedCountries: string[];
   };
-  timeBasedAccess: {
-    enabled: boolean;
-    allowedHours: { start: number; end: number };
-    timezone: string;
-  };
-  deviceRestrictions: {
-    enabled: boolean;
-    allowedTypes: string[];
-    requireTrustedDevice: boolean;
-  };
   securityFeatures: {
     autoBlockSuspicious: boolean;
     requireReauthAfterSuspicious: boolean;
