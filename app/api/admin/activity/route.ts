@@ -1,14 +1,10 @@
-import { headers as nextHeaders } from "next/headers";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
-import { rateLimit } from "@/lib/rate-limiter";
+import { createApiHandler } from "@/lib/api-middleware";
+import { log } from "@/lib/logger";
 
 // Configuration
 export const runtime = "nodejs";
-
-// Force dynamic rendering for authenticated endpoints
-// This ensures fresh session validation on every request
 export const dynamic = "force-dynamic";
 
 // Security: Constants
@@ -155,8 +151,8 @@ function mapToActivityItems(events: EventRecord[], apps: AppRecord[]): ActivityI
  * Shows latest updates to events and applications.
  * 
  * Security:
- * - Requires admin authentication
- * - Rate limited (30 requests per minute per user)
+ * - Requires admin authentication (handled by middleware)
+ * - Rate limited via RATE_LIMITS.ADMIN (handled by middleware)
  * - Email addresses masked for privacy
  * - Cached for 30 seconds
  * 
@@ -167,66 +163,32 @@ function mapToActivityItems(events: EventRecord[], apps: AppRecord[]): ActivityI
  * 
  * Returns: Array of ActivityItem (max 20 items)
  */
-export async function GET() {
-    try {
-        const session = await requireAdmin();
-        if (!session) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401, headers: { "Content-Type": "application/json; charset=utf-8" } }
-            );
-        }
-        
-        const userId = session.user?.id || 'unknown';
-        const h = await nextHeaders();
-        const forwardedFor = h.get("x-forwarded-for");
-        const clientIP = (forwardedFor ? forwardedFor.split(",")[0]?.trim() : null) || 
-                        h.get("x-real-ip") || 
-                        `user:${userId}`;
-        
-        // Security: Redis-based rate limiting (distributed, scalable)
-        const rateLimitResult = await rateLimit(clientIP, {
+export const GET = createApiHandler(
+    {
+        auth: "admin",
+        rateLimit: {
             key: "admin:activity",
-            limit: 30,
+            limit: 30, // 30 requests per minute (appropriate for activity feed)
             window: 60,
             strategy: "sliding-window",
-        });
-
-        if (!rateLimitResult.allowed) {
-            console.warn(`[Admin Activity] Rate limit exceeded for user: ${userId}`);
-            return NextResponse.json(
-                { error: "Too many requests" },
-                { 
-                    status: 429,
-                    headers: {
-                        "Retry-After": rateLimitResult.resetAfter.toString(),
-                        "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-                        "X-RateLimit-Remaining": "0",
-                        "X-RateLimit-Reset": rateLimitResult.resetAt.toString(),
-                        "Content-Type": "application/json; charset=utf-8",
-                    },
-                }
-            );
-        }
-
+        },
+    },
+    async (_req, { userId }) => {
+        // Fetch data in parallel
         const [events, apps] = await fetchActivityData();
+        
+        // Map and merge activity items
         const merged = mapToActivityItems(events, apps);
+
+        log.info("Admin activity feed fetched", { 
+            userId, 
+            itemCount: merged.length 
+        });
 
         return NextResponse.json(merged, {
             headers: {
                 "Cache-Control": `private, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 2}`,
-                "Content-Type": "application/json; charset=utf-8",
-                "X-Content-Type-Options": "nosniff",
-                "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-                "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
-                "X-RateLimit-Reset": rateLimitResult.resetAt.toString(),
             },
         });
-    } catch (e) {
-        console.error("[Admin Activity] Error:", e instanceof Error ? e.message : "Unknown error");
-        return NextResponse.json(
-            { error: "Failed to load activity feed" },
-            { status: 500, headers: { "Content-Type": "application/json; charset=utf-8" } }
-        );
     }
-}
+);
