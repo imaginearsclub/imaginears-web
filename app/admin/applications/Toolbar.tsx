@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { cn } from "@/lib/utils";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/common";
