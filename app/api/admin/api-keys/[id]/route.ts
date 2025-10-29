@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
 import { API_SCOPES } from "@/lib/api-keys";
-import { rateLimit } from "@/lib/rate-limiter";
 import { log } from "@/lib/logger";
 import { logAudit } from "@/lib/audit-logger";
-import { headers as nextHeaders } from "next/headers";
+import { createApiHandler } from "@/lib/api-middleware";
+import { getClientIp, getUserAgent } from "@/lib/middleware/shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -125,46 +124,22 @@ function validateUpdates(body: Record<string, unknown>): ValidationResult {
 /**
  * PATCH /api/admin/api-keys/[id]
  * Update an API key (name, scopes, status, etc.)
+ * 
+ * Security: Admin authentication and rate limiting handled by middleware
  */
-export async function PATCH(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await requireAdmin();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Rate limiting
-    const h = await nextHeaders();
-    const forwardedFor = h.get("x-forwarded-for");
-    const clientIP = (forwardedFor ? forwardedFor.split(",")[0]?.trim() : null) || 
-                    h.get("x-real-ip") || 
-                    `user:${session.user.id}`;
-
-    const rateLimitResult = await rateLimit(clientIP, {
+export const PATCH = createApiHandler(
+  {
+    auth: "admin",
+    rateLimit: {
       key: "admin:api-keys:update",
       limit: 30,
       window: 60,
       strategy: "sliding-window",
-    });
-
-    if (!rateLimitResult.allowed) {
-      return NextResponse.json(
-        { error: "Too many requests" },
-        { 
-          status: 429,
-          headers: {
-            "Retry-After": rateLimitResult.resetAfter.toString(),
-            "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-            "X-RateLimit-Remaining": "0",
-          },
-        }
-      );
-    }
-
-    const { id } = await params;
+    },
+    maxBodySize: 5000, // 5KB max
+  },
+  async (req, { userId, params }) => {
+    const id = params!['id']!;
     const body = await req.json();
 
     // Validate updates
@@ -173,100 +148,77 @@ export async function PATCH(
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const apiKey = await prisma.apiKey.update({
-      where: { id },
-      data: validation.updates,
-      select: {
-        id: true,
-        name: true,
-        keyPrefix: true,
-        scopes: true,
-        isActive: true,
-        rateLimit: true,
-        description: true,
-        expiresAt: true,
-        lastUsedAt: true,
-        usageCount: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    try {
+      const apiKey = await prisma.apiKey.update({
+        where: { id },
+        data: validation.updates,
+        select: {
+          id: true,
+          name: true,
+          keyPrefix: true,
+          scopes: true,
+          isActive: true,
+          rateLimit: true,
+          description: true,
+          expiresAt: true,
+          lastUsedAt: true,
+          usageCount: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
 
-    // Security: Audit log
-    logAudit({
-      timestamp: new Date().toISOString(),
-      action: "api_key.updated",
-      actor: { id: session.user.id, email: session.user.email },
-      target: { id, type: "api_key", name: apiKey.name },
-      details: { fields: Object.keys(validation.updates), keyPrefix: apiKey.keyPrefix },
-      ipAddress: clientIP,
-      userAgent: h.get("user-agent") || "Unknown",
-      success: true,
-    });
+      // Security: Audit log
+      const clientIP = getClientIp(req.headers);
+      const userAgent = getUserAgent(req.headers);
+      
+      logAudit({
+        timestamp: new Date().toISOString(),
+        action: "api_key.updated",
+        actor: { id: userId! },
+        target: { id, type: "api_key", name: apiKey.name },
+        details: { fields: Object.keys(validation.updates), keyPrefix: apiKey.keyPrefix },
+        ipAddress: clientIP,
+        userAgent: userAgent || "Unknown",
+        success: true,
+      });
 
-    return NextResponse.json({ apiKey }, {
-      headers: {
-        "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-        "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
-      },
-    });
-  } catch (error) {
-    const err = error as { code?: string; message?: string };
-    log.error("API key update failed", { error: err, apiKeyId: (await params).id });
-    
-    if (err.code === "P2025") {
-      return NextResponse.json({ error: "API key not found" }, { status: 404 });
+      log.info("API key updated", { userId, keyId: id, fields: Object.keys(validation.updates) });
+
+      return NextResponse.json({ apiKey });
+    } catch (error) {
+      const err = error as { code?: string; message?: string };
+      log.error("API key update failed", { error: err, apiKeyId: id, userId });
+      
+      if (err.code === "P2025") {
+        return NextResponse.json({ error: "API key not found" }, { status: 404 });
+      }
+      
+      throw error; // Let middleware handle other errors
     }
-    
-    return NextResponse.json({ error: "Failed to update API key" }, { status: 500 });
   }
-}
+);
 
 /**
  * DELETE /api/admin/api-keys/[id]
  * Delete an API key
+ * 
+ * Security: Admin authentication and rate limiting handled by middleware
  */
-export async function DELETE(
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await requireAdmin();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Rate limiting
-    const h = await nextHeaders();
-    const forwardedFor = h.get("x-forwarded-for");
-    const clientIP = (forwardedFor ? forwardedFor.split(",")[0]?.trim() : null) || 
-                    h.get("x-real-ip") || 
-                    `user:${session.user.id}`;
-
-    const rateLimitResult = await rateLimit(clientIP, {
+export const DELETE = createApiHandler(
+  {
+    auth: "admin",
+    rateLimit: {
       key: "admin:api-keys:delete",
-      limit: 10,
+      limit: 10, // Strict limit for deletions
       window: 60,
       strategy: "sliding-window",
-    });
+    },
+  },
+  async (req, { userId, params }) => {
+    const id = params!['id']!;
 
-    if (!rateLimitResult.allowed) {
-      return NextResponse.json(
-        { error: "Too many requests" },
-        { 
-          status: 429,
-          headers: {
-            "Retry-After": rateLimitResult.resetAfter.toString(),
-            "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-            "X-RateLimit-Remaining": "0",
-          },
-        }
-      );
-    }
-
-    const { id } = await params;
-
-    // Get key info for audit log
+    // Get key info for audit log before deletion
     const apiKey = await prisma.apiKey.findUnique({
       where: { id },
       select: { name: true, keyPrefix: true },
@@ -276,35 +228,36 @@ export async function DELETE(
       return NextResponse.json({ error: "API key not found" }, { status: 404 });
     }
 
-    await prisma.apiKey.delete({ where: { id } });
+    try {
+      await prisma.apiKey.delete({ where: { id } });
 
-    // Security: Audit log
-    logAudit({
-      timestamp: new Date().toISOString(),
-      action: "api_key.deleted",
-      actor: { id: session.user.id, email: session.user.email },
-      target: { id, type: "api_key", name: apiKey.name },
-      details: { keyPrefix: apiKey.keyPrefix },
-      ipAddress: clientIP,
-      userAgent: h.get("user-agent") || "Unknown",
-      success: true,
-    });
+      // Security: Audit log
+      const clientIP = getClientIp(req.headers);
+      const userAgent = getUserAgent(req.headers);
+      
+      logAudit({
+        timestamp: new Date().toISOString(),
+        action: "api_key.deleted",
+        actor: { id: userId! },
+        target: { id, type: "api_key", name: apiKey.name },
+        details: { keyPrefix: apiKey.keyPrefix },
+        ipAddress: clientIP,
+        userAgent: userAgent || "Unknown",
+        success: true,
+      });
 
-    return NextResponse.json({ message: "API key deleted successfully" }, {
-      headers: {
-        "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-        "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
-      },
-    });
-  } catch (error) {
-    const err = error as { code?: string; message?: string };
-    log.error("API key deletion failed", { error: err, apiKeyId: (await params).id });
-    
-    if (err.code === "P2025") {
-      return NextResponse.json({ error: "API key not found" }, { status: 404 });
+      log.info("API key deleted", { userId, keyId: id, keyPrefix: apiKey.keyPrefix });
+
+      return NextResponse.json({ message: "API key deleted successfully" });
+    } catch (error) {
+      const err = error as { code?: string; message?: string };
+      log.error("API key deletion failed", { error: err, apiKeyId: id, userId });
+      
+      if (err.code === "P2025") {
+        return NextResponse.json({ error: "API key not found" }, { status: 404 });
+      }
+      
+      throw error; // Let middleware handle other errors
     }
-    
-    return NextResponse.json({ error: "Failed to delete API key" }, { status: 500 });
   }
-}
-
+);

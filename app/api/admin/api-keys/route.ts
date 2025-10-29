@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
 import { generateApiKey, API_SCOPES } from "@/lib/api-keys";
-import { rateLimit } from "@/lib/rate-limiter";
 import { log } from "@/lib/logger";
 import { logAudit } from "@/lib/audit-logger";
-import { headers as nextHeaders } from "next/headers";
+import { createApiHandler } from "@/lib/api-middleware";
+import { getClientIp, getUserAgent } from "@/lib/middleware/shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,42 +62,20 @@ function validateCreateRequest(body: Record<string, unknown>): CreateKeyValidati
 /**
  * GET /api/admin/api-keys
  * List all API keys (without the actual key value)
+ * 
+ * Security: Admin authentication and rate limiting handled by middleware
  */
-export async function GET() {
-  try {
-    const session = await requireAdmin();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Rate limiting
-    const h = await nextHeaders();
-    const forwardedFor = h.get("x-forwarded-for");
-    const clientIP = (forwardedFor ? forwardedFor.split(",")[0]?.trim() : null) || 
-                    h.get("x-real-ip") || 
-                    `user:${session.user?.id}`;
-
-    const rateLimitResult = await rateLimit(clientIP, {
+export const GET = createApiHandler(
+  {
+    auth: "admin",
+    rateLimit: {
       key: "admin:api-keys:list",
       limit: 60,
       window: 60,
       strategy: "sliding-window",
-    });
-
-    if (!rateLimitResult.allowed) {
-      return NextResponse.json(
-        { error: "Too many requests" },
-        { 
-          status: 429,
-          headers: {
-            "Retry-After": rateLimitResult.resetAfter.toString(),
-            "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-            "X-RateLimit-Remaining": "0",
-          },
-        }
-      );
-    }
-
+    },
+  },
+  async (_req, { userId }) => {
     const apiKeys = await prisma.apiKey.findMany({
       select: {
         id: true,
@@ -122,57 +99,30 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ apiKeys }, {
-      headers: {
-        "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-        "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
-      },
-    });
-  } catch (error) {
-    log.error("API keys list failed", { error });
-    return NextResponse.json({ error: "Failed to fetch API keys" }, { status: 500 });
+    log.info("API keys listed", { userId, count: apiKeys.length });
+
+    return NextResponse.json({ apiKeys });
   }
-}
+);
 
 /**
  * POST /api/admin/api-keys
  * Create a new API key
+ * 
+ * Security: Admin authentication and rate limiting handled by middleware
  */
-export async function POST(req: Request) {
-  try {
-    const session = await requireAdmin();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Rate limiting
-    const h = await nextHeaders();
-    const forwardedFor = h.get("x-forwarded-for");
-    const clientIP = (forwardedFor ? forwardedFor.split(",")[0]?.trim() : null) || 
-                    h.get("x-real-ip") || 
-                    `user:${session.user.id}`;
-
-    const rateLimitResult = await rateLimit(clientIP, {
+export const POST = createApiHandler(
+  {
+    auth: "admin",
+    rateLimit: {
       key: "admin:api-keys:create",
-      limit: 10,
+      limit: 10, // Strict limit for key creation
       window: 60,
       strategy: "sliding-window",
-    });
-
-    if (!rateLimitResult.allowed) {
-      return NextResponse.json(
-        { error: "Too many requests" },
-        { 
-          status: 429,
-          headers: {
-            "Retry-After": rateLimitResult.resetAfter.toString(),
-            "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-            "X-RateLimit-Remaining": "0",
-          },
-        }
-      );
-    }
-
+    },
+    maxBodySize: 5000, // 5KB max
+  },
+  async (req, { userId }) => {
     const body = await req.json();
     const validation = validateCreateRequest(body);
     
@@ -191,7 +141,7 @@ export async function POST(req: Request) {
         rateLimit: validation.data.rateLimit,
         description: validation.data.description,
         expiresAt: validation.data.expiresAt,
-        createdById: session.user.id,
+        createdById: userId!,
       },
       select: {
         id: true,
@@ -207,29 +157,26 @@ export async function POST(req: Request) {
     });
 
     // Audit log
+    const clientIP = getClientIp(req.headers);
+    const userAgent = getUserAgent(req.headers);
+    
     logAudit({
       timestamp: new Date().toISOString(),
       action: "api_key.created",
-      actor: { id: session.user.id, email: session.user.email },
+      actor: { id: userId! },
       target: { id: apiKey.id, type: "api_key", name: apiKey.name },
       details: { scopes: validation.data.scopes, keyPrefix },
       ipAddress: clientIP,
-      userAgent: h.get("user-agent") || "Unknown",
+      userAgent: userAgent || "Unknown",
       success: true,
     });
+
+    log.info("API key created", { userId, keyId: apiKey.id, keyPrefix });
 
     return NextResponse.json({ 
       apiKey: { ...apiKey, key },
       message: "API key created successfully. Save this key - it won't be shown again!" 
-    }, {
-      headers: {
-        "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-        "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
-      },
-    });
-  } catch (error) {
-    log.error("API key creation failed", { error });
-    return NextResponse.json({ error: "Failed to create API key" }, { status: 500 });
+    }, { status: 201 });
   }
-}
+);
 
