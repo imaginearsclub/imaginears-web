@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { Metadata } from "next";
+import type { Metadata } from "next";
 import { AnalyticsDashboard } from "@/components/admin/analytics/AnalyticsDashboard";
 import { Skeleton } from "@/components/common/Skeleton";
 import { PageHeader } from "@/components/admin/PageHeader";
