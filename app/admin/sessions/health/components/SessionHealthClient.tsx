@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/common';
 import { Activity, TrendingUp, TrendingDown, Clock, Zap, AlertCircle, CheckCircle } from 'lucide-react';
 import { clientLog } from '@/lib/client-logger';
+import { captureSentryException, addSentryBreadcrumb } from '@/lib/sentry-helpers';
+import * as Sentry from '@sentry/nextjs';
 
 interface HealthMetrics {
   totalSessions: number;
@@ -183,32 +185,135 @@ function HealthRecommendations({ metrics }: { metrics: HealthMetrics }) {
   );
 }
 
+function KeyMetricsCards({ metrics }: { metrics: HealthMetrics }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <MetricCard
+        icon={Activity}
+        label="Active Sessions"
+        value={metrics.activeSessions}
+        subtitle={`${metrics.totalSessions} total`}
+        color="blue"
+      />
+      <MetricCard
+        icon={TrendingUp}
+        label="Recent Activity"
+        value={metrics.recentActivity}
+        subtitle="Last hour"
+        color="purple"
+      />
+      <MetricCard
+        icon={Clock}
+        label="Avg Duration"
+        value={`${metrics.avgSessionDuration}m`}
+        subtitle="Per session"
+        color="green"
+      />
+      <MetricCard
+        icon={Zap}
+        label="Cache Hit Rate"
+        value={`${metrics.cacheHitRate}%`}
+        subtitle={metrics.cacheHitRate >= 90 ? 'Excellent' : 'Good'}
+        color="cyan"
+      />
+    </div>
+  );
+}
+
+function SystemPerformanceCard({ metrics }: { metrics: HealthMetrics }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">System Performance</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <PerformanceGauge
+            label="Database Query Time"
+            value={metrics.avgDatabaseQueryTime}
+            max={100}
+            unit="ms"
+            thresholds={{ good: 30, warning: 60 }}
+          />
+          <PerformanceGauge
+            label="Cache Hit Rate"
+            value={metrics.cacheHitRate}
+            max={100}
+            unit="%"
+            thresholds={{ good: 90, warning: 80 }}
+            inverted
+          />
+          <PerformanceGauge
+            label="Error Rate"
+            value={metrics.errorRate}
+            max={10}
+            unit="%"
+            thresholds={{ good: 0.5, warning: 2 }}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function SessionHealthClient({ initialMetrics }: Props) {
   const [metrics, setMetrics] = useState(initialMetrics);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    const interval = setInterval(async () => {
+    const fetchMetrics = async () => {
       setRefreshing(true);
-      try {
-        // In production, fetch from API
-        // const response = await fetch('/api/admin/sessions/health');
-        // const data = await response.json();
-        // setMetrics(data);
-        
-        // Simulate minor fluctuations
-        setMetrics(prev => ({
-          ...prev,
-          recentActivity: prev.recentActivity + Math.floor(Math.random() * 10) - 5,
-          activeSessions: prev.activeSessions + Math.floor(Math.random() * 6) - 3,
-        }));
-      } catch (error) {
-        clientLog.error('Session Health: Failed to refresh metrics', { error });
-      } finally {
-        setRefreshing(false);
-      }
-    }, 10000);
+      
+      // Track this as a performance span in Sentry
+      return await Sentry.startSpan(
+        {
+          op: 'http.client',
+          name: 'Fetch Session Health Metrics',
+        },
+        async (span) => {
+          try {
+            const response = await fetch('/api/admin/sessions/health');
+            
+            if (!response.ok) {
+              throw new Error(`Failed to fetch health metrics: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            setMetrics(data);
+            
+            // Add custom attributes to the span
+            span.setAttribute('activeSessions', data.activeSessions);
+            span.setAttribute('cacheHitRate', data.cacheHitRate);
+            span.setAttribute('errorRate', data.errorRate);
+            
+            // Add breadcrumb for successful refresh
+            addSentryBreadcrumb('Session health metrics refreshed', {
+              activeSessions: data.activeSessions,
+              cacheHitRate: data.cacheHitRate,
+              errorRate: data.errorRate,
+            });
+            
+            clientLog.info('Session Health: Metrics refreshed', {
+              activeSessions: data.activeSessions,
+              cacheHitRate: data.cacheHitRate,
+            });
+          } catch (error) {
+            // Capture exception in Sentry with context
+            captureSentryException(error, {
+              component: 'SessionHealthClient',
+              action: 'fetchMetrics',
+              timestamp: new Date().toISOString(),
+            });
+            
+            clientLog.error('Session Health: Failed to refresh metrics', { error });
+          } finally {
+            setRefreshing(false);
+          }
+        }
+      );
+    };
 
+    const interval = setInterval(fetchMetrics, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -217,88 +322,23 @@ export function SessionHealthClient({ initialMetrics }: Props) {
   return (
     <div className="space-y-6">
       <HealthStatusCard health={health} refreshing={refreshing} />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          icon={Activity}
-          label="Active Sessions"
-          value={metrics.activeSessions}
-          subtitle={`${metrics.totalSessions} total`}
-          trend={12}
-          color="blue"
-        />
-        <MetricCard
-          icon={TrendingUp}
-          label="Recent Activity"
-          value={metrics.recentActivity}
-          subtitle="Last hour"
-          color="purple"
-        />
-        <MetricCard
-          icon={Clock}
-          label="Avg Duration"
-          value={`${metrics.avgSessionDuration}m`}
-          subtitle="Per session"
-          color="green"
-        />
-        <MetricCard
-          icon={Zap}
-          label="Cache Hit Rate"
-          value={`${metrics.cacheHitRate}%`}
-          subtitle={metrics.cacheHitRate >= 90 ? 'Excellent' : 'Good'}
-          color="cyan"
-        />
-      </div>
-
+      <KeyMetricsCards metrics={metrics} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SessionStatistics metrics={metrics} />
         <ActivityMetrics metrics={metrics} />
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">System Performance</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <PerformanceGauge
-              label="Database Query Time"
-              value={metrics.avgDatabaseQueryTime}
-              max={100}
-              unit="ms"
-              thresholds={{ good: 30, warning: 60 }}
-            />
-            <PerformanceGauge
-              label="Cache Hit Rate"
-              value={metrics.cacheHitRate}
-              max={100}
-              unit="%"
-              thresholds={{ good: 90, warning: 80 }}
-              inverted
-            />
-            <PerformanceGauge
-              label="Error Rate"
-              value={metrics.errorRate}
-              max={10}
-              unit="%"
-              thresholds={{ good: 0.5, warning: 2 }}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
+      <SystemPerformanceCard metrics={metrics} />
       <SessionLifecycleFlow metrics={metrics} />
       <HealthRecommendations metrics={metrics} />
     </div>
   );
 }
 
-function MetricCard({ icon: Icon, label, value, subtitle, trend, color }: {
+function MetricCard({ icon: Icon, label, value, subtitle, color }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string | number;
   subtitle?: string;
-  trend?: number;
   color: string;
 }) {
   const colorClasses: Record<string, string> = {
@@ -326,11 +366,6 @@ function MetricCard({ icon: Icon, label, value, subtitle, trend, color }: {
             {subtitle && (
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 {subtitle}
-              </div>
-            )}
-            {trend !== undefined && (
-              <div className="text-xs text-green-600 dark:text-green-400 font-semibold mt-1">
-                +{trend}%
               </div>
             )}
           </div>
