@@ -71,7 +71,7 @@ export const GET = createApiHandler(
 
       // Verify webhook exists
       const webhook = await prisma.webhook.findUnique({
-        where: { id },
+        where: { id: id! },
         select: { id: true, name: true },
       });
 
@@ -89,7 +89,7 @@ export const GET = createApiHandler(
       });
 
       // Get health statistics from utility function
-      const stats = await getWebhookHealthStats(id);
+      const stats = await getWebhookHealthStats(id!);
 
       const duration = Date.now() - startTime;
 
@@ -106,7 +106,7 @@ export const GET = createApiHandler(
         userId,
         webhookId: id,
         duration,
-        isHealthy: stats.isHealthy,
+        healthStatus: stats.healthStatus,
         successRate: stats.successRate,
       });
 
