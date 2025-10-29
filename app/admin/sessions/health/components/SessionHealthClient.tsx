@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/common';
-import { Activity, TrendingUp, TrendingDown, Clock, Database, Zap, AlertCircle, CheckCircle } from 'lucide-react';
+import { Activity, TrendingUp, TrendingDown, Clock, Zap, AlertCircle, CheckCircle } from 'lucide-react';
+import { clientLog } from '@/lib/client-logger';
 
 interface HealthMetrics {
   totalSessions: number;
@@ -22,6 +23,164 @@ interface HealthMetrics {
 
 interface Props {
   initialMetrics: HealthMetrics;
+}
+
+function getHealthStatus(metrics: HealthMetrics) {
+  if (metrics.errorRate > 5) return { status: 'critical', color: 'red', label: 'Critical' };
+  if (metrics.errorRate > 1) return { status: 'warning', color: 'orange', label: 'Warning' };
+  if (metrics.cacheHitRate < 80) return { status: 'degraded', color: 'yellow', label: 'Degraded' };
+  return { status: 'healthy', color: 'green', label: 'Healthy' };
+}
+
+function HealthStatusCard({ health, refreshing }: { health: ReturnType<typeof getHealthStatus>; refreshing: boolean }) {
+  return (
+    <Card className={`border-2 border-${health.color}-500`}>
+      <CardContent className="pt-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {health.status === 'healthy' ? (
+              <CheckCircle className="w-12 h-12 text-green-500" />
+            ) : (
+              <AlertCircle className="w-12 h-12 text-orange-500" />
+            )}
+            <div>
+              <div className="text-3xl font-bold text-slate-900 dark:text-white">System {health.label}</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                All session services operating normally
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className={`w-3 h-3 rounded-full bg-${health.color}-500 ${refreshing ? '' : 'animate-pulse'}`} />
+            <span className="text-xs text-slate-600 dark:text-slate-400">Live</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SessionStatistics({ metrics }: { metrics: HealthMetrics }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Session Statistics</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <StatRow label="Total Sessions (All-time)" value={metrics.totalSessions.toLocaleString()} />
+          <StatRow
+            label="Active Sessions"
+            value={metrics.activeSessions.toLocaleString()}
+            percentage={(metrics.activeSessions / metrics.totalSessions) * 100}
+          />
+          <StatRow
+            label="Expired Sessions"
+            value={metrics.expiredSessions.toLocaleString()}
+            percentage={(metrics.expiredSessions / metrics.totalSessions) * 100}
+          />
+          <StatRow label="Average Active Sessions" value={metrics.avgActiveSessions.toLocaleString()} />
+          <StatRow label="Peak Concurrent Sessions" value={metrics.peakConcurrentSessions.toLocaleString()} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ActivityMetrics({ metrics }: { metrics: HealthMetrics }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Activity Metrics</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <StatRow label="Activity (Last Hour)" value={metrics.recentActivity.toLocaleString()} />
+          <StatRow label="Activity (Last 24h)" value={metrics.activityLast24h.toLocaleString()} />
+          <StatRow label="Session Creation Rate" value={`${metrics.sessionCreationRate}/min`} />
+          <StatRow label="Session Termination Rate" value={`${metrics.sessionTerminationRate}/min`} />
+          <StatRow
+            label="Net Growth Rate"
+            value={`${(metrics.sessionCreationRate - metrics.sessionTerminationRate).toFixed(1)}/min`}
+            trend={metrics.sessionCreationRate > metrics.sessionTerminationRate ? 'up' : 'down'}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SessionLifecycleFlow({ metrics }: { metrics: HealthMetrics }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Session Lifecycle Flow</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+          <div className="text-center flex-1">
+            <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+              {metrics.sessionCreationRate}/min
+            </div>
+            <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">Created</div>
+            <TrendingUp className="w-6 h-6 mx-auto mt-2 text-green-600 dark:text-green-400" />
+          </div>
+          <div className="text-slate-400 text-4xl">→</div>
+          <div className="text-center flex-1">
+            <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{metrics.activeSessions}</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">Active Pool</div>
+            <Activity className="w-6 h-6 mx-auto mt-2 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div className="text-slate-400 text-4xl">→</div>
+          <div className="text-center flex-1">
+            <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">
+              {metrics.sessionTerminationRate}/min
+            </div>
+            <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">Terminated</div>
+            <TrendingDown className="w-6 h-6 mx-auto mt-2 text-orange-600 dark:text-orange-400" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function HealthRecommendations({ metrics }: { metrics: HealthMetrics }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Health Recommendations</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {metrics.cacheHitRate < 90 && (
+            <Recommendation
+              type="warning"
+              message="Cache hit rate is below optimal. Consider increasing cache size or TTL."
+            />
+          )}
+          {metrics.avgDatabaseQueryTime > 50 && (
+            <Recommendation
+              type="warning"
+              message="Database query time is high. Consider adding indexes or optimizing queries."
+            />
+          )}
+          {metrics.errorRate > 1 && (
+            <Recommendation type="error" message="Error rate is elevated. Check logs for recurring issues." />
+          )}
+          {metrics.peakConcurrentSessions > metrics.avgActiveSessions * 1.5 && (
+            <Recommendation
+              type="info"
+              message="Peak sessions significantly exceed average. Consider horizontal scaling during peak hours."
+            />
+          )}
+          {metrics.cacheHitRate >= 90 && metrics.avgDatabaseQueryTime <= 30 && metrics.errorRate <= 0.5 && (
+            <Recommendation type="success" message="All systems performing optimally. No action required." />
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export function SessionHealthClient({ initialMetrics }: Props) {
@@ -44,57 +203,21 @@ export function SessionHealthClient({ initialMetrics }: Props) {
           activeSessions: prev.activeSessions + Math.floor(Math.random() * 6) - 3,
         }));
       } catch (error) {
-        console.error('Failed to refresh metrics:', error);
+        clientLog.error('Session Health: Failed to refresh metrics', { error });
       } finally {
         setRefreshing(false);
       }
-    }, 10000); // Refresh every 10 seconds
+    }, 10000);
 
     return () => clearInterval(interval);
   }, []);
 
-  const getHealthStatus = () => {
-    if (metrics.errorRate > 5) return { status: 'critical', color: 'red', label: 'Critical' };
-    if (metrics.errorRate > 1) return { status: 'warning', color: 'orange', label: 'Warning' };
-    if (metrics.cacheHitRate < 80) return { status: 'degraded', color: 'yellow', label: 'Degraded' };
-    return { status: 'healthy', color: 'green', label: 'Healthy' };
-  };
-
-  const health = getHealthStatus();
+  const health = getHealthStatus(metrics);
 
   return (
     <div className="space-y-6">
-      {/* Overall Health Status */}
-      <Card className={`border-2 border-${health.color}-500`}>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {health.status === 'healthy' ? (
-                <CheckCircle className="w-12 h-12 text-green-500" />
-              ) : (
-                <AlertCircle className="w-12 h-12 text-orange-500" />
-              )}
-              <div>
-                <div className="text-3xl font-bold text-slate-900 dark:text-white">
-                  System {health.label}
-                </div>
-                <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                  All session services operating normally
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full bg-${health.color}-500 ${refreshing ? '' : 'animate-pulse'}`} />
-              <span className="text-xs text-slate-600 dark:text-slate-400">
-                Live
-              </span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <HealthStatusCard health={health} refreshing={refreshing} />
 
-      {/* Key Performance Indicators */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           icon={Activity}
@@ -127,73 +250,11 @@ export function SessionHealthClient({ initialMetrics }: Props) {
         />
       </div>
 
-      {/* Performance Metrics */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Session Statistics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <StatRow
-                label="Total Sessions (All-time)"
-                value={metrics.totalSessions.toLocaleString()}
-              />
-              <StatRow
-                label="Active Sessions"
-                value={metrics.activeSessions.toLocaleString()}
-                percentage={(metrics.activeSessions / metrics.totalSessions) * 100}
-              />
-              <StatRow
-                label="Expired Sessions"
-                value={metrics.expiredSessions.toLocaleString()}
-                percentage={(metrics.expiredSessions / metrics.totalSessions) * 100}
-              />
-              <StatRow
-                label="Average Active Sessions"
-                value={metrics.avgActiveSessions.toLocaleString()}
-              />
-              <StatRow
-                label="Peak Concurrent Sessions"
-                value={metrics.peakConcurrentSessions.toLocaleString()}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Activity Metrics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <StatRow
-                label="Activity (Last Hour)"
-                value={metrics.recentActivity.toLocaleString()}
-              />
-              <StatRow
-                label="Activity (Last 24h)"
-                value={metrics.activityLast24h.toLocaleString()}
-              />
-              <StatRow
-                label="Session Creation Rate"
-                value={`${metrics.sessionCreationRate}/min`}
-              />
-              <StatRow
-                label="Session Termination Rate"
-                value={`${metrics.sessionTerminationRate}/min`}
-              />
-              <StatRow
-                label="Net Growth Rate"
-                value={`${(metrics.sessionCreationRate - metrics.sessionTerminationRate).toFixed(1)}/min`}
-                trend={metrics.sessionCreationRate > metrics.sessionTerminationRate ? 'up' : 'down'}
-              />
-            </div>
-          </CardContent>
-        </Card>
+        <SessionStatistics metrics={metrics} />
+        <ActivityMetrics metrics={metrics} />
       </div>
 
-      {/* System Performance */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">System Performance</CardTitle>
@@ -226,96 +287,14 @@ export function SessionHealthClient({ initialMetrics }: Props) {
         </CardContent>
       </Card>
 
-      {/* Session Lifecycle */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Session Lifecycle Flow</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-            <div className="text-center flex-1">
-              <div className="text-3xl font-bold text-green-600 dark:text-green-400">
-                {metrics.sessionCreationRate}/min
-              </div>
-              <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                Created
-              </div>
-              <TrendingUp className="w-6 h-6 mx-auto mt-2 text-green-600 dark:text-green-400" />
-            </div>
-
-            <div className="text-slate-400 text-4xl">→</div>
-
-            <div className="text-center flex-1">
-              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                {metrics.activeSessions}
-              </div>
-              <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                Active Pool
-              </div>
-              <Activity className="w-6 h-6 mx-auto mt-2 text-blue-600 dark:text-blue-400" />
-            </div>
-
-            <div className="text-slate-400 text-4xl">→</div>
-
-            <div className="text-center flex-1">
-              <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">
-                {metrics.sessionTerminationRate}/min
-              </div>
-              <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                Terminated
-              </div>
-              <TrendingDown className="w-6 h-6 mx-auto mt-2 text-orange-600 dark:text-orange-400" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Recommendations */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Health Recommendations</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {metrics.cacheHitRate < 90 && (
-              <Recommendation
-                type="warning"
-                message="Cache hit rate is below optimal. Consider increasing cache size or TTL."
-              />
-            )}
-            {metrics.avgDatabaseQueryTime > 50 && (
-              <Recommendation
-                type="warning"
-                message="Database query time is high. Consider adding indexes or optimizing queries."
-              />
-            )}
-            {metrics.errorRate > 1 && (
-              <Recommendation
-                type="error"
-                message="Error rate is elevated. Check logs for recurring issues."
-              />
-            )}
-            {metrics.peakConcurrentSessions > metrics.avgActiveSessions * 1.5 && (
-              <Recommendation
-                type="info"
-                message="Peak sessions significantly exceed average. Consider horizontal scaling during peak hours."
-              />
-            )}
-            {metrics.cacheHitRate >= 90 && metrics.avgDatabaseQueryTime <= 30 && metrics.errorRate <= 0.5 && (
-              <Recommendation
-                type="success"
-                message="All systems performing optimally. No action required."
-              />
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <SessionLifecycleFlow metrics={metrics} />
+      <HealthRecommendations metrics={metrics} />
     </div>
   );
 }
 
 function MetricCard({ icon: Icon, label, value, subtitle, trend, color }: {
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string | number;
   subtitle?: string;
@@ -333,6 +312,7 @@ function MetricCard({ icon: Icon, label, value, subtitle, trend, color }: {
     <Card>
       <CardContent className="pt-6">
         <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line security/detect-object-injection */}
           <div className={`p-3 rounded-lg ${colorClasses[color]}`}>
             <Icon className="w-6 h-6" />
           </div>
@@ -422,6 +402,7 @@ function PerformanceGauge({ label, value, max, unit, thresholds, inverted }: {
       </div>
       <div className="w-full h-3 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
         <div
+          // eslint-disable-next-line security/detect-object-injection
           className={`h-full ${colorClasses[color]} transition-all duration-500`}
           style={{ width: `${percentage}%` }}
         />
@@ -444,6 +425,7 @@ function Recommendation({ type, message }: {
     error: { icon: AlertCircle, color: 'red', bg: 'bg-red-50 dark:bg-red-900/20', border: 'border-red-200 dark:border-red-800' },
   };
 
+  // eslint-disable-next-line security/detect-object-injection
   const { icon: Icon, color, bg, border } = config[type];
 
   return (
