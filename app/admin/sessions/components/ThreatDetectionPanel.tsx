@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/common';
-import { AlertTriangle, Shield, Lock, Zap, CheckCircle } from 'lucide-react';
+import { Shield, Lock, Zap, CheckCircle } from 'lucide-react';
+import { clientLog } from '@/lib/client-logger';
 
 interface Threat {
   id: string;
@@ -12,6 +13,89 @@ interface Threat {
   affectedUsers: number;
   detectedAt: Date;
   status: 'active' | 'investigating' | 'resolved';
+}
+
+function getSeverityColor(severity: Threat['severity']) {
+  switch (severity) {
+    case 'critical': return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-500';
+    case 'high': return 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-500';
+    case 'medium': return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-500';
+    case 'low': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-500';
+  }
+}
+
+function getSeverityIcon(severity: Threat['severity']) {
+  switch (severity) {
+    case 'critical': return '🔴';
+    case 'high': return '🟠';
+    case 'medium': return '🟡';
+    case 'low': return '🔵';
+  }
+}
+
+function formatTimeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+function ThreatCard({ 
+  threat, 
+  onAction 
+}: { 
+  threat: Threat; 
+  onAction: (_threatId: string, _action: 'block' | 'investigate' | 'resolve') => void; // eslint-disable-line no-unused-vars
+}) {
+  return (
+    <div className={`p-4 rounded-lg border-2 ${getSeverityColor(threat.severity)}`}>
+      <div className="flex items-start gap-3">
+        <div className="text-2xl">{getSeverityIcon(threat.severity)}</div>
+        
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <div className="font-semibold text-sm">{threat.type}</div>
+              <div className="text-sm mt-1">{threat.description}</div>
+              <div className="flex items-center gap-3 mt-2 text-xs">
+                <span>{threat.affectedUsers} user{threat.affectedUsers !== 1 ? 's' : ''} affected</span>
+                <span>•</span>
+                <span>{formatTimeAgo(threat.detectedAt)}</span>
+                {threat.status === 'investigating' && (
+                  <>
+                    <span>•</span>
+                    <span className="font-semibold">🔍 Investigating</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 mt-3">
+            {threat.status === 'active' && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => onAction(threat.id, 'investigate')}>
+                  <Shield className="w-3 h-3 mr-1" />
+                  Investigate
+                </Button>
+                {threat.severity === 'critical' && (
+                  <Button size="sm" variant="danger" onClick={() => onAction(threat.id, 'block')}>
+                    <Lock className="w-3 h-3 mr-1" />
+                    Block Now
+                  </Button>
+                )}
+              </>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => onAction(threat.id, 'resolve')}>
+              <CheckCircle className="w-3 h-3 mr-1" />
+              Resolve
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function ThreatDetectionPanel() {
@@ -45,26 +129,10 @@ export function ThreatDetectionPanel() {
     }
   ]);
 
-  const getSeverityColor = (severity: Threat['severity']) => {
-    switch (severity) {
-      case 'critical': return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-500';
-      case 'high': return 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-500';
-      case 'medium': return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-500';
-      case 'low': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-500';
-    }
-  };
-
-  const getSeverityIcon = (severity: Threat['severity']) => {
-    switch (severity) {
-      case 'critical': return '🔴';
-      case 'high': return '🟠';
-      case 'medium': return '🟡';
-      case 'low': return '🔵';
-    }
-  };
-
   const handleQuickAction = async (threatId: string, action: 'block' | 'investigate' | 'resolve') => {
-    console.log(`${action} threat ${threatId}`);
+    clientLog.info(`Threat ${action}`, { threatId, action });
+    // In production, this would call an API endpoint
+    // await fetch('/api/admin/sessions/threats', { method: 'POST', body: JSON.stringify({ threatId, action }) });
     
     if (action === 'resolve') {
       setThreats(prev => prev.map(t => 
@@ -104,83 +172,13 @@ export function ThreatDetectionPanel() {
       <CardContent>
         <div className="space-y-3">
           {threats.filter(t => t.status !== 'resolved').map(threat => (
-            <div
-              key={threat.id}
-              className={`p-4 rounded-lg border-2 ${getSeverityColor(threat.severity)}`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="text-2xl">{getSeverityIcon(threat.severity)}</div>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="font-semibold text-sm">
-                        {threat.type}
-                      </div>
-                      <div className="text-sm mt-1">
-                        {threat.description}
-                      </div>
-                      <div className="flex items-center gap-3 mt-2 text-xs">
-                        <span>{threat.affectedUsers} user{threat.affectedUsers !== 1 ? 's' : ''} affected</span>
-                        <span>•</span>
-                        <span>{formatTimeAgo(threat.detectedAt)}</span>
-                        {threat.status === 'investigating' && (
-                          <>
-                            <span>•</span>
-                            <span className="font-semibold">🔍 Investigating</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Quick Actions */}
-                  <div className="flex items-center gap-2 mt-3">
-                    {threat.status === 'active' && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleQuickAction(threat.id, 'investigate')}
-                        >
-                          <Shield className="w-3 h-3 mr-1" />
-                          Investigate
-                        </Button>
-                        {threat.severity === 'critical' && (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleQuickAction(threat.id, 'block')}
-                          >
-                            <Lock className="w-3 h-3 mr-1" />
-                            Block Now
-                          </Button>
-                        )}
-                      </>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleQuickAction(threat.id, 'resolve')}
-                    >
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Resolve
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <ThreatCard key={threat.id} threat={threat} onAction={handleQuickAction} />
           ))}
-
           {threats.filter(t => t.status !== 'resolved').length === 0 && (
             <div className="text-center py-8">
               <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-2" />
-              <div className="font-semibold text-slate-900 dark:text-white">
-                All Clear
-              </div>
-              <div className="text-sm text-slate-600 dark:text-slate-400">
-                No active threats detected
-              </div>
+              <div className="font-semibold text-slate-900 dark:text-white">All Clear</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">No active threats detected</div>
             </div>
           )}
         </div>
@@ -188,13 +186,3 @@ export function ThreatDetectionPanel() {
     </Card>
   );
 }
-
-function formatTimeAgo(date: Date): string {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  
-  if (seconds < 60) return `${seconds}s ago`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
-}
-
