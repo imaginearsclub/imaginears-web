@@ -2,8 +2,125 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
 import { API_SCOPES } from "@/lib/api-keys";
+import { rateLimit } from "@/lib/rate-limiter";
+import { log } from "@/lib/logger";
+import { logAudit } from "@/lib/audit-logger";
+import { headers as nextHeaders } from "next/headers";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+interface ApiKeyUpdate {
+  name?: string;
+  description?: string | null;
+  scopes?: string[];
+  isActive?: boolean;
+  rateLimit?: number;
+  expiresAt?: Date | null;
+}
+
+type ValidationResult = { valid: true; updates: ApiKeyUpdate } | { valid: false; error: string };
+
+/**
+ * Validate name field
+ */
+function validateName(name: unknown): string | null {
+  if (typeof name !== "string" || name.trim().length === 0) return null;
+  return name.trim();
+}
+
+/**
+ * Validate scopes field
+ */
+function validateScopes(scopes: unknown): string[] | null {
+  if (!Array.isArray(scopes) || scopes.length === 0) return null;
+  
+  const validScopes = Object.keys(API_SCOPES);
+  const invalidScopes = scopes.filter((s) => !validScopes.includes(s as string));
+  if (invalidScopes.length > 0) return null;
+  
+  return scopes;
+}
+
+/**
+ * Validate rate limit field
+ */
+function validateRateLimit(value: unknown): number | null {
+  const parsed = parseInt(value as string);
+  if (isNaN(parsed) || parsed < 1 || parsed > 10000) return null;
+  return parsed;
+}
+
+/**
+ * Apply validated field to updates object (type-safe)
+ */
+function applyField(
+  updates: ApiKeyUpdate,
+  field: "name" | "scopes" | "rateLimit",
+  value: string | string[] | number | null,
+  body: Record<string, unknown>,
+  errorMsg: string
+): string | null {
+  // Safe: field is constrained to literal types, not user input
+  /* eslint-disable-next-line security/detect-object-injection */
+  const fieldValue = body[field];
+  if (fieldValue === undefined) return null;
+  if (value === null) return errorMsg;
+  
+  // Type-safe assignment with explicit checks
+  switch (field) {
+    case "name":
+      if (typeof value === "string") updates.name = value;
+      break;
+    case "scopes":
+      if (Array.isArray(value)) updates.scopes = value;
+      break;
+    case "rateLimit":
+      if (typeof value === "number") updates.rateLimit = value;
+      break;
+  }
+  
+  return null;
+}
+
+/**
+ * Validate and build update object from request body
+ */
+function validateUpdates(body: Record<string, unknown>): ValidationResult {
+  const updates: ApiKeyUpdate = {};
+
+  // Validate each field
+  const nameError = applyField(updates, "name", validateName(body["name"]), body, "Name must be a non-empty string");
+  if (nameError) return { valid: false, error: nameError };
+
+  const scopesError = applyField(updates, "scopes", validateScopes(body["scopes"]), body, "Scopes must be a valid non-empty array");
+  if (scopesError) return { valid: false, error: scopesError };
+
+  const rateLimitError = applyField(updates, "rateLimit", validateRateLimit(body["rateLimit"]), body, "Rate limit must be between 1 and 10000");
+  if (rateLimitError) return { valid: false, error: rateLimitError };
+
+  // Simple fields
+  if (body["description"] !== undefined) {
+    updates.description = (body["description"] as string)?.trim() || null;
+  }
+
+  if (body["isActive"] !== undefined) {
+    if (typeof body["isActive"] !== "boolean") {
+      return { valid: false, error: "isActive must be a boolean" };
+    }
+    updates.isActive = body["isActive"];
+  }
+
+  if (body["expiresAt"] !== undefined) {
+    updates.expiresAt = body["expiresAt"] ? new Date(body["expiresAt"] as string) : null;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return { valid: false, error: "No valid fields to update" };
+  }
+
+  return { valid: true, updates };
+}
 
 /**
  * PATCH /api/admin/api-keys/[id]
@@ -15,70 +132,50 @@ export async function PATCH(
 ) {
   try {
     const session = await requireAdmin();
-    
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limiting
+    const h = await nextHeaders();
+    const forwardedFor = h.get("x-forwarded-for");
+    const clientIP = (forwardedFor ? forwardedFor.split(",")[0]?.trim() : null) || 
+                    h.get("x-real-ip") || 
+                    `user:${session.user.id}`;
+
+    const rateLimitResult = await rateLimit(clientIP, {
+      key: "admin:api-keys:update",
+      limit: 30,
+      window: 60,
+      strategy: "sliding-window",
+    });
+
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { 
+          status: 429,
+          headers: {
+            "Retry-After": rateLimitResult.resetAfter.toString(),
+            "X-RateLimit-Limit": rateLimitResult.limit.toString(),
+            "X-RateLimit-Remaining": "0",
+          },
+        }
+      );
     }
 
     const { id } = await params;
     const body = await req.json();
 
-    // Build update object
-    const updates: any = {};
-
-    if (body.name !== undefined) {
-      if (typeof body.name !== "string" || body.name.trim().length === 0) {
-        return NextResponse.json({ error: "Name must be a non-empty string" }, { status: 400 });
-      }
-      updates.name = body.name.trim();
-    }
-
-    if (body.description !== undefined) {
-      updates.description = body.description?.trim() || null;
-    }
-
-    if (body.scopes !== undefined) {
-      if (!Array.isArray(body.scopes) || body.scopes.length === 0) {
-        return NextResponse.json({ error: "Scopes must be a non-empty array" }, { status: 400 });
-      }
-      
-      const validScopes = Object.keys(API_SCOPES);
-      const invalidScopes = body.scopes.filter((s: string) => !validScopes.includes(s));
-      if (invalidScopes.length > 0) {
-        return NextResponse.json({ 
-          error: `Invalid scopes: ${invalidScopes.join(", ")}` 
-        }, { status: 400 });
-      }
-      
-      updates.scopes = body.scopes;
-    }
-
-    if (body.isActive !== undefined) {
-      if (typeof body.isActive !== "boolean") {
-        return NextResponse.json({ error: "isActive must be a boolean" }, { status: 400 });
-      }
-      updates.isActive = body.isActive;
-    }
-
-    if (body.rateLimit !== undefined) {
-      const parsedRateLimit = parseInt(body.rateLimit);
-      if (isNaN(parsedRateLimit) || parsedRateLimit < 1 || parsedRateLimit > 10000) {
-        return NextResponse.json({ error: "Rate limit must be between 1 and 10000" }, { status: 400 });
-      }
-      updates.rateLimit = parsedRateLimit;
-    }
-
-    if (body.expiresAt !== undefined) {
-      updates.expiresAt = body.expiresAt ? new Date(body.expiresAt) : null;
-    }
-
-    if (Object.keys(updates).length === 0) {
-      return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+    // Validate updates
+    const validation = validateUpdates(body);
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     const apiKey = await prisma.apiKey.update({
       where: { id },
-      data: updates,
+      data: validation.updates,
       select: {
         id: true,
         name: true,
@@ -95,13 +192,29 @@ export async function PATCH(
       },
     });
 
-    console.log(`[AUDIT] API key ${id} updated by admin ${session.user.id} - Fields: ${Object.keys(updates).join(", ")}`);
+    // Security: Audit log
+    logAudit({
+      timestamp: new Date().toISOString(),
+      action: "api_key.updated",
+      actor: { id: session.user.id, email: session.user.email },
+      target: { id, type: "api_key", name: apiKey.name },
+      details: { fields: Object.keys(validation.updates), keyPrefix: apiKey.keyPrefix },
+      ipAddress: clientIP,
+      userAgent: h.get("user-agent") || "Unknown",
+      success: true,
+    });
 
-    return NextResponse.json({ apiKey });
-  } catch (error: any) {
-    console.error("[API Keys PATCH] Error:", error);
+    return NextResponse.json({ apiKey }, {
+      headers: {
+        "X-RateLimit-Limit": rateLimitResult.limit.toString(),
+        "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
+      },
+    });
+  } catch (error) {
+    const err = error as { code?: string; message?: string };
+    log.error("API key update failed", { error: err, apiKeyId: (await params).id });
     
-    if (error.code === "P2025") {
+    if (err.code === "P2025") {
       return NextResponse.json({ error: "API key not found" }, { status: 404 });
     }
     
@@ -119,9 +232,36 @@ export async function DELETE(
 ) {
   try {
     const session = await requireAdmin();
-    
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limiting
+    const h = await nextHeaders();
+    const forwardedFor = h.get("x-forwarded-for");
+    const clientIP = (forwardedFor ? forwardedFor.split(",")[0]?.trim() : null) || 
+                    h.get("x-real-ip") || 
+                    `user:${session.user.id}`;
+
+    const rateLimitResult = await rateLimit(clientIP, {
+      key: "admin:api-keys:delete",
+      limit: 10,
+      window: 60,
+      strategy: "sliding-window",
+    });
+
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { 
+          status: 429,
+          headers: {
+            "Retry-After": rateLimitResult.resetAfter.toString(),
+            "X-RateLimit-Limit": rateLimitResult.limit.toString(),
+            "X-RateLimit-Remaining": "0",
+          },
+        }
+      );
     }
 
     const { id } = await params;
@@ -136,17 +276,31 @@ export async function DELETE(
       return NextResponse.json({ error: "API key not found" }, { status: 404 });
     }
 
-    await prisma.apiKey.delete({
-      where: { id },
+    await prisma.apiKey.delete({ where: { id } });
+
+    // Security: Audit log
+    logAudit({
+      timestamp: new Date().toISOString(),
+      action: "api_key.deleted",
+      actor: { id: session.user.id, email: session.user.email },
+      target: { id, type: "api_key", name: apiKey.name },
+      details: { keyPrefix: apiKey.keyPrefix },
+      ipAddress: clientIP,
+      userAgent: h.get("user-agent") || "Unknown",
+      success: true,
     });
 
-    console.log(`[AUDIT] API key ${id} (${apiKey.name} - ${apiKey.keyPrefix}) deleted by admin ${session.user.id}`);
-
-    return NextResponse.json({ message: "API key deleted successfully" });
-  } catch (error: any) {
-    console.error("[API Keys DELETE] Error:", error);
+    return NextResponse.json({ message: "API key deleted successfully" }, {
+      headers: {
+        "X-RateLimit-Limit": rateLimitResult.limit.toString(),
+        "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
+      },
+    });
+  } catch (error) {
+    const err = error as { code?: string; message?: string };
+    log.error("API key deletion failed", { error: err, apiKeyId: (await params).id });
     
-    if (error.code === "P2025") {
+    if (err.code === "P2025") {
       return NextResponse.json({ error: "API key not found" }, { status: 404 });
     }
     
