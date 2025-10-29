@@ -9,98 +9,12 @@ import { Checkbox } from "@/components/common/Checkbox";
 import { type Permission } from "@/lib/rbac";
 
 interface CreateRoleFormProps {
-  action: (formData: FormData) => Promise<{ success: boolean; message: string }>;
+  action: (_formData: FormData) => Promise<{ success: boolean; message: string }>; // eslint-disable-line no-unused-vars
 }
 
-const PERMISSION_CATEGORIES = {
-  Events: ["events:read", "events:write", "events:delete", "events:publish"],
-  Applications: ["applications:read", "applications:write", "applications:delete", "applications:approve"],
-  Players: ["players:read", "players:write", "players:ban"],
-  Users: ["users:read", "users:write", "users:delete", "users:manage_roles"],
-  "Bulk Operations": [
-    "users:bulk_operations",
-    "users:bulk_suspend",
-    "users:bulk_activate",
-    "users:bulk_change_roles",
-    "users:bulk_reset_passwords",
-    "users:bulk_send_email",
-  ],
-  "Session Management": [
-    "sessions:view_own",
-    "sessions:view_all",
-    "sessions:view_analytics",
-    "sessions:revoke_own",
-    "sessions:revoke_any",
-    "sessions:configure_policies",
-    "sessions:view_health",
-  ],
-  Settings: ["settings:read", "settings:write", "settings:security"],
-  Dashboard: ["dashboard:view", "dashboard:stats"],
-  System: ["system:maintenance", "system:logs"],
-};
-
-export function CreateRoleForm({ action }: CreateRoleFormProps) {
-  const [isPending, startTransition] = useTransition();
-  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [selectedPermissions, setSelectedPermissions] = useState<Set<Permission>>(new Set());
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setResult(null);
-
-    const formData = new FormData(e.currentTarget);
-    formData.set("permissions", JSON.stringify(Array.from(selectedPermissions)));
-
-    startTransition(async () => {
-      try {
-        const res = await action(formData);
-        setResult(res);
-        
-        if (res.success) {
-          // Reset form
-          e.currentTarget.reset();
-          setSelectedPermissions(new Set());
-        }
-      } catch (error: any) {
-        setResult({
-          success: false,
-          message: error.message || "Failed to create role",
-        });
-      }
-    });
-  };
-
-  const togglePermission = (permission: Permission) => {
-    const newSet = new Set(selectedPermissions);
-    if (newSet.has(permission)) {
-      newSet.delete(permission);
-    } else {
-      newSet.add(permission);
-    }
-    setSelectedPermissions(newSet);
-  };
-
-  const toggleCategory = (category: Permission[]) => {
-    const allSelected = category.every(p => selectedPermissions.has(p));
-    const newSet = new Set(selectedPermissions);
-    
-    if (allSelected) {
-      category.forEach(p => newSet.delete(p));
-    } else {
-      category.forEach(p => newSet.add(p));
-    }
-    
-    setSelectedPermissions(newSet);
-  };
-
+function RoleBasicFields({ isPending }: { isPending: boolean }) {
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {result && (
-        <Alert variant={result.success ? "success" : "error"}>
-          {result.message}
-        </Alert>
-      )}
-
+    <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="name" className="block text-sm font-medium mb-2">
@@ -154,54 +68,169 @@ export function CreateRoleForm({ action }: CreateRoleFormProps) {
           disabled={isPending}
         />
       </div>
+    </>
+  );
+}
+
+type PermissionToggleHandler = (permission: Permission) => void; // eslint-disable-line no-unused-vars
+
+function PermissionCategory({
+  category,
+  permissions,
+  selectedPermissions,
+  isPending,
+  onToggleCategory,
+  onTogglePermission,
+}: {
+  category: string;
+  permissions: Permission[];
+  selectedPermissions: Set<Permission>;
+  isPending: boolean;
+  onToggleCategory: () => void;
+  onTogglePermission: PermissionToggleHandler;
+}) {
+  const allSelected = permissions.every(p => selectedPermissions.has(p));
+  const someSelected = permissions.some(p => selectedPermissions.has(p));
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 mb-2">
+        <Checkbox
+          id={`category-${category}`}
+          checked={allSelected ? true : (someSelected && !allSelected) ? "indeterminate" : false}
+          onCheckedChange={onToggleCategory}
+          disabled={isPending}
+        />
+        <label htmlFor={`category-${category}`} className="font-semibold text-sm cursor-pointer">
+          {category}
+        </label>
+      </div>
+      <div className="ml-6 space-y-1.5">
+        {permissions.map((permission) => (
+          <div key={permission} className="flex items-center gap-2">
+            <Checkbox
+              id={permission}
+              checked={selectedPermissions.has(permission)}
+              onCheckedChange={() => onTogglePermission(permission)}
+              disabled={isPending}
+            />
+            <label htmlFor={permission} className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">
+              {permission.split(':')[1]}
+            </label>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const PERMISSION_CATEGORIES = {
+  Events: ["events:read", "events:write", "events:delete", "events:publish"],
+  Applications: ["applications:read", "applications:write", "applications:delete", "applications:approve"],
+  Players: ["players:read", "players:write", "players:ban"],
+  Users: ["users:read", "users:write", "users:delete", "users:manage_roles"],
+  "Bulk Operations": [
+    "users:bulk_operations",
+    "users:bulk_suspend",
+    "users:bulk_activate",
+    "users:bulk_change_roles",
+    "users:bulk_reset_passwords",
+    "users:bulk_send_email",
+  ],
+  "Session Management": [
+    "sessions:view_own",
+    "sessions:view_all",
+    "sessions:view_analytics",
+    "sessions:revoke_own",
+    "sessions:revoke_any",
+    "sessions:configure_policies",
+    "sessions:view_health",
+  ],
+  Settings: ["settings:read", "settings:write", "settings:security"],
+  Dashboard: ["dashboard:view", "dashboard:stats"],
+  System: ["system:maintenance", "system:logs"],
+};
+
+export function CreateRoleForm({ action }: CreateRoleFormProps) {
+  const [isPending, startTransition] = useTransition();
+  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [selectedPermissions, setSelectedPermissions] = useState<Set<Permission>>(new Set());
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setResult(null);
+
+    const formData = new FormData(e.currentTarget);
+    formData.set("permissions", JSON.stringify(Array.from(selectedPermissions)));
+
+    startTransition(async () => {
+      try {
+        const res = await action(formData);
+        setResult(res);
+        
+        if (res.success) {
+          // Reset form
+          e.currentTarget.reset();
+          setSelectedPermissions(new Set());
+        }
+      } catch (error) {
+        setResult({
+          success: false,
+          message: error instanceof Error ? error.message : "Failed to create role",
+        });
+      }
+    });
+  };
+
+  const togglePermission = (permission: Permission) => {
+    const newSet = new Set(selectedPermissions);
+    if (newSet.has(permission)) {
+      newSet.delete(permission);
+    } else {
+      newSet.add(permission);
+    }
+    setSelectedPermissions(newSet);
+  };
+
+  const toggleCategory = (category: Permission[]) => {
+    const allSelected = category.every(p => selectedPermissions.has(p));
+    const newSet = new Set(selectedPermissions);
+    
+    if (allSelected) {
+      category.forEach(p => newSet.delete(p));
+    } else {
+      category.forEach(p => newSet.add(p));
+    }
+    
+    setSelectedPermissions(newSet);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {result && (
+        <Alert variant={result.success ? "success" : "error"}>
+          {result.message}
+        </Alert>
+      )}
+
+      <RoleBasicFields isPending={isPending} />
 
       <div>
         <label className="block text-sm font-medium mb-3">
           Permissions ({selectedPermissions.size} selected)
         </label>
         <div className="space-y-4 p-4 border border-slate-200 dark:border-slate-800 rounded-lg max-h-[400px] overflow-y-auto">
-          {Object.entries(PERMISSION_CATEGORIES).map(([category, permissions]) => {
-            const categoryPerms = permissions as Permission[];
-            const allSelected = categoryPerms.every(p => selectedPermissions.has(p));
-            const someSelected = categoryPerms.some(p => selectedPermissions.has(p));
-
-            return (
-              <div key={category} className="space-y-2">
-                <div className="flex items-center gap-2 mb-2">
-                  <Checkbox
-                    id={`category-${category}`}
-                    checked={allSelected ? true : (someSelected && !allSelected) ? "indeterminate" : false}
-                    onCheckedChange={() => toggleCategory(categoryPerms)}
-                    disabled={isPending}
-                  />
-                  <label
-                    htmlFor={`category-${category}`}
-                    className="font-semibold text-sm cursor-pointer"
-                  >
-                    {category}
-                  </label>
-                </div>
-                <div className="ml-6 space-y-1.5">
-                  {categoryPerms.map((permission) => (
-                    <div key={permission} className="flex items-center gap-2">
-                      <Checkbox
-                        id={permission}
-                        checked={selectedPermissions.has(permission)}
-                        onCheckedChange={() => togglePermission(permission)}
-                        disabled={isPending}
-                      />
-                      <label
-                        htmlFor={permission}
-                        className="text-sm cursor-pointer text-slate-700 dark:text-slate-300"
-                      >
-                        {permission.split(':')[1]}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+          {Object.entries(PERMISSION_CATEGORIES).map(([category, permissions]) => (
+            <PermissionCategory
+              key={category}
+              category={category}
+              permissions={permissions as Permission[]}
+              selectedPermissions={selectedPermissions}
+              isPending={isPending}
+              onToggleCategory={() => toggleCategory(permissions as Permission[])}
+              onTogglePermission={togglePermission}
+            />
+          ))}
         </div>
       </div>
 

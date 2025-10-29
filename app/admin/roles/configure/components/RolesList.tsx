@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/common/Badge";
-import { Button } from "@/components/common";
+import { Button, toast } from "@/components/common";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/common/Dialog";
 import { Input } from "@/components/common/Input";
 import { Checkbox } from "@/components/common/Checkbox";
@@ -11,6 +11,7 @@ import { Spinner } from "@/components/common/Spinner";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import type { Permission } from "@/lib/rbac";
 import { Pencil, Trash2, Shield } from "lucide-react";
+import { log } from "@/lib/logger";
 
 interface Role {
   id: string;
@@ -26,8 +27,8 @@ interface Role {
 
 interface RolesListProps {
   roles: Role[];
-  updateAction: (formData: FormData) => Promise<{ success: boolean; message: string }>;
-  deleteAction: (formData: FormData) => Promise<{ success: boolean; message: string }>;
+  updateAction: (_formData: FormData) => Promise<{ success: boolean; message: string }>; // eslint-disable-line no-unused-vars
+  deleteAction: (formData: FormData) => Promise<{ success: boolean; message: string }>; // eslint-disable-line no-unused-vars
 }
 
 const PERMISSION_CATEGORIES = {
@@ -57,7 +58,116 @@ const PERMISSION_CATEGORIES = {
   System: ["system:maintenance", "system:logs"],
 };
 
-export function RolesList({ roles, updateAction, deleteAction }: RolesListProps) {
+function RoleCard({ role, onEdit, onDelete }: { role: Role; onEdit: () => void; onDelete: () => void }) {
+  return (
+    <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200/60 dark:border-slate-800/60 hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors">
+      <div className="flex-1">
+        <div className="flex items-center gap-3 mb-1">
+          <h3 className="font-semibold text-lg">{role.name}</h3>
+          {role.isSystem && (
+            <Badge variant="default" className="text-xs">
+              <Shield className="w-3 h-3 mr-1" />
+              System
+            </Badge>
+          )}
+          {role.color && (
+            <div
+              className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-700"
+              style={{ backgroundColor: role.color }}
+            />
+          )}
+        </div>
+        <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+          {role.description || "No description"}
+        </p>
+        <div className="flex items-center gap-4 text-xs text-slate-500">
+          <span>Slug: <code className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded">{role.slug}</code></span>
+          <span>{role.permissions.length} permissions</span>
+          <span>{role.userCount} {role.userCount === 1 ? "user" : "users"}</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" onClick={onEdit}>
+          <Pencil className="w-4 h-4 mr-1" />
+          Edit
+        </Button>
+        {!role.isSystem && (
+          <Button size="sm" variant="danger" onClick={onDelete}>
+            <Trash2 className="w-4 h-4 mr-1" />
+            Delete
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type PermissionToggleHandler = (permission: Permission) => void; // eslint-disable-line no-unused-vars
+type CategoryToggleHandler = (category: Permission[]) => void; // eslint-disable-line no-unused-vars
+
+function PermissionsEditor({
+  selectedPermissions,
+  isPending,
+  onTogglePermission,
+  onToggleCategory,
+}: {
+  selectedPermissions: Set<Permission>;
+  isPending: boolean;
+  onTogglePermission: PermissionToggleHandler;
+  onToggleCategory: CategoryToggleHandler;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-3">
+        Permissions ({selectedPermissions.size} selected)
+      </label>
+      <div className="space-y-4 p-4 border border-slate-200 dark:border-slate-800 rounded-lg max-h-[300px] overflow-y-auto">
+        {Object.entries(PERMISSION_CATEGORIES).map(([category, permissions]) => {
+          const categoryPerms = permissions as Permission[];
+          const allSelected = categoryPerms.every(p => selectedPermissions.has(p));
+          const someSelected = categoryPerms.some(p => selectedPermissions.has(p));
+
+          return (
+            <div key={category} className="space-y-2">
+              <div className="flex items-center gap-2 mb-2">
+                <Checkbox
+                  id={`edit-category-${category}`}
+                  checked={allSelected ? true : (someSelected && !allSelected) ? "indeterminate" : false}
+                  onCheckedChange={() => onToggleCategory(categoryPerms)}
+                  disabled={isPending}
+                />
+                <label htmlFor={`edit-category-${category}`} className="font-semibold text-sm cursor-pointer">
+                  {category}
+                </label>
+              </div>
+              <div className="ml-6 space-y-1.5">
+                {categoryPerms.map((permission) => (
+                  <div key={permission} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`edit-${permission}`}
+                      checked={selectedPermissions.has(permission)}
+                      onCheckedChange={() => onTogglePermission(permission)}
+                      disabled={isPending}
+                    />
+                    <label htmlFor={`edit-${permission}`} className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">
+                      {permission.split(':')[1]}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+type FormSubmitHandler = (e: React.FormEvent<HTMLFormElement>) => void; // eslint-disable-line no-unused-vars
+type DeleteAction = (formData: FormData) => Promise<{ success: boolean; message: string }>; // eslint-disable-line no-unused-vars
+type UpdateAction = (formData: FormData) => Promise<{ success: boolean; message: string }>; // eslint-disable-line no-unused-vars
+
+function useRoleManagement(updateAction: UpdateAction, deleteAction: DeleteAction) {
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [deletingRole, setDeletingRole] = useState<Role | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -93,10 +203,12 @@ export function RolesList({ roles, updateAction, deleteAction }: RolesListProps)
         if (res.success) {
           setTimeout(() => closeEditDialog(), 1500);
         }
-      } catch (error: any) {
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to update role";
+        log.error("Roles: Failed to update role", { error, roleId: editingRole.id });
         setResult({
           success: false,
-          message: error.message || "Failed to update role",
+          message,
         });
       }
     });
@@ -114,11 +226,14 @@ export function RolesList({ roles, updateAction, deleteAction }: RolesListProps)
         
         if (res.success) {
           setDeletingRole(null);
+          toast.success("Role deleted successfully");
         } else {
-          alert(res.message);
+          toast.error(res.message);
         }
-      } catch (error: any) {
-        alert(error.message || "Failed to delete role");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to delete role";
+        log.error("Roles: Failed to delete role", { error, roleId: deletingRole.id });
+        toast.error(message);
       }
     });
   };
@@ -146,196 +261,167 @@ export function RolesList({ roles, updateAction, deleteAction }: RolesListProps)
     setSelectedPermissions(newSet);
   };
 
+  return {
+    editingRole,
+    deletingRole,
+    isPending,
+    result,
+    selectedPermissions,
+    openEditDialog,
+    closeEditDialog,
+    setDeletingRole,
+    handleUpdate,
+    handleDelete,
+    togglePermission,
+    toggleCategory,
+  };
+}
+
+function EditRoleDialog({
+  role,
+  isPending,
+  result,
+  selectedPermissions,
+  onClose,
+  onSubmit,
+  onTogglePermission,
+  onToggleCategory,
+}: {
+  role: Role | null;
+  isPending: boolean;
+  result: { success: boolean; message: string } | null;
+  selectedPermissions: Set<Permission>;
+  onClose: () => void;
+  onSubmit: FormSubmitHandler;
+  onTogglePermission: PermissionToggleHandler;
+  onToggleCategory: CategoryToggleHandler;
+}) {
+  return (
+    <Dialog open={!!role} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Role: {role?.name}</DialogTitle>
+          <DialogDescription>
+            Modify role details and permissions. {role?.isSystem ? "System roles cannot be deleted but permissions can be customized." : ""}
+          </DialogDescription>
+        </DialogHeader>
+
+        {role && (
+          <form onSubmit={onSubmit} className="space-y-6 mt-4">
+            {result && (
+              <Alert variant={result.success ? "success" : "error"}>
+                {result.message}
+              </Alert>
+            )}
+
+            <div>
+              <label htmlFor="edit-name" className="block text-sm font-medium mb-2">
+                Role Name *
+              </label>
+              <Input
+                id="edit-name"
+                name="name"
+                defaultValue={role.name}
+                required
+                disabled={isPending}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="edit-description" className="block text-sm font-medium mb-2">
+                Description
+              </label>
+              <Input
+                id="edit-description"
+                name="description"
+                defaultValue={role.description || ""}
+                disabled={isPending}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="edit-color" className="block text-sm font-medium mb-2">
+                Badge Color <span className="text-xs text-slate-500">(hex color)</span>
+              </label>
+              <Input
+                id="edit-color"
+                name="color"
+                defaultValue={role.color || ""}
+                pattern="^#[0-9A-Fa-f]{6}$"
+                placeholder="#3B82F6"
+                disabled={isPending}
+              />
+            </div>
+
+            <PermissionsEditor
+              selectedPermissions={selectedPermissions}
+              isPending={isPending}
+              onTogglePermission={onTogglePermission}
+              onToggleCategory={onToggleCategory}
+            />
+
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isPending}>
+                {isPending ? (
+                  <>
+                    <Spinner className="mr-2" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Role"
+                )}
+              </Button>
+            </div>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function RolesList({ roles, updateAction, deleteAction }: RolesListProps) {
+  const {
+    editingRole,
+    deletingRole,
+    isPending,
+    result,
+    selectedPermissions,
+    openEditDialog,
+    closeEditDialog,
+    setDeletingRole,
+    handleUpdate,
+    handleDelete,
+    togglePermission,
+    toggleCategory,
+  } = useRoleManagement(updateAction, deleteAction);
+
   return (
     <>
       <div className="space-y-3">
         {roles.map((role) => (
-          <div
+          <RoleCard
             key={role.id}
-            className="flex items-center justify-between p-4 rounded-lg border border-slate-200/60 dark:border-slate-800/60 hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors"
-          >
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-1">
-                <h3 className="font-semibold text-lg">{role.name}</h3>
-                {role.isSystem && (
-                  <Badge variant="default" className="text-xs">
-                    <Shield className="w-3 h-3 mr-1" />
-                    System
-                  </Badge>
-                )}
-                {role.color && (
-                  <div
-                    className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-700"
-                    style={{ backgroundColor: role.color }}
-                  />
-                )}
-              </div>
-              <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                {role.description || "No description"}
-              </p>
-              <div className="flex items-center gap-4 text-xs text-slate-500">
-                <span>Slug: <code className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded">{role.slug}</code></span>
-                <span>{role.permissions.length} permissions</span>
-                <span>{role.userCount} {role.userCount === 1 ? "user" : "users"}</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => openEditDialog(role)}
-              >
-                <Pencil className="w-4 h-4 mr-1" />
-                Edit
-              </Button>
-              {!role.isSystem && (
-                <Button
-                  size="sm"
-                  variant="danger"
-                  onClick={() => setDeletingRole(role)}
-                >
-                  <Trash2 className="w-4 h-4 mr-1" />
-                  Delete
-                </Button>
-              )}
-            </div>
-          </div>
+            role={role}
+            onEdit={() => openEditDialog(role)}
+            onDelete={() => setDeletingRole(role)}
+          />
         ))}
       </div>
 
-      {/* Edit Dialog */}
-      <Dialog open={!!editingRole} onOpenChange={(open) => !open && closeEditDialog()}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Role: {editingRole?.name}</DialogTitle>
-            <DialogDescription>
-              Modify role details and permissions. {editingRole?.isSystem ? "System roles cannot be deleted but permissions can be customized." : ""}
-            </DialogDescription>
-          </DialogHeader>
+      <EditRoleDialog
+        role={editingRole}
+        isPending={isPending}
+        result={result}
+        selectedPermissions={selectedPermissions}
+        onClose={closeEditDialog}
+        onSubmit={handleUpdate}
+        onTogglePermission={togglePermission}
+        onToggleCategory={toggleCategory}
+      />
 
-          {editingRole && (
-            <form onSubmit={handleUpdate} className="space-y-6 mt-4">
-              {result && (
-                <Alert variant={result.success ? "success" : "error"}>
-                  {result.message}
-                </Alert>
-              )}
-
-              <div>
-                <label htmlFor="edit-name" className="block text-sm font-medium mb-2">
-                  Role Name *
-                </label>
-                <Input
-                  id="edit-name"
-                  name="name"
-                  defaultValue={editingRole.name}
-                  required
-                  disabled={isPending}
-                />
-              </div>
-
-              <div>
-                <label htmlFor="edit-description" className="block text-sm font-medium mb-2">
-                  Description
-                </label>
-                <Input
-                  id="edit-description"
-                  name="description"
-                  defaultValue={editingRole.description || ""}
-                  disabled={isPending}
-                />
-              </div>
-
-              <div>
-                <label htmlFor="edit-color" className="block text-sm font-medium mb-2">
-                  Badge Color <span className="text-xs text-slate-500">(hex color)</span>
-                </label>
-                <Input
-                  id="edit-color"
-                  name="color"
-                  defaultValue={editingRole.color || ""}
-                  pattern="^#[0-9A-Fa-f]{6}$"
-                  placeholder="#3B82F6"
-                  disabled={isPending}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-3">
-                  Permissions ({selectedPermissions.size} selected)
-                </label>
-                <div className="space-y-4 p-4 border border-slate-200 dark:border-slate-800 rounded-lg max-h-[300px] overflow-y-auto">
-                  {Object.entries(PERMISSION_CATEGORIES).map(([category, permissions]) => {
-                    const categoryPerms = permissions as Permission[];
-                    const allSelected = categoryPerms.every(p => selectedPermissions.has(p));
-                    const someSelected = categoryPerms.some(p => selectedPermissions.has(p));
-
-                    return (
-                      <div key={category} className="space-y-2">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Checkbox
-                            id={`edit-category-${category}`}
-                            checked={allSelected ? true : (someSelected && !allSelected) ? "indeterminate" : false}
-                            onCheckedChange={() => toggleCategory(categoryPerms)}
-                            disabled={isPending}
-                          />
-                          <label
-                            htmlFor={`edit-category-${category}`}
-                            className="font-semibold text-sm cursor-pointer"
-                          >
-                            {category}
-                          </label>
-                        </div>
-                        <div className="ml-6 space-y-1.5">
-                          {categoryPerms.map((permission) => (
-                            <div key={permission} className="flex items-center gap-2">
-                              <Checkbox
-                                id={`edit-${permission}`}
-                                checked={selectedPermissions.has(permission)}
-                                onCheckedChange={() => togglePermission(permission)}
-                                disabled={isPending}
-                              />
-                              <label
-                                htmlFor={`edit-${permission}`}
-                                className="text-sm cursor-pointer text-slate-700 dark:text-slate-300"
-                              >
-                                {permission.split(':')[1]}
-                              </label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={closeEditDialog}
-                  disabled={isPending}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isPending}>
-                  {isPending ? (
-                    <>
-                      <Spinner className="mr-2" />
-                      Updating...
-                    </>
-                  ) : (
-                    "Update Role"
-                  )}
-                </Button>
-              </div>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation */}
       <ConfirmDialog
         open={!!deletingRole}
         onOpenChange={(open) => !open && setDeletingRole(null)}
