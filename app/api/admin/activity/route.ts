@@ -2,6 +2,7 @@ import { headers as nextHeaders } from "next/headers";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/session";
+import { rateLimit } from "@/lib/rate-limiter";
 
 // Configuration
 export const runtime = "nodejs";
@@ -15,13 +16,6 @@ const MAX_ITEMS_PER_TYPE = 15; // Fetch up to 15 of each type
 const MAX_TOTAL_ITEMS = 20; // Return top 20 merged items
 const CACHE_SECONDS = 30; // Cache for 30 seconds (admins see near real-time)
 
-// Security: Rate limiting for activity feed
-// Note: In-memory map works for single-instance deployments
-// For multi-instance/serverless, consider Redis or similar
-const activityRequests = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
-const MAX_ACTIVITY_REQUESTS = 30; // Max 30 requests per minute per user
-
 type ActivityItem = {
     id: string;
     kind: "event" | "application";
@@ -30,32 +24,6 @@ type ActivityItem = {
     when: string;      // ISO string
     updatedBy?: string | undefined; // User who made the change (minecraft name or full name)
 };
-
-/**
- * Security: Check rate limiting with auto-cleanup
- */
-function isRateLimited(identifier: string): boolean {
-    const now = Date.now();
-    const record = activityRequests.get(identifier);
-    
-    // Cleanup expired entries on-demand (no setInterval memory leak)
-    if (activityRequests.size > 1000) {
-        for (const [key, value] of activityRequests.entries()) {
-            if (now > value.resetTime) activityRequests.delete(key);
-        }
-    }
-    
-    if (!record || now > record.resetTime) {
-        activityRequests.set(identifier, {
-            count: 1,
-            resetTime: now + RATE_LIMIT_WINDOW_MS,
-        });
-        return false;
-    }
-    
-    record.count++;
-    return record.count > MAX_ACTIVITY_REQUESTS;
-}
 
 /**
  * Security: Mask email address for privacy
@@ -216,14 +184,25 @@ export async function GET() {
                         h.get("x-real-ip") || 
                         `user:${userId}`;
         
-        if (isRateLimited(clientIP)) {
+        // Security: Redis-based rate limiting (distributed, scalable)
+        const rateLimitResult = await rateLimit(clientIP, {
+            key: "admin:activity",
+            limit: 30,
+            window: 60,
+            strategy: "sliding-window",
+        });
+
+        if (!rateLimitResult.allowed) {
             console.warn(`[Admin Activity] Rate limit exceeded for user: ${userId}`);
             return NextResponse.json(
                 { error: "Too many requests" },
                 { 
                     status: 429,
                     headers: {
-                        "Retry-After": "60",
+                        "Retry-After": rateLimitResult.resetAfter.toString(),
+                        "X-RateLimit-Limit": rateLimitResult.limit.toString(),
+                        "X-RateLimit-Remaining": "0",
+                        "X-RateLimit-Reset": rateLimitResult.resetAt.toString(),
                         "Content-Type": "application/json; charset=utf-8",
                     },
                 }
@@ -238,6 +217,9 @@ export async function GET() {
                 "Cache-Control": `private, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 2}`,
                 "Content-Type": "application/json; charset=utf-8",
                 "X-Content-Type-Options": "nosniff",
+                "X-RateLimit-Limit": rateLimitResult.limit.toString(),
+                "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
+                "X-RateLimit-Reset": rateLimitResult.resetAt.toString(),
             },
         });
     } catch (e) {
