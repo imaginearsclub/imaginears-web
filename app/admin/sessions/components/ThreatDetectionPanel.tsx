@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/common';
 import { Shield, Lock, Zap, CheckCircle } from 'lucide-react';
 import { clientLog } from '@/lib/client-logger';
@@ -99,51 +99,67 @@ function ThreatCard({
 }
 
 export function ThreatDetectionPanel() {
-  const [threats, setThreats] = useState<Threat[]>([
-    {
-      id: '1',
-      severity: 'high',
-      type: 'Multiple Failed Logins',
-      description: '15 failed login attempts detected from same IP in 5 minutes',
-      affectedUsers: 3,
-      detectedAt: new Date(Date.now() - 10 * 60 * 1000),
-      status: 'active'
-    },
-    {
-      id: '2',
-      severity: 'medium',
-      type: 'VPN Detection',
-      description: '8 sessions using commercial VPN services detected',
-      affectedUsers: 8,
-      detectedAt: new Date(Date.now() - 30 * 60 * 1000),
-      status: 'investigating'
-    },
-    {
-      id: '3',
-      severity: 'critical',
-      type: 'Location Anomaly',
-      description: 'User logged in from 2 countries within 5 minutes (impossible travel)',
-      affectedUsers: 1,
-      detectedAt: new Date(Date.now() - 45 * 60 * 1000),
-      status: 'active'
-    }
-  ]);
+  const [threats, setThreats] = useState<Threat[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleQuickAction = async (threatId: string, action: 'block' | 'investigate' | 'resolve') => {
-    clientLog.info(`Threat ${action}`, { threatId, action });
-    // In production, this would call an API endpoint
-    // await fetch('/api/admin/sessions/threats', { method: 'POST', body: JSON.stringify({ threatId, action }) });
-    
-    if (action === 'resolve') {
-      setThreats(prev => prev.map(t => 
-        t.id === threatId ? { ...t, status: 'resolved' as const } : t
-      ));
-    } else if (action === 'investigate') {
-      setThreats(prev => prev.map(t => 
-        t.id === threatId ? { ...t, status: 'investigating' as const } : t
-      ));
+  const fetchThreats = async () => {
+    try {
+      const response = await fetch('/api/admin/sessions/threats');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch threats');
+      }
+      
+      const data = await response.json();
+      
+      // Convert timestamp strings to Date objects
+      const threats = data.map((threat: Threat) => ({
+        ...threat,
+        detectedAt: new Date(threat.detectedAt),
+      }));
+      
+      setThreats(threats);
+      setLoading(false);
+    } catch (error) {
+      clientLog.error('Threats: Failed to fetch', { error });
+      setLoading(false);
     }
   };
+
+  const handleQuickAction = async (threatId: string, action: 'block' | 'investigate' | 'resolve') => {
+    try {
+      const response = await fetch('/api/admin/sessions/threats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threatId, action }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to handle threat action');
+      }
+      
+      clientLog.info(`Threat ${action}`, { threatId, action });
+      
+      // Update local state
+      if (action === 'resolve') {
+        setThreats(prev => prev.map(t => 
+          t.id === threatId ? { ...t, status: 'resolved' as const } : t
+        ));
+      } else if (action === 'investigate') {
+        setThreats(prev => prev.map(t => 
+          t.id === threatId ? { ...t, status: 'investigating' as const } : t
+        ));
+      }
+    } catch (error) {
+      clientLog.error('Threats: Failed to handle action', { error, threatId, action });
+    }
+  };
+
+  useEffect(() => {
+    fetchThreats();
+    const interval = setInterval(fetchThreats, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   const activeThreats = threats.filter(t => t.status === 'active');
   const criticalCount = activeThreats.filter(t => t.severity === 'critical').length;
@@ -170,18 +186,24 @@ export function ThreatDetectionPanel() {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
-          {threats.filter(t => t.status !== 'resolved').map(threat => (
-            <ThreatCard key={threat.id} threat={threat} onAction={handleQuickAction} />
-          ))}
-          {threats.filter(t => t.status !== 'resolved').length === 0 && (
-            <div className="text-center py-8">
-              <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-2" />
-              <div className="font-semibold text-slate-900 dark:text-white">All Clear</div>
-              <div className="text-sm text-slate-600 dark:text-slate-400">No active threats detected</div>
-            </div>
-          )}
-        </div>
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {threats.filter(t => t.status !== 'resolved').map(threat => (
+              <ThreatCard key={threat.id} threat={threat} onAction={handleQuickAction} />
+            ))}
+            {threats.filter(t => t.status !== 'resolved').length === 0 && (
+              <div className="text-center py-8">
+                <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-2" />
+                <div className="font-semibold text-slate-900 dark:text-white">All Clear</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">No active threats detected</div>
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

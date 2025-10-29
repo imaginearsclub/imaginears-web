@@ -101,42 +101,21 @@ export function SessionTimeline() {
 
   const fetchEvents = async () => {
     try {
-      // In production, fetch from API
-      // const response = await fetch('/api/admin/sessions/timeline');
-      // const data = await response.json();
-      // setEvents(data);
+      const response = await fetch('/api/admin/sessions/timeline');
       
-      // Mock data for now
-      setEvents([
-        {
-          id: '1',
-          type: 'login',
-          user: 'john@example.com',
-          timestamp: new Date(Date.now() - 5 * 60 * 1000),
-          details: 'Successful login',
-          location: 'San Francisco, US',
-          device: 'Chrome on macOS'
-        },
-        {
-          id: '2',
-          type: 'suspicious',
-          user: 'jane@example.com',
-          timestamp: new Date(Date.now() - 15 * 60 * 1000),
-          details: 'Rapid location change detected',
-          location: 'London, UK → Tokyo, JP',
-          device: 'Firefox on Windows'
-        },
-        {
-          id: '3',
-          type: 'logout',
-          user: 'bob@example.com',
-          timestamp: new Date(Date.now() - 30 * 60 * 1000),
-          details: 'User logged out',
-          location: 'New York, US',
-          device: 'Safari on iOS'
-        },
-      ]);
+      if (!response.ok) {
+        throw new Error('Failed to fetch timeline events');
+      }
       
+      const data = await response.json();
+      
+      // Convert timestamp strings to Date objects
+      const events = data.map((event: TimelineEvent) => ({
+        ...event,
+        timestamp: new Date(event.timestamp),
+      }));
+      
+      setEvents(events);
       setLoading(false);
     } catch (error) {
       clientLog.error('Session Timeline: Failed to fetch', { error });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/common';
+import { Card, CardContent, CardHeader, CardTitle, Button, Tooltip } from '@/components/common';
 import { 
   Activity, 
   Users, 
@@ -14,6 +14,7 @@ import {
   Eye
 } from 'lucide-react';
 import { clientLog } from '@/lib/client-logger';
+import { ViewSessionsModal } from './ViewSessionsModal';
 
 interface User {
   id: string;
@@ -185,14 +186,16 @@ function ActionBar({
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={onRefresh} disabled={refreshing}>
-              <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-            <Button variant="outline" size="sm" onClick={onExport}>
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
+            <Tooltip content="Refresh data">
+              <Button variant="outline" size="sm" onClick={onRefresh} disabled={refreshing}>
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Export to CSV">
+              <Button variant="outline" size="sm" onClick={onExport}>
+                <Download className="w-4 h-4" />
+              </Button>
+            </Tooltip>
             {suspiciousCount > 0 && (
               <Button variant="danger" size="sm" onClick={onBulkRevoke}>
                 <Lock className="w-4 h-4 mr-2" />
@@ -266,6 +269,46 @@ function UsersTable({
   );
 }
 
+async function handleBulkRevoke(
+  onRefresh: () => Promise<void>,
+  setRefreshing: (_value: boolean) => void // eslint-disable-line no-unused-vars
+) {
+  if (!confirm('Are you sure you want to revoke ALL suspicious sessions? This will log out affected users.')) {
+    return;
+  }
+  
+  setRefreshing(true);
+  try {
+    const response = await fetch('/api/admin/sessions/bulk-revoke-suspicious', {
+      method: 'POST',
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to revoke suspicious sessions');
+    }
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      clientLog.warn('Admin Sessions: Bulk revoked suspicious sessions', {
+        revokedCount: result.revokedCount,
+        affectedUsers: result.affectedUsers,
+      });
+      
+      alert(`Successfully revoked ${result.revokedCount} suspicious sessions affecting ${result.affectedUsers} users`);
+      
+      await onRefresh();
+    } else {
+      throw new Error(result.message || 'Failed to revoke sessions');
+    }
+  } catch (error) {
+    clientLog.error('Admin Sessions: Failed to bulk revoke', { error });
+    alert('Failed to revoke suspicious sessions. Please try again.');
+  } finally {
+    setRefreshing(false);
+  }
+}
+
 export function AdminSessionsClient({
   initialUsers,
   totalActiveSessions: initialActive,
@@ -273,34 +316,41 @@ export function AdminSessionsClient({
   recentLogins: initialRecent,
   uniqueActiveUsers: initialUnique,
 }: AdminSessionsClientProps) {
-  const [users] = useState(initialUsers);
+  const [users, setUsers] = useState(initialUsers);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterRisk, setFilterRisk] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'name' | 'sessions' | 'risk'>('risk');
   const [refreshing, setRefreshing] = useState(false);
-  const [, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   
   // Live stats
-  const [stats] = useState({
+  const [stats, setStats] = useState({
     activeSessions: initialActive,
     suspiciousSessions: initialSuspicious,
     recentLogins: initialRecent,
     activeUsers: initialUnique,
   });
 
-  // Refresh data
+  // Refresh data from API
   const refreshData = async () => {
     setRefreshing(true);
     try {
-      // In production, fetch from API
-      // const response = await fetch('/api/admin/sessions/stats');
-      // const data = await response.json();
-      // setUsers(data.users);
-      // setStats(data.stats);
+      const response = await fetch('/api/admin/sessions/stats');
       
-      // Simulate refresh for now
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (!response.ok) {
+        throw new Error('Failed to fetch session stats');
+      }
+      
+      const data = await response.json();
+      
+      setUsers(data.users);
+      setStats(data.stats);
+      
+      clientLog.info('Admin Sessions: Data refreshed', {
+        userCount: data.users.length,
+        activeSessions: data.stats.activeSessions,
+      });
     } catch (error) {
       clientLog.error('Admin Sessions: Failed to refresh', { error });
     } finally {
@@ -309,20 +359,13 @@ export function AdminSessionsClient({
   };
 
   useEffect(() => {
-    const interval = setInterval(refreshData, 30000);
+    const interval = setInterval(refreshData, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
   }, []);
 
   const filteredUsers = useSessionManagement(users, searchQuery, filterRole, filterRisk, sortBy);
 
-  const handleBulkRevokeSuspicious = async () => {
-    if (!confirm('Are you sure you want to revoke ALL suspicious sessions? This will log out affected users.')) {
-      return;
-    }
-    // In production, this would call an API endpoint
-    clientLog.warn('Bulk revoking suspicious sessions...');
-  };
-
+  const handleBulkRevokeSuspicious = () => handleBulkRevoke(refreshData, setRefreshing);
   const handleExportData = () => exportToCSV(filteredUsers);
 
   return (
@@ -359,6 +402,12 @@ export function AdminSessionsClient({
           </span>
         )}
       </div>
+
+      {/* View Sessions Modal */}
+      <ViewSessionsModal
+        userId={selectedUserId}
+        onClose={() => setSelectedUserId(null)}
+      />
     </div>
   );
 }
@@ -477,13 +526,15 @@ function UserSessionRow({ user, onViewSessions }: { user: User; onViewSessions: 
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onViewSessions}
-          >
-            <Eye className="w-4 h-4" />
-          </Button>
+          <Tooltip content="View all sessions">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onViewSessions}
+            >
+              <Eye className="w-4 h-4" />
+            </Button>
+          </Tooltip>
         </div>
       </div>
     </div>
