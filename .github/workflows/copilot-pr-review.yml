@@ -25,16 +25,15 @@ jobs:
       - name: Ensure GitHub CLI is available
         run: gh --version
 
+      - name: Authenticate GitHub CLI
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
       - name: Install Copilot GH CLI extension
         run: gh extension install github/gh-copilot
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate Copilot review
         id: review
         shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Generate a markdown review using Copilot
           gh copilot review \
@@ -46,7 +45,4 @@ jobs:
           fi
 
       - name: Post review as PR comment
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr comment ${{ github.event.pull_request.number }} --body-file review.md
+        run: gh pr comment ${{ github.event.pull_request.number }} --body-file review.md
