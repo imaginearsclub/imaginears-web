@@ -1,33 +1,120 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+/**
+ * Applications by Status Statistics API
+ * 
+ * GET /api/admin/stats/applications-by-status
+ * Returns application counts grouped by status
+ * 
+ * Security: Admin-only access, rate limited
+ * Performance: Database aggregation, efficient groupBy query, response caching
+ */
 
-export const runtime = "nodejs";
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { log } from '@/lib/logger';
+import { createApiHandler } from '@/lib/api-middleware';
+import type { ApplicationsStatusData } from '../schemas';
 
-// Force dynamic rendering for authenticated endpoints
-// This ensures fresh session validation on every request
-export const dynamic = "force-dynamic";
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-export async function GET() {
+/**
+ * GET /api/admin/stats/applications-by-status
+ * 
+ * Returns application counts grouped by status
+ * 
+ * Response Format:
+ * - Array of { status: string, count: number }
+ * 
+ * Security:
+ * - Admin-only access enforced
+ * - Rate limited to 120 requests per minute
+ * 
+ * Performance:
+ * - Database groupBy aggregation (efficient)
+ * - Duration monitoring
+ * - Cache-Control headers for client-side caching (5 minutes)
+ */
+export const GET = createApiHandler(
+  {
+    auth: 'admin',
+    rateLimit: {
+      key: 'stats:applications',
+      limit: 120, // Generous for dashboard refreshes
+      window: 60,
+      strategy: 'sliding-window',
+    },
+  },
+  async (_req, { userId }) => {
+    const startTime = Date.now();
+
     try {
-        const session = await requireAdmin();
-        
-        // requireAdmin() returns null if unauthorized (doesn't throw)
-        if (!session) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
+      log.info('Applications status stats requested', { userId });
 
-        // Group by Application.status
-        const rows = await prisma.application.groupBy({
-            by: ["status"],
-            _count: { _all: true },
+      // Group by Application.status - efficient database aggregation
+      const rows = await prisma.application.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+      });
+
+      // Transform to clean response format
+      const data: ApplicationsStatusData[] = rows.map((r) => ({
+        status: r.status,
+        count: r._count._all,
+      }));
+
+      const duration = Date.now() - startTime;
+
+      // Performance: Log slow queries
+      if (duration > 500) {
+        log.warn('Slow applications status stats query', {
+          userId,
+          duration,
+          statusCount: data.length,
         });
+      }
 
-        const data = rows.map(r => ({ status: r.status, count: r._count._all }));
-        return NextResponse.json(data);
-    } catch (e: any) {
-        console.error("[Stats/Applications] Error:", e);
-        return NextResponse.json({ error: "Server error" }, { status: 500 });
+      const totalApplications = data.reduce((sum, d) => sum + d.count, 0);
+
+      log.info('Applications status stats retrieved successfully', {
+        userId,
+        duration,
+        totalApplications,
+        statusBreakdown: data.map((d) => `${d.status}: ${d.count}`).join(', '),
+      });
+
+      return NextResponse.json(
+        {
+          success: true,
+          data,
+        },
+        {
+          headers: {
+            'X-Response-Time': `${duration}ms`,
+            // Cache for 5 minutes to reduce database load
+            'Cache-Control': 'private, max-age=300',
+          },
+        }
+      );
+    } catch (error) {
+      const duration = Date.now() - startTime;
+
+      log.error('Applications status stats fetch failed', {
+        userId,
+        duration,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      // Return empty data to allow dashboard to load gracefully
+      return NextResponse.json(
+        {
+          success: false,
+          data: [],
+          error: 'Failed to fetch applications statistics',
+        },
+        { status: 500 }
+      );
     }
-}
+  }
+);
 

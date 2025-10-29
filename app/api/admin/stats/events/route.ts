@@ -1,86 +1,192 @@
-import {NextResponse} from 'next/server';
-import {prisma} from '@/lib/prisma';
-import {requireAdmin} from '@/lib/session';
+/**
+ * Events Statistics API
+ * 
+ * GET /api/admin/stats/events
+ * Returns event creation counts bucketed by day for a configurable range
+ * 
+ * Security: Admin-only access, rate limited, input validated
+ * Performance: Database aggregation, efficient queries, response caching headers
+ */
 
-export const runtime = "nodejs";
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { log } from '@/lib/logger';
+import { createApiHandler } from '@/lib/api-middleware';
+import { eventsStatsQuerySchema, type EventsStatsQuery, type EventsStatsData } from '../schemas';
 
-// Force dynamic rendering for authenticated endpoints
-// This ensures fresh session validation on every request
-export const dynamic = "force-dynamic";
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-// Buckets by day for last N (default 30) days based on Event.createdAt
-export async function GET(req: Request){
-    try {
-        const session = await requireAdmin();
-        
-        // requireAdmin() returns null if unauthorized (doesn't throw)
-        if (!session) {
-            return NextResponse.json({error: "Unauthorized"}, {status: 401});
-        }
-
-        const {searchParams} = new URL(req.url);
-        const rangeParam = searchParams.get('range') || '30';
-        
-        // Validate input is a number
-        if (!/^\d+$/.test(rangeParam)) {
-            return NextResponse.json({error: "Invalid range parameter"}, {status: 400});
-        }
-        
-        const range = parseInt(rangeParam, 10);
-        const days = Math.min(Math.max(range, 1), 90);
-
-        // Use start of day for consistent date boundaries (UTC)
-        const end = new Date();
-        end.setUTCHours(23, 59, 59, 999);
-        
-        const start = new Date(end);
-        start.setUTCDate(end.getUTCDate() - (days - 1));
-        start.setUTCHours(0, 0, 0, 0);
-
-        // Create map with all dates initialized to 0
-        const map = new Map<string, number>();
-        const tempDate = new Date(start);
-        for (let i = 0; i < days; i++) {
-            const key = tempDate.toISOString().slice(0, 10);
-            map.set(key, 0);
-            tempDate.setUTCDate(tempDate.getUTCDate() + 1);
-        }
-
-        // Try to get data from database
-        try {
-            // Use database aggregation instead of fetching all records
-            // This is much more efficient for large datasets
-            const rows = await prisma.$queryRaw<Array<{date: string; count: bigint}>>`
-                SELECT 
-                    DATE(createdAt) as date,
-                    COUNT(*) as count
-                FROM Event
-                WHERE createdAt >= ${start}
-                    AND createdAt <= ${end}
-                GROUP BY DATE(createdAt)
-                ORDER BY date ASC
-            `;
-
-            // Fill in actual counts from database
-            for (const row of rows) {
-                const dateStr = String(row.date).slice(0, 10);
-                map.set(dateStr, Number(row.count));
-            }
-        } catch (dbError: any) {
-            console.error("[Stats/Events] Database query error:", dbError);
-            // Continue with empty data (all zeros) if query fails
-            // This allows the dashboard to load even if Event table is empty or has issues
-        }
-
-        const data = Array.from(map.entries()).map(([key, count]) => ({
-            date: key.slice(5), // MM-DD format
-            count,
-        }));
-
-        return NextResponse.json(data);
-    } catch (e: any) {
-        console.error("[Stats/Events] Error:", e);
-        // Return empty array instead of error to allow dashboard to load
-        return NextResponse.json([]);
-    }
+/**
+ * Helper: Create date map with all dates initialized to 0
+ * 
+ * Memory Safety: Limited size (max 90 entries)
+ * Performance: Pre-allocated map for efficient updates
+ */
+function createDateMap(start: Date, days: number): Map<string, number> {
+  const map = new Map<string, number>();
+  const tempDate = new Date(start);
+  
+  for (let i = 0; i < days; i++) {
+    const key = tempDate.toISOString().slice(0, 10);
+    map.set(key, 0);
+    tempDate.setUTCDate(tempDate.getUTCDate() + 1);
+  }
+  
+  return map;
 }
+
+/**
+ * Helper: Fetch event counts from database
+ * 
+ * Performance: Uses database aggregation for efficiency
+ * Error handling: Returns empty array on database errors
+ */
+async function fetchEventCounts(start: Date, end: Date): Promise<Array<{ date: string; count: bigint }>> {
+  try {
+    const rows = await prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
+      SELECT 
+        DATE(createdAt) as date,
+        COUNT(*) as count
+      FROM Event
+      WHERE createdAt >= ${start}
+        AND createdAt <= ${end}
+      GROUP BY DATE(createdAt)
+      ORDER BY date ASC
+    `;
+    
+    return rows;
+  } catch (error) {
+    log.error('Failed to fetch event counts', {
+      error: error instanceof Error ? error.message : String(error),
+      start,
+      end,
+    });
+    // Return empty array to allow dashboard to load with zeros
+    return [];
+  }
+}
+
+/**
+ * GET /api/admin/stats/events
+ * 
+ * Returns daily event creation statistics
+ * 
+ * Query Parameters:
+ * - range: Number of days to include (1-90, default: 30)
+ * 
+ * Security:
+ * - Admin-only access enforced
+ * - Rate limited to 120 requests per minute
+ * - Input validation with Zod
+ * 
+ * Performance:
+ * - Database aggregation (not fetching all records)
+ * - Pre-allocated date map for efficiency
+ * - Duration monitoring
+ * - Cache-Control headers for client-side caching
+ */
+export const GET = createApiHandler(
+  {
+    auth: 'admin',
+    rateLimit: {
+      key: 'stats:events',
+      limit: 120, // Generous for dashboard refreshes
+      window: 60,
+      strategy: 'sliding-window',
+    },
+    validateQuery: eventsStatsQuerySchema,
+  },
+  async (_req, { userId, validatedQuery }) => {
+    const startTime = Date.now();
+
+    try {
+      const query = validatedQuery as EventsStatsQuery;
+      const days = query.range;
+
+      log.info('Events stats requested', {
+        userId,
+        days,
+      });
+
+      // Use start of day for consistent date boundaries (UTC)
+      const end = new Date();
+      end.setUTCHours(23, 59, 59, 999);
+      
+      const start = new Date(end);
+      start.setUTCDate(end.getUTCDate() - (days - 1));
+      start.setUTCHours(0, 0, 0, 0);
+
+      // Create map with all dates initialized to 0
+      const dateMap = createDateMap(start, days);
+
+      // Fetch event counts from database
+      const rows = await fetchEventCounts(start, end);
+
+      // Fill in actual counts from database
+      for (const row of rows) {
+        const dateStr = String(row.date).slice(0, 10);
+        dateMap.set(dateStr, Number(row.count));
+      }
+
+      // Convert map to array format
+      const data: EventsStatsData[] = Array.from(dateMap.entries()).map(([key, count]) => ({
+        date: key.slice(5), // MM-DD format
+        count,
+      }));
+
+      const duration = Date.now() - startTime;
+
+      // Performance: Log slow queries
+      if (duration > 1000) {
+        log.warn('Slow events stats query', {
+          userId,
+          days,
+          duration,
+          rowCount: rows.length,
+        });
+      }
+
+      log.info('Events stats retrieved successfully', {
+        userId,
+        days,
+        duration,
+        totalEvents: data.reduce((sum, d) => sum + d.count, 0),
+      });
+
+      return NextResponse.json(
+        {
+          success: true,
+          data,
+        },
+        {
+          headers: {
+            'X-Response-Time': `${duration}ms`,
+            // Cache for 5 minutes to reduce database load
+            'Cache-Control': 'private, max-age=300',
+          },
+        }
+      );
+    } catch (error) {
+      const duration = Date.now() - startTime;
+
+      log.error('Events stats fetch failed', {
+        userId,
+        duration,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      // Return empty data to allow dashboard to load
+      // This is more graceful than returning an error
+      return NextResponse.json(
+        {
+          success: false,
+          data: [],
+          error: 'Failed to fetch events statistics',
+        },
+        { status: 500 }
+      );
+    }
+  }
+);
