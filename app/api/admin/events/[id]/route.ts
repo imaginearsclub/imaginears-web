@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
 import { log } from "@/lib/logger";
-import { rateLimit, RATE_LIMITS } from "@/lib/rate-limiter";
 import { sanitizeInput, sanitizeDescription } from "@/lib/input-sanitization";
 import { logEventUpdated } from "@/lib/audit-logger";
+import { createApiHandler } from "@/lib/api-middleware";
 
 export const runtime = "nodejs";
 
@@ -111,47 +110,32 @@ function validateEventUpdate(body: Record<string, unknown>): { data: Record<stri
     return { data };
 }
 
-export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-    try {
-        const session = await requireAdmin();
-        
-        // requireAdmin() returns null if unauthorized (doesn't throw)
-        if (!session) {
-            log.warn("Unauthorized admin event detail access attempt");
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-        
-        // Security: Rate limiting for admin endpoints
-        const rateLimitResult = await rateLimit(`admin:${session.user.id}`, RATE_LIMITS.ADMIN);
-        
-        if (!rateLimitResult.allowed) {
-            log.warn("Admin event detail rate limit exceeded", { 
-                userId: session.user.id 
-            });
-            return NextResponse.json(
-                { error: "Too many requests" },
-                { 
-                    status: 429,
-                    headers: {
-                        "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-                        "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
-                        "X-RateLimit-Reset": rateLimitResult.resetAt.toString(),
-                        "Retry-After": rateLimitResult.resetAfter.toString(),
-                    }
-                }
-            );
-        }
-        
-        // Next.js 15+: params is now a Promise
-        const { id } = await params;
+/**
+ * GET /api/admin/events/[id]
+ * Get event details
+ * 
+ * Security: Admin authentication and rate limiting handled by middleware
+ */
+export const GET = createApiHandler(
+    {
+        auth: "admin",
+        rateLimit: {
+            key: "admin:events:detail",
+            limit: 60,
+            window: 60,
+            strategy: "sliding-window",
+        },
+    },
+    async (_req, { userId, params }) => {
+        const id = params!['id']!;
         
         // Security: Validate ID format
         if (!id || typeof id !== 'string' || id.length > 50) {
-            log.warn("Invalid event ID format", { id });
+            log.warn("Invalid event ID format", { id, userId });
             return NextResponse.json({ error: "Invalid event ID" }, { status: 400 });
         }
         
-        const e = await prisma.event.findUnique({
+        const event = await prisma.event.findUnique({
             where: { id },
             select: {
                 id: true,
@@ -174,86 +158,50 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
             },
         });
         
-        if (!e) {
-            log.warn("Event not found", { id });
+        if (!event) {
+            log.warn("Event not found", { id, userId });
             return NextResponse.json({ error: "Not found" }, { status: 404 });
         }
         
-        return NextResponse.json(e, {
-            headers: {
-                "Content-Type": "application/json; charset=utf-8",
-                "X-Content-Type-Options": "nosniff",
-            }
-        });
-    } catch (error) {
-        log.error("/api/admin/events/[id] GET failed", { 
-            error: error instanceof Error ? error.message : String(error), 
-            stack: error instanceof Error ? error.stack : undefined 
-        });
-        return NextResponse.json({ error: "Server error" }, { status: 500 });
+        log.info("Event detail retrieved", { eventId: id, userId });
+        
+        return NextResponse.json(event);
     }
-}
+);
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-    try {
-        const session = await requireAdmin();
-        if (!session) {
-            log.warn("Unauthorized admin event update attempt");
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-        
-        // Security: Rate limiting for admin endpoints
-        const rateLimitResult = await rateLimit(`admin:${session.user.id}`, RATE_LIMITS.ADMIN);
-        
-        if (!rateLimitResult.allowed) {
-            log.warn("Admin event update rate limit exceeded", { 
-                userId: session.user.id 
-            });
-            return NextResponse.json(
-                { error: "Too many requests" },
-                { 
-                    status: 429,
-                    headers: {
-                        "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-                        "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
-                        "X-RateLimit-Reset": rateLimitResult.resetAt.toString(),
-                        "Retry-After": rateLimitResult.resetAfter.toString(),
-                    }
-                }
-            );
-        }
-        
-        const { id } = await params;
+/**
+ * PATCH /api/admin/events/[id]
+ * Update an event
+ * 
+ * Security: Admin authentication and rate limiting handled by middleware
+ */
+export const PATCH = createApiHandler(
+    {
+        auth: "admin",
+        rateLimit: {
+            key: "admin:events:update",
+            limit: 30,
+            window: 60,
+            strategy: "sliding-window",
+        },
+        maxBodySize: 100_000, // 100KB max
+    },
+    async (req, { userId, params }) => {
+        const id = params!['id']!;
         
         // Security: Validate ID format
         if (!id || typeof id !== 'string' || id.length > 50) {
-            log.warn("Invalid event ID format for update", { id });
+            log.warn("Invalid event ID format for update", { id, userId });
             return NextResponse.json({ error: "Invalid event ID" }, { status: 400 });
         }
         
-        // Security: Validate request body size
-        const text = await req.text();
-        if (text.length > 100_000) { // 100KB max
-            log.warn("Event update request body too large", { 
-                size: text.length, 
-                userId: session.user.id 
-            });
-            return NextResponse.json({ error: "Request body too large" }, { status: 413 });
-        }
-        
-        let body: Record<string, unknown>;
-        try {
-            body = JSON.parse(text);
-        } catch {
-            log.warn("Invalid JSON in event update request", { userId: session.user.id });
-            return NextResponse.json({ error: "Invalid request format" }, { status: 400 });
-        }
+        const body = await req.json();
 
         const validation = validateEventUpdate(body);
         if (validation.error) {
             log.warn("Event update validation failed", { 
                 error: validation.error, 
-                userId: session.user.id 
+                userId 
             });
             return NextResponse.json({ error: validation.error }, { status: 400 });
         }
@@ -265,7 +213,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         });
         
         if (!existing) {
-            log.warn("Event not found for update", { id, userId: session.user.id });
+            log.warn("Event not found for update", { id, userId });
             return NextResponse.json({ error: "Event not found" }, { status: 404 });
         }
 
@@ -274,31 +222,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             data: validation.data,
         });
 
-        // Audit log
+        // Audit log (note: userId is always string here due to middleware auth)
         logEventUpdated(
             id, 
-            session.user.id,
-            session.user.email || '',
+            userId!,
+            '', // Email not available in middleware context
             Object.keys(validation.data)
         );
         
         log.info("Event updated successfully", { 
             eventId: id, 
-            userId: session.user.id,
+            userId,
             fields: Object.keys(validation.data)
         });
 
-        return NextResponse.json(updated, {
-            headers: {
-                "Content-Type": "application/json; charset=utf-8",
-                "X-Content-Type-Options": "nosniff",
-            }
-        });
-    } catch (error) {
-        log.error("/api/admin/events/[id] PATCH failed", { 
-            error: error instanceof Error ? error.message : String(error), 
-            stack: error instanceof Error ? error.stack : undefined 
-        });
-        return NextResponse.json({ error: "Server error" }, { status: 500 });
+        return NextResponse.json(updated);
     }
-}
+);
