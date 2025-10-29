@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, memo, useRef, useEffect } from 'react';
 import { AlertTriangle, Save, Check } from 'lucide-react';
 import { Button, Tooltip } from '@/components/common';
 import { clientLog } from '@/lib/client-logger';
@@ -13,7 +13,7 @@ interface Props {
   initialPolicies: SessionPolicies;
 }
 
-function SaveButton({ 
+const SaveButton = memo(({ 
   onClick, 
   saving, 
   saved 
@@ -21,7 +21,7 @@ function SaveButton({
   onClick: () => void; 
   saving: boolean; 
   saved: boolean; 
-}) {
+}) => {
   return (
     <Tooltip content={saved ? 'Saved!' : saving ? 'Saving...' : 'Save Changes'}>
       <Button 
@@ -39,25 +39,71 @@ function SaveButton({
       </Button>
     </Tooltip>
   );
-}
+});
+
+SaveButton.displayName = 'SaveButton';
 
 export function SessionPoliciesClient({ initialPolicies }: Props) {
   const [policies, setPolicies] = useState(initialPolicies);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  
+  // Track timeout for cleanup to prevent memory leak
+  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleSave = async () => {
+  // Memoize handleSave to prevent unnecessary re-renders
+  const handleSave = useCallback(async () => {
     setSaving(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate save
+      // Save policies to API
+      const response = await fetch('/api/admin/sessions/policies', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(policies),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save policies');
+      }
+
+      const savedPolicies = await response.json();
+      
+      // Update local state with saved policies to ensure consistency
+      setPolicies(savedPolicies);
+      
       setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      
+      // Clear any existing timeout before setting a new one
+      if (savedTimeoutRef.current) {
+        clearTimeout(savedTimeoutRef.current);
+      }
+      
+      // Store timeout ref for cleanup
+      savedTimeoutRef.current = setTimeout(() => {
+        setSaved(false);
+        savedTimeoutRef.current = null;
+      }, 3000);
+      
+      clientLog.info('Session policies saved successfully');
     } catch (error) {
       clientLog.error('Session Policies: Failed to save', { error });
+      // You might want to show an error toast here
     } finally {
       setSaving(false);
     }
-  };
+  }, [policies]);
+
+  // Cleanup timeout on unmount to prevent memory leak
+  useEffect(() => {
+    return () => {
+      if (savedTimeoutRef.current) {
+        clearTimeout(savedTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="space-y-6">

@@ -1,8 +1,53 @@
 import { Card, CardContent, CardHeader, CardTitle, Input, Switch } from '@/components/common';
 import { Lock, Bell } from 'lucide-react';
 import type { SessionPolicies, SetPolicies } from './types';
+import { useCallback, memo } from 'react';
 
-export function SecurityFeaturesCard({ policies, setPolicies }: { policies: SessionPolicies; setPolicies: SetPolicies }) {
+// eslint-disable-next-line max-lines-per-function
+export const SecurityFeaturesCard = memo(({ policies, setPolicies }: { policies: SessionPolicies; setPolicies: SetPolicies }) => {
+  // Memoize all handlers to prevent unnecessary re-renders
+  const handleAutoBlockChange = useCallback((checked: boolean) => {
+    setPolicies((prev) => ({
+      ...prev,
+      securityFeatures: { ...prev.securityFeatures, autoBlockSuspicious: checked }
+    }));
+  }, [setPolicies]);
+
+  const handleReauthChange = useCallback((checked: boolean) => {
+    setPolicies((prev) => ({
+      ...prev,
+      securityFeatures: { ...prev.securityFeatures, requireReauthAfterSuspicious: checked }
+    }));
+  }, [setPolicies]);
+
+  const handleVpnDetectionChange = useCallback((checked: boolean) => {
+    setPolicies((prev) => ({
+      ...prev,
+      securityFeatures: { ...prev.securityFeatures, enableVpnDetection: checked }
+    }));
+  }, [setPolicies]);
+
+  const handleImpossibleTravelChange = useCallback((checked: boolean) => {
+    setPolicies((prev) => ({
+      ...prev,
+      securityFeatures: { ...prev.securityFeatures, enableImpossibleTravelDetection: checked }
+    }));
+  }, [setPolicies]);
+
+  const handleMaxFailedLoginsChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setPolicies((prev) => ({
+      ...prev,
+      securityFeatures: { ...prev.securityFeatures, maxFailedLogins: Math.max(1, parseInt(e.target.value) || 5) }
+    }));
+  }, [setPolicies]);
+
+  const handleFailedLoginWindowChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setPolicies((prev) => ({
+      ...prev,
+      securityFeatures: { ...prev.securityFeatures, failedLoginWindow: Math.max(1, parseInt(e.target.value) || 15) }
+    }));
+  }, [setPolicies]);
+
   return (
     <Card>
       <CardHeader>
@@ -21,10 +66,7 @@ export function SecurityFeaturesCard({ policies, setPolicies }: { policies: Sess
           </div>
           <Switch
             checked={policies.securityFeatures.autoBlockSuspicious}
-            onCheckedChange={(checked) => setPolicies((prev) => ({
-              ...prev,
-              securityFeatures: { ...prev.securityFeatures, autoBlockSuspicious: checked }
-            }))}
+            onCheckedChange={handleAutoBlockChange}
           />
         </div>
         <div className="flex items-center justify-between">
@@ -36,10 +78,7 @@ export function SecurityFeaturesCard({ policies, setPolicies }: { policies: Sess
           </div>
           <Switch
             checked={policies.securityFeatures.requireReauthAfterSuspicious}
-            onCheckedChange={(checked) => setPolicies((prev) => ({
-              ...prev,
-              securityFeatures: { ...prev.securityFeatures, requireReauthAfterSuspicious: checked }
-            }))}
+            onCheckedChange={handleReauthChange}
           />
         </div>
         <div className="flex items-center justify-between">
@@ -49,10 +88,7 @@ export function SecurityFeaturesCard({ policies, setPolicies }: { policies: Sess
           </div>
           <Switch
             checked={policies.securityFeatures.enableVpnDetection}
-            onCheckedChange={(checked) => setPolicies((prev) => ({
-              ...prev,
-              securityFeatures: { ...prev.securityFeatures, enableVpnDetection: checked }
-            }))}
+            onCheckedChange={handleVpnDetectionChange}
           />
         </div>
         <div className="flex items-center justify-between">
@@ -64,10 +100,7 @@ export function SecurityFeaturesCard({ policies, setPolicies }: { policies: Sess
           </div>
           <Switch
             checked={policies.securityFeatures.enableImpossibleTravelDetection}
-            onCheckedChange={(checked) => setPolicies((prev) => ({
-              ...prev,
-              securityFeatures: { ...prev.securityFeatures, enableImpossibleTravelDetection: checked }
-            }))}
+            onCheckedChange={handleImpossibleTravelChange}
           />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -76,10 +109,7 @@ export function SecurityFeaturesCard({ policies, setPolicies }: { policies: Sess
             <Input
               type="number"
               value={policies.securityFeatures.maxFailedLogins}
-              onChange={(e) => setPolicies((prev) => ({
-                ...prev,
-                securityFeatures: { ...prev.securityFeatures, maxFailedLogins: Math.max(1, parseInt(e.target.value) || 5) }
-              }))}
+              onChange={handleMaxFailedLoginsChange}
               min="1"
               max="100"
             />
@@ -89,10 +119,7 @@ export function SecurityFeaturesCard({ policies, setPolicies }: { policies: Sess
             <Input
               type="number"
               value={policies.securityFeatures.failedLoginWindow}
-              onChange={(e) => setPolicies((prev) => ({
-                ...prev,
-                securityFeatures: { ...prev.securityFeatures, failedLoginWindow: Math.max(1, parseInt(e.target.value) || 15) }
-              }))}
+              onChange={handleFailedLoginWindowChange}
               min="1"
               max="1440"
             />
@@ -101,9 +128,40 @@ export function SecurityFeaturesCard({ policies, setPolicies }: { policies: Sess
       </CardContent>
     </Card>
   );
-}
+});
 
-export function NotificationsCard({ policies, setPolicies }: { policies: SessionPolicies; setPolicies: SetPolicies }) {
+SecurityFeaturesCard.displayName = 'SecurityFeaturesCard';
+
+export const NotificationsCard = memo(({ policies, setPolicies }: { policies: SessionPolicies; setPolicies: SetPolicies }) => {
+  // Memoize all handlers to prevent unnecessary re-renders
+  const handleEmailOnNewDeviceChange = useCallback((checked: boolean) => {
+    setPolicies((prev) => ({
+      ...prev,
+      notifications: { ...prev.notifications, emailOnNewDevice: checked }
+    }));
+  }, [setPolicies]);
+
+  const handleEmailOnSuspiciousChange = useCallback((checked: boolean) => {
+    setPolicies((prev) => ({
+      ...prev,
+      notifications: { ...prev.notifications, emailOnSuspicious: checked }
+    }));
+  }, [setPolicies]);
+
+  const handleEmailOnPolicyViolationChange = useCallback((checked: boolean) => {
+    setPolicies((prev) => ({
+      ...prev,
+      notifications: { ...prev.notifications, emailOnPolicyViolation: checked }
+    }));
+  }, [setPolicies]);
+
+  const handleNotifyAdminsOnCriticalChange = useCallback((checked: boolean) => {
+    setPolicies((prev) => ({
+      ...prev,
+      notifications: { ...prev.notifications, notifyAdminsOnCritical: checked }
+    }));
+  }, [setPolicies]);
+
   return (
     <Card>
       <CardHeader>
@@ -120,10 +178,7 @@ export function NotificationsCard({ policies, setPolicies }: { policies: Session
           </div>
           <Switch
             checked={policies.notifications.emailOnNewDevice}
-            onCheckedChange={(checked) => setPolicies((prev) => ({
-              ...prev,
-              notifications: { ...prev.notifications, emailOnNewDevice: checked }
-            }))}
+            onCheckedChange={handleEmailOnNewDeviceChange}
           />
         </div>
         <div className="flex items-center justify-between">
@@ -133,10 +188,7 @@ export function NotificationsCard({ policies, setPolicies }: { policies: Session
           </div>
           <Switch
             checked={policies.notifications.emailOnSuspicious}
-            onCheckedChange={(checked) => setPolicies((prev) => ({
-              ...prev,
-              notifications: { ...prev.notifications, emailOnSuspicious: checked }
-            }))}
+            onCheckedChange={handleEmailOnSuspiciousChange}
           />
         </div>
         <div className="flex items-center justify-between">
@@ -146,10 +198,7 @@ export function NotificationsCard({ policies, setPolicies }: { policies: Session
           </div>
           <Switch
             checked={policies.notifications.emailOnPolicyViolation}
-            onCheckedChange={(checked) => setPolicies((prev) => ({
-              ...prev,
-              notifications: { ...prev.notifications, emailOnPolicyViolation: checked }
-            }))}
+            onCheckedChange={handleEmailOnPolicyViolationChange}
           />
         </div>
         <div className="flex items-center justify-between">
@@ -161,14 +210,13 @@ export function NotificationsCard({ policies, setPolicies }: { policies: Session
           </div>
           <Switch
             checked={policies.notifications.notifyAdminsOnCritical}
-            onCheckedChange={(checked) => setPolicies((prev) => ({
-              ...prev,
-              notifications: { ...prev.notifications, notifyAdminsOnCritical: checked }
-            }))}
+            onCheckedChange={handleNotifyAdminsOnCriticalChange}
           />
         </div>
       </CardContent>
     </Card>
   );
-}
+});
+
+NotificationsCard.displayName = 'NotificationsCard';
 
