@@ -30,7 +30,7 @@ import {
   logUserCreated,
   logOperationFailed,
 } from "@/lib/audit-logger";
-import { hashPasswordArgon2 } from "@/lib/password-migration";
+import { hashPassword } from "@/lib/password";
 
 export const dynamic = "force-dynamic";
 
@@ -132,7 +132,7 @@ export async function createStaffAction(formData: FormData) {
     }
 
     // Hash password with Argon2id (OWASP 2023 recommendation)
-    const hashedPassword = await hashPasswordArgon2(password);
+    const hashedPassword = await hashPassword(password);
 
     // Create user and account in a transaction
     const user = await prisma.user.create({
