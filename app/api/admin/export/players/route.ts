@@ -1,92 +1,30 @@
 import { NextResponse } from "next/server";
 import { userHasPermissionAsync } from "@/lib/rbac-server";
 import { prisma } from "@/lib/prisma";
-import { exportToCSV, exportToExcel, exportToPDF, formatDataForExport } from "@/lib/exports";
+import { formatDataForExport } from "@/lib/exports";
 import { log } from "@/lib/logger";
 import { logDataExported } from "@/lib/audit-logger";
 import { createApiHandler } from "@/lib/api-middleware";
-import { z } from "zod";
-
-// Security: Constants for validation
-const MAX_EXPORT_RECORDS = 10000; // Prevent excessive exports
-
-// Validation schema for query parameters
-const exportQuerySchema = z.object({
-    format: z.enum(["csv", "excel", "pdf"]).default("csv"),
-    days: z.coerce.number().int().min(1).max(365).default(30),
-});
-
-type ExportQuery = z.infer<typeof exportQuerySchema>;
+import {
+  exportQuerySchema,
+  generateExportResponse,
+  generateDateRange,
+  EXPORT_CONSTANTS,
+  type ExportQuery,
+  type ExportColumn,
+} from "../utils";
 
 /**
- * Generate export response based on format
+ * Player analytics export columns
  */
-function generateExport(
-  format: string,
-  formattedData: unknown[],
-  filename: string,
-  days: number,
-  userId: string
-): NextResponse {
-  const columns = [
-    { key: "minecraftName", label: "Minecraft Name" },
-    { key: "totalWebVisits", label: "Web Visits" },
-    { key: "totalMinecraftTime", label: "Playtime (minutes)" },
-    { key: "totalMinecraftJoins", label: "Joins" },
-    { key: "overallEngagement", label: "Engagement %" },
-    { key: "lastActiveAt", label: "Last Active" },
-  ];
-
-  switch (format) {
-    case "csv": {
-      const csv = exportToCSV(formattedData, filename, columns);
-      log.info("Player CSV export completed", { userId, filename });
-      return new NextResponse(csv, {
-        headers: {
-          "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": `attachment; filename="${filename}.csv"`,
-          "X-Content-Type-Options": "nosniff",
-          "Cache-Control": "no-store, must-revalidate",
-        },
-      });
-    }
-
-    case "excel": {
-      const excel = exportToExcel(formattedData, filename, "Player Analytics", columns);
-      log.info("Player Excel export completed", { userId, filename });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return new NextResponse(excel as any, {
-        headers: {
-          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "Content-Disposition": `attachment; filename="${filename}.xlsx"`,
-          "X-Content-Type-Options": "nosniff",
-          "Cache-Control": "no-store, must-revalidate",
-        },
-      });
-    }
-
-    case "pdf": {
-      const pdf = exportToPDF(formattedData, filename, "Player Analytics Report", columns, {
-        subtitle: `Active players in the last ${days} days`,
-        dateRange: `${new Date(Date.now() - days * 24 * 60 * 60 * 1000).toLocaleDateString()} - ${new Date().toLocaleDateString()}`,
-      });
-      log.info("Player PDF export completed", { userId, filename });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return new NextResponse(pdf as any, {
-        headers: {
-          "Content-Type": "application/pdf",
-          "Content-Disposition": `attachment; filename="${filename}.pdf"`,
-          "X-Content-Type-Options": "nosniff",
-          "Cache-Control": "no-store, must-revalidate",
-        },
-      });
-    }
-
-    default:
-      log.warn("Invalid export format requested", { userId, format });
-      return NextResponse.json({ error: "Invalid format" }, { status: 400 });
-  }
-}
+const PLAYER_COLUMNS: ExportColumn[] = [
+  { key: "minecraftName", label: "Minecraft Name" },
+  { key: "totalWebVisits", label: "Web Visits" },
+  { key: "totalMinecraftTime", label: "Playtime (minutes)" },
+  { key: "totalMinecraftJoins", label: "Joins" },
+  { key: "overallEngagement", label: "Engagement %" },
+  { key: "lastActiveAt", label: "Last Active" },
+];
 
 /**
  * GET /api/admin/export/players
@@ -138,7 +76,7 @@ export const GET = createApiHandler(
         },
       },
       orderBy: { totalMinecraftTime: "desc" },
-      take: MAX_EXPORT_RECORDS, // Security: Prevent excessive exports
+      take: EXPORT_CONSTANTS.MAX_PLAYERS_RECORDS,
     });
 
     // Format data
@@ -166,7 +104,17 @@ export const GET = createApiHandler(
     );
 
     // Generate and return export
-    return generateExport(format, formattedData, filename, days, userId!)
+    return generateExportResponse({
+      format,
+      formattedData,
+      filename,
+      columns: PLAYER_COLUMNS,
+      userId: userId!,
+      exportType: "Player Analytics",
+      pdfOptions: {
+        subtitle: `Active players in the last ${days} days`,
+        dateRange: generateDateRange(days),
+      },
+    });
   }
 );
-
