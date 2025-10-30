@@ -1,114 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { log } from "@/lib/logger";
-import { sanitizeInput, sanitizeDescription } from "@/lib/input-sanitization";
 import { logEventUpdated } from "@/lib/audit-logger";
 import { createApiHandler } from "@/lib/api-middleware";
+import { validateEventUpdate } from "../utils";
 
 export const runtime = "nodejs";
-
-// Security: Constants
-const MAX_TITLE_LENGTH = 200;
-const MAX_WORLD_LENGTH = 100;
-const MAX_SHORT_DESC_LENGTH = 500;
-const MAX_DETAILS_LENGTH = 50000;
-
-// Valid enum values from Prisma schema
-const VALID_CATEGORIES = ["Fireworks", "SeasonalOverlay", "Seasonal", "MeetAndGreet", "Parade", "Other"];
-const VALID_STATUSES = ["Draft", "Published", "Archived"];
-
-function validateEnum(value: unknown, validValues: string[]): boolean {
-    return typeof value === 'string' && validValues.includes(value);
-}
-
-function validateStringLength(value: unknown, min: number, max: number): string | null {
-    if (!value || typeof value !== 'string') return null;
-    const str = sanitizeInput(String(value), max);
-    if (str.length < min || str.length > max) {
-        return null;
-    }
-    return str;
-}
-
-// eslint-disable-next-line complexity
-function validateEventUpdate(body: Record<string, unknown>): { data: Record<string, unknown>; error?: string } {
-    const data: Record<string, unknown> = {};
-    
-    if (body['title'] !== undefined) {
-        const title = validateStringLength(body['title'], 1, MAX_TITLE_LENGTH);
-        if (!title) return { data, error: "Title must be 1-200 characters" };
-        data["title"] = title;
-    }
-    
-    if (body['shortDescription'] !== undefined) {
-        const shortDesc = typeof body['shortDescription'] === 'string' 
-            ? sanitizeDescription(body['shortDescription'], MAX_SHORT_DESC_LENGTH)
-            : null;
-        data['shortDescription'] = shortDesc;
-    }
-    
-    if (body['details'] !== undefined) {
-        const details = typeof body['details'] === 'string'
-            ? sanitizeDescription(body['details'], MAX_DETAILS_LENGTH)
-            : null;
-        data['details'] = details;
-    }
-    
-    if (body['category'] !== undefined) {
-        if (!validateEnum(body['category'], VALID_CATEGORIES)) {
-            return { data, error: "Invalid category" };
-        }
-        data["category"] = body['category'];
-    }
-    
-    if (body['status'] !== undefined) {
-        if (!validateEnum(body['status'], VALID_STATUSES)) {
-            return { data, error: "Invalid status" };
-        }
-        data["status"] = body['status'];
-    }
-    
-    if (body['world'] !== undefined) {
-        const world = validateStringLength(body['world'], 1, MAX_WORLD_LENGTH);
-        if (!world) return { data, error: "World must be 1-100 characters" };
-        data["world"] = world;
-    }
-    
-    if (body['startAt'] !== undefined) {
-        try {
-            const date = new Date(body['startAt'] as string);
-            if (isNaN(date.getTime())) {
-                return { data, error: "Invalid startAt date" };
-            }
-            data["startAt"] = date;
-        } catch {
-            return { data, error: "Invalid startAt date" };
-        }
-    }
-    
-    if (body['endAt'] !== undefined) {
-        if (body['endAt'] === null) {
-            data["endAt"] = null;
-        } else {
-            try {
-                const date = new Date(body['endAt'] as string);
-                if (isNaN(date.getTime())) {
-                    return { data, error: "Invalid endAt date" };
-                }
-                data["endAt"] = date;
-            } catch {
-                return { data, error: "Invalid endAt date" };
-            }
-        }
-    }
-    
-    // Validation: If both dates provided, end must be after start
-    if (data["startAt"] && data["endAt"] && data["endAt"] <= data["startAt"]) {
-        return { data, error: "End date must be after start date" };
-    }
-    
-    return { data };
-}
 
 /**
  * GET /api/admin/events/[id]

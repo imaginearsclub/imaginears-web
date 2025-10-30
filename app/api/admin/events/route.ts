@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { log } from "@/lib/logger";
 import { createApiHandler } from "@/lib/api-middleware";
 import { z } from "zod";
-import type { Prisma, EventCategory, EventVisibility } from "@prisma/client";
+import { buildEventWhereClause } from "./utils";
 
 export const runtime = "nodejs";
 
@@ -21,19 +21,6 @@ const eventsQuerySchema = z.object({
 });
 
 type EventsQuery = z.infer<typeof eventsQuerySchema>;
-
-/**
- * Build where clause from validated query parameters
- */
-function buildWhereClause(query: EventsQuery): Prisma.EventWhereInput {
-    const where: Prisma.EventWhereInput = {};
-    
-    if (query.status) where.status = query.status;
-    if (query.category) where.category = query.category as EventCategory;
-    if (query.visibility) where.visibility = query.visibility as EventVisibility;
-    
-    return where;
-}
 
 /**
  * GET /api/admin/events
@@ -58,7 +45,7 @@ export const GET = createApiHandler(
         const skip = (page - 1) * take;
         
         // Build safe where clause with validated filters
-        const where = buildWhereClause(query);
+        const where = buildEventWhereClause(query);
 
         // Performance: Run count and query in parallel
         const [total, items] = await Promise.all([
