@@ -5,6 +5,13 @@ import { log } from "@/lib/logger";
 import { logAudit } from "@/lib/audit-logger";
 import { createApiHandler } from "@/lib/api-middleware";
 import { getClientIp, getUserAgent } from "@/lib/middleware/shared";
+import {
+  validateApplicationName,
+  validateApplicationEmail,
+  validateApplicationMcUsername,
+  validateApplicationNotes,
+  type ApplicationValidationResult,
+} from "../utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,65 +19,26 @@ export const dynamic = "force-dynamic";
 // Valid enum values
 const VALID_ROLES: AppRole[] = ["Developer", "GuestServices", "Imaginear"];
 const VALID_STATUSES: AppStatus[] = ["New", "InReview", "Approved", "Rejected"];
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-type ValidationResult = { valid: true; data: Record<string, unknown> } | { valid: false; error: string };
-
-/**
- * Validate name field
- */
-function validateName(name: unknown): string | null {
-  const n = String(name).trim();
-  if (n.length === 0 || n.length > 100) return null;
-  return n;
-}
-
-/**
- * Validate email field
- */
-function validateEmail(email: unknown): string | null {
-  const e = String(email).trim().toLowerCase();
-  if (!EMAIL_REGEX.test(e) || e.length > 255) return null;
-  return e;
-}
-
-/**
- * Validate Minecraft username
- */
-function validateMcUsername(mcUsername: unknown): string | null {
-  const mc = String(mcUsername).trim();
-  if (mc.length > 0 && (mc.length < 3 || mc.length > 16)) return null;
-  return mc || null;
-}
-
-/**
- * Validate notes field
- */
-function validateNotes(notes: unknown): string | null {
-  const n = notes ? String(notes).trim() : null;
-  if (n && n.length > 10000) return null;
-  return n;
-}
 
 /**
  * Validate basic fields (name, email, notes)
  */
 function validateBasicFields(body: Record<string, unknown>, patch: Record<string, unknown>): string | null {
   if (body["name"] !== undefined) {
-    const name = validateName(body["name"]);
+    const name = validateApplicationName(body["name"]);
     if (!name) return "Name must be 1-100 characters";
     patch["name"] = name;
   }
 
   if (body["email"] !== undefined) {
-    const email = validateEmail(body["email"]);
+    const email = validateApplicationEmail(body["email"]);
     if (!email) return "Invalid email address";
     patch["email"] = email;
   }
 
   if (body["notes"] !== undefined) {
-    const notes = validateNotes(body["notes"]);
-    if (notes === null && body["notes"]) return "Notes too long (max 10000 characters)";
+    const notes = validateApplicationNotes(body["notes"]);
+    if (notes === null && body["notes"]) return "Notes too long (max 1000 characters)";
     patch["notes"] = notes;
   }
 
@@ -97,7 +65,7 @@ function validateEnumFields(body: Record<string, unknown>, patch: Record<string,
 /**
  * Validate all application update fields
  */
-function validateApplicationUpdate(body: Record<string, unknown>): ValidationResult {
+function validateApplicationUpdate(body: Record<string, unknown>): ApplicationValidationResult<Record<string, unknown>> {
   const patch: Record<string, unknown> = {};
 
   // Validate basic text fields
@@ -110,7 +78,7 @@ function validateApplicationUpdate(body: Record<string, unknown>): ValidationRes
 
   // Validate Minecraft username separately (special logic)
   if (body["mcUsername"] !== undefined) {
-    const mc = validateMcUsername(body["mcUsername"]);
+    const mc = validateApplicationMcUsername(body["mcUsername"]);
     if (mc === null && String(body["mcUsername"]).trim().length > 0) {
       return { valid: false, error: "Minecraft username must be 3-16 characters" };
     }

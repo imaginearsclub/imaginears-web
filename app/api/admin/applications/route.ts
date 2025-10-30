@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { AppStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { log } from "@/lib/logger";
 import { createApiHandler } from "@/lib/api-middleware";
 import { z } from "zod";
+import { buildApplicationSearchQuery } from "./utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,26 +17,6 @@ const applicationsQuerySchema = z.object({
 });
 
 type ApplicationsQuery = z.infer<typeof applicationsQuerySchema>;
-
-/**
- * Build search query for applications
- */
-function buildSearchQuery(status: AppStatus | undefined, searchTerm: string) {
-  const where: Record<string, unknown> = {};
-  
-  if (status) where["status"] = status;
-  
-  if (searchTerm) {
-    where["OR"] = [
-      { name: { contains: searchTerm, mode: "insensitive" } },
-      { email: { contains: searchTerm, mode: "insensitive" } },
-      { mcUsername: { contains: searchTerm, mode: "insensitive" } },
-      { discordUser: { contains: searchTerm, mode: "insensitive" } },
-    ];
-  }
-  
-  return where;
-}
 
 /**
  * GET /api/admin/applications
@@ -58,7 +38,7 @@ export const GET = createApiHandler(
   async (_req, { userId, validatedQuery }) => {
     const { status, q: searchTerm, take, cursor } = validatedQuery as ApplicationsQuery;
 
-    const where = buildSearchQuery(status, searchTerm);
+    const where = buildApplicationSearchQuery(status, searchTerm);
 
     const queryOptions = {
       where,
