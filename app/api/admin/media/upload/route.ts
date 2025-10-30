@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
-import { userHasPermissionAsync } from "@/lib/rbac-server";
-import { prisma } from "@/lib/prisma";
 import { uploadFile } from "@/lib/media-library";
 import { triggerWebhook, WEBHOOK_EVENTS } from "@/lib/webhooks";
 import { createApiHandler } from "@/lib/api-middleware";
 import { log } from "@/lib/logger";
-
-// Security: Max file size 50MB
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
-const VALID_CATEGORIES = ["audio", "images", "documents"];
+import { checkMediaPermission, releaseBuffer, isValidCategory, parseTags, MAX_FILE_SIZE } from "../utils";
 
 /**
  * POST /api/admin/media/upload
@@ -30,13 +25,7 @@ export const POST = createApiHandler(
   },
   async (req, { userId }) => {
     // Check permission
-    const user = await prisma.user.findUnique({
-      where: { id: userId! },
-      select: { role: true },
-    });
-
-    if (!user || !(await userHasPermissionAsync(user.role, "media:upload"))) {
-      log.warn("Media upload permission denied", { userId, role: user?.role });
+    if (!(await checkMediaPermission(userId!, "media:upload"))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -58,7 +47,7 @@ export const POST = createApiHandler(
     }
 
     // Security: Validate category
-    if (!VALID_CATEGORIES.includes(category)) {
+    if (!isValidCategory(category)) {
       log.warn("Media upload invalid category", { userId, category });
       return NextResponse.json(
         { error: "Invalid category" },
@@ -76,8 +65,8 @@ export const POST = createApiHandler(
     }
 
     // Convert File to Buffer
-    let buffer: Buffer | null = Buffer.from(await file.arrayBuffer());
-    const tags = tagsStr ? JSON.parse(tagsStr) : undefined;
+    const buffer: Buffer = Buffer.from(await file.arrayBuffer());
+    const tags = parseTags(tagsStr);
 
     let uploadedFile;
     try {
@@ -93,9 +82,7 @@ export const POST = createApiHandler(
         ...(tags && { tags }),
       });
     } finally {
-      // Memory: Explicitly release buffer to help GC
-      buffer = null;
-      if (global.gc) global.gc(); // Force GC if --expose-gc flag is set (optional)
+      releaseBuffer();
     }
 
     log.info("Media file uploaded", { 

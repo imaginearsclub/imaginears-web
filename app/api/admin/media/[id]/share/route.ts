@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { userHasPermissionAsync } from "@/lib/rbac-server";
 import { prisma } from "@/lib/prisma";
 import { generateShareLink } from "@/lib/media-library";
 import { createApiHandler } from "@/lib/api-middleware";
 import { log } from "@/lib/logger";
+import { checkMediaPermission } from "../../utils";
 import { z } from "zod";
 
 // Validation schema for share link creation
@@ -34,13 +34,7 @@ export const POST = createApiHandler(
     const { expiresInDays } = validatedBody as z.infer<typeof createShareSchema>;
 
     // Check permission
-    const user = await prisma.user.findUnique({
-      where: { id: userId! },
-      select: { role: true },
-    });
-
-    if (!user || !(await userHasPermissionAsync(user.role, "media:upload"))) {
-      log.warn("Media share permission denied", { userId, role: user?.role, mediaId: id });
+    if (!(await checkMediaPermission(userId!, "media:upload", id))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -73,13 +67,7 @@ export const DELETE = createApiHandler(
     const id = params!['id']!;
 
     // Check permission
-    const user = await prisma.user.findUnique({
-      where: { id: userId! },
-      select: { role: true },
-    });
-
-    if (!user || !(await userHasPermissionAsync(user.role, "media:upload"))) {
-      log.warn("Media unshare permission denied", { userId, role: user?.role, mediaId: id });
+    if (!(await checkMediaPermission(userId!, "media:upload", id))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { userHasPermissionAsync } from "@/lib/rbac-server";
-import { prisma } from "@/lib/prisma";
 import { deleteMedia, updateMedia } from "@/lib/media-library";
 import { createApiHandler } from "@/lib/api-middleware";
 import { log } from "@/lib/logger";
+import { checkMediaPermission } from "../utils";
 import { z } from "zod";
 
 // Validation schema for media updates
@@ -33,13 +32,7 @@ export const DELETE = createApiHandler(
     const id = params!['id']!;
 
     // Check permission
-    const user = await prisma.user.findUnique({
-      where: { id: userId! },
-      select: { role: true },
-    });
-
-    if (!user || !(await userHasPermissionAsync(user.role, "media:delete"))) {
-      log.warn("Media delete permission denied", { userId, role: user?.role, mediaId: id });
+    if (!(await checkMediaPermission(userId!, "media:delete", id))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -74,13 +67,7 @@ export const PATCH = createApiHandler(
     const body = validatedBody as z.infer<typeof updateMediaSchema>;
 
     // Check permission
-    const user = await prisma.user.findUnique({
-      where: { id: userId! },
-      select: { role: true },
-    });
-
-    if (!user || !(await userHasPermissionAsync(user.role, "media:upload"))) {
-      log.warn("Media update permission denied", { userId, role: user?.role, mediaId: id });
+    if (!(await checkMediaPermission(userId!, "media:upload", id))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

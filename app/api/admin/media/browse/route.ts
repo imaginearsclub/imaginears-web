@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { userHasPermissionAsync } from "@/lib/rbac-server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { initializeRootDirectories } from "@/lib/media-library";
 import { createApiHandler } from "@/lib/api-middleware";
 import { log } from "@/lib/logger";
+import { checkMediaPermission, formatMediaResponse } from "../utils";
 import { z } from "zod";
 
 // Validation schema for query parameters
@@ -36,13 +36,7 @@ export const GET = createApiHandler(
     const { parentId, category, limit, cursor } = validatedQuery as z.infer<typeof browseQuerySchema>;
 
     // Check permission
-    const user = await prisma.user.findUnique({
-      where: { id: userId! },
-      select: { role: true },
-    });
-
-    if (!user || !(await userHasPermissionAsync(user.role, "media:read"))) {
-      log.warn("Media browse permission denied", { userId, role: user?.role });
+    if (!(await checkMediaPermission(userId!, "media:read"))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -80,10 +74,7 @@ export const GET = createApiHandler(
     const contents = hasMore ? items.slice(0, limit) : items;
     const nextCursor = hasMore && contents.length > 0 ? contents[contents.length - 1]!.id : null;
 
-    const result = contents.map((item) => ({
-      ...item,
-      childCount: item.children.length,
-    }));
+    const result = contents.map((item) => formatMediaResponse(item));
 
     log.info("Media directory browsed", { userId, parentId, category, itemCount: result.length, hasMore });
 

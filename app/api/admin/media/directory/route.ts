@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { userHasPermissionAsync } from "@/lib/rbac-server";
-import { prisma } from "@/lib/prisma";
 import { createDirectory } from "@/lib/media-library";
 import { createApiHandler } from "@/lib/api-middleware";
 import { log } from "@/lib/logger";
+import { checkMediaPermission } from "./utils";
 import { z } from "zod";
 
 // Validation schema for directory creation
@@ -36,13 +35,7 @@ export const POST = createApiHandler(
     const { name, parentId, category, description } = validatedBody as z.infer<typeof createDirectorySchema>;
 
     // Check permission
-    const user = await prisma.user.findUnique({
-      where: { id: userId! },
-      select: { role: true },
-    });
-
-    if (!user || !(await userHasPermissionAsync(user.role, "media:manage_directories"))) {
-      log.warn("Media directory creation permission denied", { userId, role: user?.role });
+    if (!(await checkMediaPermission(userId!, "media:manage_directories"))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
