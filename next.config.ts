@@ -25,7 +25,7 @@ const nextConfig: NextConfig = {
     },
     
     // Performance: External packages for server components (moved from experimental)
-    serverExternalPackages: ['@prisma/client', 'bcryptjs'],
+    serverExternalPackages: ['@prisma/client'],
     
     // Security: Configure security headers
     async headers() {
