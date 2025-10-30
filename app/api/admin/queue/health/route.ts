@@ -12,8 +12,7 @@ import { NextResponse } from "next/server";
 import { getQueueHealth } from "@/lib/queue";
 import { createApiHandler } from "@/lib/api-middleware";
 import { log } from "@/lib/logger";
-import { userHasPermissionAsync } from "@/lib/rbac-server";
-import { prisma } from "@/lib/prisma";
+import { checkPermission } from "@/lib/role-security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,31 +43,8 @@ export const GET = createApiHandler(
     const startTime = Date.now();
 
     try {
-      // Fetch user role for RBAC check
-      const user = await prisma.user.findUnique({
-        where: { id: userId! },
-        select: { role: true },
-      });
-
-      if (!user) {
-        log.warn("Queue health check - user not found", { userId });
-        return NextResponse.json(
-          { error: "User not found" },
-          { status: 404 }
-        );
-      }
-
-      // Check RBAC permission (webhooks:read)
-      const hasPermission = await userHasPermissionAsync(
-        user.role,
-        "webhooks:read"
-      );
-
-      if (!hasPermission) {
-        log.warn("Queue health check - insufficient permissions", { 
-          userId, 
-          role: user.role 
-        });
+      // Check permission
+      if (!(await checkPermission(userId!, "webhooks:read"))) {
         return NextResponse.json(
           { error: "Forbidden: Insufficient permissions" },
           { status: 403 }
@@ -88,7 +64,6 @@ export const GET = createApiHandler(
       log.info("Queue health checked", { 
         userId, 
         duration,
-        role: user.role,
         queueCount: Object.keys(health).length
       });
 
