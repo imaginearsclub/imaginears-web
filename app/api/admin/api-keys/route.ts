@@ -5,11 +5,17 @@ import { log } from "@/lib/logger";
 import { logAudit } from "@/lib/audit-logger";
 import { createApiHandler } from "@/lib/api-middleware";
 import { getClientIp, getUserAgent } from "@/lib/middleware/shared";
+import {
+  validateName,
+  validateScopes,
+  validateRateLimit,
+  validateDescription,
+  validateExpiresAt,
+  type ValidationResult,
+} from "./utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type CreateKeyValidation = { valid: true; data: CreateKeyData } | { valid: false; error: string };
 
 interface CreateKeyData {
   name: string;
@@ -22,11 +28,12 @@ interface CreateKeyData {
 /**
  * Validate API key creation request
  */
-function validateCreateRequest(body: Record<string, unknown>): CreateKeyValidation {
+function validateCreateRequest(body: Record<string, unknown>): ValidationResult<CreateKeyData> {
   const { name, description, scopes, rateLimit: rl, expiresAt } = body;
 
   // Name validation
-  if (!name || typeof name !== "string" || name.trim().length === 0) {
+  const validatedName = validateName(name);
+  if (!validatedName) {
     return { valid: false, error: "Name is required" };
   }
 
@@ -35,26 +42,27 @@ function validateCreateRequest(body: Record<string, unknown>): CreateKeyValidati
     return { valid: false, error: "At least one scope is required" };
   }
 
-  const validScopes = Object.keys(API_SCOPES);
-  const invalidScopes = scopes.filter((s) => !validScopes.includes(s as string));
-  if (invalidScopes.length > 0) {
+  const validatedScopes = validateScopes(scopes);
+  if (!validatedScopes) {
+    const validScopes = Object.keys(API_SCOPES);
+    const invalidScopes = scopes.filter((s) => !validScopes.includes(s as string));
     return { valid: false, error: `Invalid scopes: ${invalidScopes.join(", ")}` };
   }
 
   // Rate limit validation
-  const parsedRateLimit = rl ? parseInt(rl as string) : 100;
-  if (parsedRateLimit < 1 || parsedRateLimit > 10000) {
+  const validatedRateLimit = validateRateLimit(rl || 100);
+  if (!validatedRateLimit) {
     return { valid: false, error: "Rate limit must be between 1 and 10000" };
   }
 
   return {
     valid: true,
     data: {
-      name: name.trim(),
-      scopes: scopes as string[],
-      rateLimit: parsedRateLimit,
-      description: (description as string)?.trim() || null,
-      expiresAt: expiresAt ? new Date(expiresAt as string) : null,
+      name: validatedName,
+      scopes: validatedScopes,
+      rateLimit: validatedRateLimit,
+      description: validateDescription(description),
+      expiresAt: validateExpiresAt(expiresAt),
     },
   };
 }

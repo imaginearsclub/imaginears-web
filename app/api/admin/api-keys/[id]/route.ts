@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { API_SCOPES } from "@/lib/api-keys";
 import { log } from "@/lib/logger";
 import { logAudit } from "@/lib/audit-logger";
 import { createApiHandler } from "@/lib/api-middleware";
 import { getClientIp, getUserAgent } from "@/lib/middleware/shared";
+import {
+  validateName,
+  validateScopes,
+  validateRateLimit,
+  validateDescription,
+  validateExpiresAt,
+  validateIsActive,
+  type ValidationResult,
+} from "../utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,37 +26,6 @@ interface ApiKeyUpdate {
   expiresAt?: Date | null;
 }
 
-type ValidationResult = { valid: true; updates: ApiKeyUpdate } | { valid: false; error: string };
-
-/**
- * Validate name field
- */
-function validateName(name: unknown): string | null {
-  if (typeof name !== "string" || name.trim().length === 0) return null;
-  return name.trim();
-}
-
-/**
- * Validate scopes field
- */
-function validateScopes(scopes: unknown): string[] | null {
-  if (!Array.isArray(scopes) || scopes.length === 0) return null;
-  
-  const validScopes = Object.keys(API_SCOPES);
-  const invalidScopes = scopes.filter((s) => !validScopes.includes(s as string));
-  if (invalidScopes.length > 0) return null;
-  
-  return scopes;
-}
-
-/**
- * Validate rate limit field
- */
-function validateRateLimit(value: unknown): number | null {
-  const parsed = parseInt(value as string);
-  if (isNaN(parsed) || parsed < 1 || parsed > 10000) return null;
-  return parsed;
-}
 
 /**
  * Apply validated field to updates object (type-safe)
@@ -85,7 +62,7 @@ function applyField(
 /**
  * Validate and build update object from request body
  */
-function validateUpdates(body: Record<string, unknown>): ValidationResult {
+function validateUpdates(body: Record<string, unknown>): ValidationResult<ApiKeyUpdate> {
   const updates: ApiKeyUpdate = {};
 
   // Validate each field
@@ -100,25 +77,26 @@ function validateUpdates(body: Record<string, unknown>): ValidationResult {
 
   // Simple fields
   if (body["description"] !== undefined) {
-    updates.description = (body["description"] as string)?.trim() || null;
+    updates.description = validateDescription(body["description"]);
   }
 
   if (body["isActive"] !== undefined) {
-    if (typeof body["isActive"] !== "boolean") {
+    const validatedIsActive = validateIsActive(body["isActive"]);
+    if (validatedIsActive === null) {
       return { valid: false, error: "isActive must be a boolean" };
     }
-    updates.isActive = body["isActive"];
+    updates.isActive = validatedIsActive;
   }
 
   if (body["expiresAt"] !== undefined) {
-    updates.expiresAt = body["expiresAt"] ? new Date(body["expiresAt"] as string) : null;
+    updates.expiresAt = validateExpiresAt(body["expiresAt"]);
   }
 
   if (Object.keys(updates).length === 0) {
     return { valid: false, error: "No valid fields to update" };
   }
 
-  return { valid: true, updates };
+  return { valid: true, data: updates };
 }
 
 /**
@@ -151,7 +129,7 @@ export const PATCH = createApiHandler(
     try {
       const apiKey = await prisma.apiKey.update({
         where: { id },
-        data: validation.updates,
+        data: validation.data,
         select: {
           id: true,
           name: true,
@@ -177,13 +155,13 @@ export const PATCH = createApiHandler(
         action: "api_key.updated",
         actor: { id: userId! },
         target: { id, type: "api_key", name: apiKey.name },
-        details: { fields: Object.keys(validation.updates), keyPrefix: apiKey.keyPrefix },
+        details: { fields: Object.keys(validation.data), keyPrefix: apiKey.keyPrefix },
         ipAddress: clientIP,
         userAgent: userAgent || "Unknown",
         success: true,
       });
 
-      log.info("API key updated", { userId, keyId: id, fields: Object.keys(validation.updates) });
+      log.info("API key updated", { userId, keyId: id, fields: Object.keys(validation.data) });
 
       return NextResponse.json({ apiKey });
     } catch (error) {

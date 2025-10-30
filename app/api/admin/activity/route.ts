@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createApiHandler } from "@/lib/api-middleware";
 import { log } from "@/lib/logger";
+import { sanitizeForDisplay, maskEmail } from "@/lib/input-sanitization";
+import { getUserDisplayName } from "@/lib/utils";
 
 // Configuration
 export const runtime = "nodejs";
@@ -20,40 +22,6 @@ type ActivityItem = {
     when: string;      // ISO string
     updatedBy?: string | undefined; // User who made the change (minecraft name or full name)
 };
-
-/**
- * Security: Mask email address for privacy
- * Converts "user@example.com" to "u***@example.com"
- */
-function maskEmail(email: string | null): string {
-    if (!email) return "N/A";
-    
-    const [local, domain] = email.split("@");
-    if (!local || !domain) return "***";
-    
-    // Show first character of local part, mask the rest
-    const maskedLocal = local.length > 1 
-        ? `${local[0]}***` 
-        : "***";
-    
-    return `${maskedLocal}@${domain}`;
-}
-
-/**
- * Security: Sanitize string for display (prevent any potential XSS)
- */
-function sanitizeForDisplay(str: string | null, maxLength: number = 100): string {
-    if (!str) return "Untitled";
-    return str.trim().slice(0, maxLength);
-}
-
-/**
- * Helper: Get display name for user (prefer minecraft name)
- */
-function getUserDisplayName(user: { minecraftName: string | null; name: string | null } | null): string | undefined {
-    if (!user) return undefined;
-    return user.minecraftName || user.name || undefined;
-}
 
 /**
  * Performance: Fetch activity data in parallel
