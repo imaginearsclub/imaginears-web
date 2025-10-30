@@ -158,12 +158,12 @@ export const ListEventsQuerySchema = z.object({
     .string()
     .optional()
     .transform((val) => (val ? Math.max(1, parseInt(val, 10)) : 1))
-    .pipe(z.number().int().min(1).default(1)),
+    .pipe(z.number().int().min(1)),
   limit: z
     .string()
     .optional()
     .transform((val) => (val ? parseInt(val, 10) : 50))
-    .pipe(z.number().int().min(1).max(100).default(50)),
+    .pipe(z.number().int().min(1).max(100)),
   status: EventStatusSchema.optional(),
   category: EventCategorySchema.optional(),
 });
@@ -180,7 +180,7 @@ export const PublicEventsQuerySchema = z.object({
     .string()
     .optional()
     .transform((val) => (val ? parseInt(val, 10) : 50))
-    .pipe(z.number().int().min(1).max(100).default(50)),
+    .pipe(z.number().int().min(1).max(100)),
   cursor: z.string().max(50).optional(),
 });
 
@@ -194,7 +194,7 @@ export const RunningEventsQuerySchema = z.object({
     .string()
     .optional()
     .transform((val) => (val ? parseInt(val, 10) : 3))
-    .pipe(z.number().int().min(1).max(50).default(3)),
+    .pipe(z.number().int().min(1).max(50)),
 });
 
 export type RunningEventsQuery = z.infer<typeof RunningEventsQuerySchema>;
@@ -207,12 +207,12 @@ export const UpcomingEventsQuerySchema = z.object({
     .string()
     .optional()
     .transform((val) => (val ? parseInt(val, 10) : 14))
-    .pipe(z.number().int().min(1).max(90).default(14)),
+    .pipe(z.number().int().min(1).max(90)),
   limit: z
     .string()
     .optional()
     .transform((val) => (val ? parseInt(val, 10) : 200))
-    .pipe(z.number().int().min(1).max(500).default(200)),
+    .pipe(z.number().int().min(1).max(500)),
 });
 
 export type UpcomingEventsQuery = z.infer<typeof UpcomingEventsQuerySchema>;

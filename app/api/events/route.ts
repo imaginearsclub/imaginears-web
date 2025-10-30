@@ -25,6 +25,78 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
+ * Helper: Sanitize and prepare event data for database
+ */
+function prepareEventData(data: CreateEventInput) {
+  return {
+    title: sanitizeInput(data.title, 200),
+    world: sanitizeInput(data.world, 100),
+    shortDescription: data.shortDescription
+      ? sanitizeDescription(data.shortDescription, 500) || null
+      : null,
+    details: data.details ? sanitizeDescription(data.details, 50000) || null : null,
+    category: data.category,
+    status: data.status,
+    startAt: data.startAt,
+    endAt: data.endAt,
+    timezone: data.timezone,
+    recurrenceFreq: data.recurrenceFreq,
+    ...(data.byWeekday && { byWeekdayJson: data.byWeekday }),
+    ...(data.times && { timesJson: data.times }),
+    recurrenceUntil: data.recurrenceUntil || null,
+  };
+}
+
+/**
+ * Helper: Log audit event for creation
+ */
+async function logCreationAudit(
+  userId: string,
+  created: { id: string; title: string; world: string },
+  sanitizedData: { category: string; status: string }
+): Promise<void> {
+  await auditLog({
+    action: 'event.created',
+    resourceType: 'event',
+    resourceId: created.id,
+    userId,
+    details: {
+      title: created.title,
+      category: sanitizedData.category,
+      status: sanitizedData.status,
+      world: created.world,
+    },
+  });
+}
+
+/**
+ * Helper: Trigger webhook for event creation
+ */
+function triggerCreationWebhook(
+  created: { id: string; title: string; category: string; status: string; startAt: Date; endAt: Date },
+  userId?: string
+): void {
+  triggerWebhook(
+    WEBHOOK_EVENTS.EVENT_CREATED,
+    {
+      id: created.id,
+      title: created.title,
+      category: created.category,
+      status: created.status,
+      startAt: created.startAt.toISOString(),
+      endAt: created.endAt.toISOString(),
+    },
+    userId ? { userId } : undefined
+  ).catch((err) =>
+    log.error('Webhook trigger failed for event creation', {
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+      eventId: created.id,
+    })
+  );
+}
+
+/**
  * GET /api/events
  * 
  * List events with pagination and filtering
@@ -168,23 +240,7 @@ export const POST = createApiHandler(
     const data = validatedBody as CreateEventInput;
 
     // Additional sanitization for text fields (defense in depth)
-    const sanitizedData = {
-      title: sanitizeInput(data.title, 200),
-      world: sanitizeInput(data.world, 100),
-      shortDescription: data.shortDescription
-        ? sanitizeDescription(data.shortDescription, 500) || null
-        : null,
-      details: data.details ? sanitizeDescription(data.details, 50000) || null : null,
-      category: data.category,
-      status: data.status,
-      startAt: data.startAt,
-      endAt: data.endAt,
-      timezone: data.timezone,
-      recurrenceFreq: data.recurrenceFreq,
-      ...(data.byWeekday && { byWeekdayJson: data.byWeekday }),
-      ...(data.times && { timesJson: data.times }),
-      recurrenceUntil: data.recurrenceUntil || null,
-    };
+    const sanitizedData = prepareEventData(data);
 
     // Create event
     const created = await prisma.event.create({
@@ -202,18 +258,7 @@ export const POST = createApiHandler(
     });
 
     // Audit log
-    await auditLog({
-      action: 'event.created',
-      resourceType: 'event',
-      resourceId: created.id,
-      userId,
-      details: {
-        title: created.title,
-        category: sanitizedData.category,
-        status: sanitizedData.status,
-        world: created.world,
-      },
-    });
+    await logCreationAudit(userId, created, sanitizedData);
 
     log.info('Event created successfully', {
       eventId: created.id,
@@ -223,24 +268,7 @@ export const POST = createApiHandler(
     });
 
     // Trigger webhook (async, fire-and-forget)
-    triggerWebhook(
-      WEBHOOK_EVENTS.EVENT_CREATED,
-      {
-        id: created.id,
-        title: created.title,
-        category: sanitizedData.category,
-        status: sanitizedData.status,
-        startAt: created.startAt.toISOString(),
-        endAt: created.endAt.toISOString(),
-      },
-      userId ? { userId } : undefined
-    ).catch((err) =>
-      log.error('Webhook trigger failed for event creation', {
-        error: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
-        eventId: created.id,
-      })
-    );
+    triggerCreationWebhook(created, userId);
 
     return NextResponse.json(
       {
