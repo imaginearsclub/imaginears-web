@@ -1,19 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/session";
+import { createApiHandler } from "@/lib/api-middleware";
+import { validatePlayerName, logPlayerAction, createSuccessResponse } from "../utils";
+import { z } from "zod";
 
 export const runtime = "nodejs";
 
-// Input validation
-function validatePlayerName(name: unknown): string | null {
-    if (typeof name !== "string") return null;
-    
-    // Minecraft username rules: 3-16 characters, alphanumeric and underscore only
-    const sanitized = name.trim();
-    if (sanitized.length < 3 || sanitized.length > 16) return null;
-    if (!/^[a-zA-Z0-9_]+$/.test(sanitized)) return null;
-    
-    return sanitized;
-}
+const kickSchema = z.object({
+  playerName: z.string().min(3).max(16).regex(/^[a-zA-Z0-9_]+$/),
+  reason: z.string().max(200).optional(),
+});
 
 /**
  * POST /api/admin/players/kick
@@ -21,22 +16,24 @@ function validatePlayerName(name: unknown): string | null {
  * 
  * Security: Requires admin authentication, input validation, audit logging
  */
-export async function POST(req: Request) {
-    try {
-        // Security: Require admin authentication
-        const session = await requireAdmin();
-        if (!session) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 }
-            );
-        }
+export const POST = createApiHandler(
+    {
+        auth: "user",
+        rateLimit: {
+            key: "admin:players:kick",
+            limit: 20,
+            window: 60,
+            strategy: "sliding-window",
+        },
+        validateBody: kickSchema,
+        maxBodySize: 1000, // 1KB max
+    },
+    async (_req, { userId, validatedBody }) => {
+        const { playerName, reason } = validatedBody as z.infer<typeof kickSchema>;
 
-        const body = await req.json().catch(() => ({}));
-        
-        // Input validation
-        const playerName = validatePlayerName(body.playerName);
-        if (!playerName) {
+        // Additional validation
+        const validated = validatePlayerName(playerName);
+        if (!validated) {
             return NextResponse.json(
                 { error: "Invalid player name" },
                 { status: 400 }
@@ -46,28 +43,19 @@ export async function POST(req: Request) {
         // TODO: Implement actual Minecraft server integration
         // Example using RCON:
         // const rconClient = await connectRcon(MINECRAFT_SERVER);
-        // await rconClient.send(`kick ${playerName} Kicked by admin`);
+        // await rconClient.send(`kick ${playerName} ${reason || "Kicked by admin"}`);
         // 
         // Or using a plugin API:
         // await fetch(`${MINECRAFT_API}/kick`, {
         //     method: "POST",
-        //     body: JSON.stringify({ player: playerName, reason: "Kicked by admin" }),
+        //     body: JSON.stringify({ player: playerName, reason: reason || "Kicked by admin" }),
         // });
 
-        // Audit logging
-        console.log(`[Kick API] Admin ${session.user?.name} kicked player: ${playerName}`);
+        logPlayerAction("kick", userId!, validated, { reason });
 
-        return NextResponse.json({
-            success: true,
-            message: `Player ${playerName} has been kicked`,
-            playerName,
-        });
-    } catch (error: any) {
-        console.error("[Kick API] Error:", error);
         return NextResponse.json(
-            { error: "Failed to kick player" },
-            { status: 500 }
+            createSuccessResponse(`Player ${validated} has been kicked`, validated)
         );
     }
-}
+);
 

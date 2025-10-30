@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/session";
+import { createApiHandler } from "@/lib/api-middleware";
+import { log } from "@/lib/logger";
 import type { Player } from "@/components/admin/PlayerTable";
 
 export const runtime = "nodejs";
-
-// Force dynamic rendering for authenticated endpoints
-// This ensures fresh session validation on every request
 export const dynamic = "force-dynamic";
 
 // Mock data - replace with actual Minecraft server API integration
@@ -61,47 +59,56 @@ const MOCK_PLAYERS: Player[] = [
  * Security: Requires admin authentication
  * Performance: Cached for 30 seconds
  */
-export async function GET(_req: Request) {
-    try {
-        // Security: Require admin authentication
-        const session = await requireAdmin();
-        if (!session) {
+export const GET = createApiHandler(
+    {
+        auth: "user",
+        rateLimit: {
+            key: "admin:players:list",
+            limit: 60,
+            window: 60,
+            strategy: "sliding-window",
+        },
+    },
+    async (_req, { userId }) => {
+        try {
+            // TODO: Replace with actual Minecraft server API integration
+            // For now, return mock data
+            // 
+            // Example integration:
+            // 1. Use Minecraft RCON to query online players
+            // 2. Use a plugin like LuckPerms API to get ranks
+            // 3. Query your database for player join dates
+            // 
+            // Example:
+            // const rconResponse = await rconQuery(MINECRAFT_SERVER, "list");
+            // const players = parsePlayerList(rconResponse);
+            // const enrichedPlayers = await enrichPlayerData(players);
+
+            // Simulate network delay (remove in production)
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            const response = {
+                players: MOCK_PLAYERS,
+                timestamp: new Date().toISOString(),
+                server: {
+                    address: process.env['MINECRAFT_SERVER'] || "mc.example.com",
+                    online: true,
+                },
+            };
+
+            log.info("Players list fetched", { userId });
+
+            return NextResponse.json(response);
+        } catch (error) {
+            log.error("Failed to fetch players", {
+                userId,
+                error: error instanceof Error ? error.message : String(error),
+            });
             return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 }
+                { error: "Failed to fetch players" },
+                { status: 500 }
             );
         }
-
-        // TODO: Replace with actual Minecraft server API integration
-        // For now, return mock data
-        // 
-        // Example integration:
-        // 1. Use Minecraft RCON to query online players
-        // 2. Use a plugin like LuckPerms API to get ranks
-        // 3. Query your database for player join dates
-        // 
-        // Example:
-        // const rconResponse = await rconQuery(MINECRAFT_SERVER, "list");
-        // const players = parsePlayerList(rconResponse);
-        // const enrichedPlayers = await enrichPlayerData(players);
-
-        // Simulate network delay (remove in production)
-        await new Promise(resolve => setTimeout(resolve, 300));
-
-        return NextResponse.json({
-            players: MOCK_PLAYERS,
-            timestamp: new Date().toISOString(),
-            server: {
-                address: process.env['MINECRAFT_SERVER'] || "mc.example.com",
-                online: true,
-            },
-        });
-    } catch (error: any) {
-        console.error("[Players API] Error:", error);
-        return NextResponse.json(
-            { error: "Failed to fetch players" },
-            { status: 500 }
-        );
     }
-}
+);
 

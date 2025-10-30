@@ -1,19 +1,13 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/session";
+import { createApiHandler } from "@/lib/api-middleware";
+import { validatePlayerName, logPlayerAction, createSuccessResponse } from "../utils";
+import { z } from "zod";
 
 export const runtime = "nodejs";
 
-// Input validation
-function validatePlayerName(name: unknown): string | null {
-    if (typeof name !== "string") return null;
-    
-    // Minecraft username rules: 3-16 characters, alphanumeric and underscore only
-    const sanitized = name.trim();
-    if (sanitized.length < 3 || sanitized.length > 16) return null;
-    if (!/^[a-zA-Z0-9_]+$/.test(sanitized)) return null;
-    
-    return sanitized;
-}
+const teleportSchema = z.object({
+  playerName: z.string().min(3).max(16).regex(/^[a-zA-Z0-9_]+$/),
+});
 
 /**
  * POST /api/admin/players/teleport
@@ -21,22 +15,24 @@ function validatePlayerName(name: unknown): string | null {
  * 
  * Security: Requires admin authentication, input validation, audit logging
  */
-export async function POST(req: Request) {
-    try {
-        // Security: Require admin authentication
-        const session = await requireAdmin();
-        if (!session) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 }
-            );
-        }
+export const POST = createApiHandler(
+    {
+        auth: "user",
+        rateLimit: {
+            key: "admin:players:teleport",
+            limit: 30,
+            window: 60,
+            strategy: "sliding-window",
+        },
+        validateBody: teleportSchema,
+        maxBodySize: 500, // 500 bytes max
+    },
+    async (_req, { userId, validatedBody }) => {
+        const { playerName } = validatedBody as z.infer<typeof teleportSchema>;
 
-        const body = await req.json().catch(() => ({}));
-        
-        // Input validation
-        const playerName = validatePlayerName(body.playerName);
-        if (!playerName) {
+        // Additional validation
+        const validated = validatePlayerName(playerName);
+        if (!validated) {
             return NextResponse.json(
                 { error: "Invalid player name" },
                 { status: 400 }
@@ -65,20 +61,11 @@ export async function POST(req: Request) {
         //     }),
         // });
 
-        // Audit logging
-        console.log(`[Teleport API] Admin ${session.user?.name} teleported to player: ${playerName}`);
+        logPlayerAction("teleport", userId!, validated);
 
-        return NextResponse.json({
-            success: true,
-            message: `Teleporting to ${playerName}...`,
-            playerName,
-        });
-    } catch (error: any) {
-        console.error("[Teleport API] Error:", error);
         return NextResponse.json(
-            { error: "Failed to teleport" },
-            { status: 500 }
+            createSuccessResponse(`Teleporting to ${validated}...`, validated)
         );
     }
-}
+);
 
