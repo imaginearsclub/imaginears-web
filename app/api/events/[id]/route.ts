@@ -23,15 +23,91 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * Helper: Build update data from validated input
+ * Helper: Log audit events for update and publish
  */
-function buildUpdateData(data: UpdateEventInput): {
-  updateData: Prisma.EventUpdateInput;
-  changedFields: string[];
-} {
-  const updateData: Prisma.EventUpdateInput = {};
-  const changedFields: string[] = [];
+async function logUpdateAudit(
+  id: string,
+  userId: string,
+  updated: { title: string; status: string },
+  existing: { status: string },
+  changedFields: string[]
+): Promise<boolean> {
+  // Log update
+  await auditLog({
+    action: 'event.updated',
+    resourceType: 'event',
+    resourceId: id,
+    userId,
+    details: {
+      title: updated.title,
+      changedFields,
+      newStatus: updated.status,
+    },
+  });
 
+  // Check if event was just published
+  const wasPublished = updated.status === 'Published' && existing.status !== 'Published';
+
+  if (wasPublished) {
+    await auditLog({
+      action: 'event.published',
+      resourceType: 'event',
+      resourceId: id,
+      userId,
+      details: {
+        title: updated.title,
+      },
+    });
+  }
+
+  return wasPublished;
+}
+
+/**
+ * Helper: Trigger webhook for event update
+ */
+function triggerUpdateWebhook(
+  wasPublished: boolean,
+  updated: {
+    id: string;
+    title: string;
+    category: string;
+    status: string;
+    startAt: Date;
+    endAt: Date;
+  },
+  userId?: string
+): void {
+  const webhookEvent = wasPublished ? WEBHOOK_EVENTS.EVENT_PUBLISHED : WEBHOOK_EVENTS.EVENT_UPDATED;
+
+  triggerWebhook(
+    webhookEvent,
+    {
+      id: updated.id,
+      title: updated.title,
+      category: updated.category,
+      status: updated.status,
+      startAt: updated.startAt.toISOString(),
+      endAt: updated.endAt.toISOString(),
+    },
+    userId ? { userId } : undefined
+  ).catch((err) =>
+    log.error('Webhook trigger failed for event update', {
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+      eventId: updated.id,
+    })
+  );
+}
+
+/**
+ * Helper: Process basic text fields (title, world)
+ */
+function processTextFields(
+  data: UpdateEventInput,
+  updateData: Prisma.EventUpdateInput,
+  changedFields: string[]
+): void {
   if (data.title !== undefined) {
     updateData.title = sanitizeInput(data.title, 200);
     changedFields.push('title');
@@ -41,7 +117,16 @@ function buildUpdateData(data: UpdateEventInput): {
     updateData.world = sanitizeInput(data.world, 100);
     changedFields.push('world');
   }
+}
 
+/**
+ * Helper: Process description fields (shortDescription, details)
+ */
+function processDescriptionFields(
+  data: UpdateEventInput,
+  updateData: Prisma.EventUpdateInput,
+  changedFields: string[]
+): void {
   if (data.shortDescription !== undefined) {
     updateData.shortDescription = data.shortDescription
       ? sanitizeDescription(data.shortDescription, 500) || null
@@ -53,7 +138,16 @@ function buildUpdateData(data: UpdateEventInput): {
     updateData.details = data.details ? sanitizeDescription(data.details, 50000) || null : null;
     changedFields.push('details');
   }
+}
 
+/**
+ * Helper: Process basic fields (category, status, dates, timezone, recurrence)
+ */
+function processBasicFields(
+  data: UpdateEventInput,
+  updateData: Prisma.EventUpdateInput,
+  changedFields: string[]
+): void {
   if (data.category !== undefined) {
     updateData.category = data.category;
     changedFields.push('category');
@@ -84,6 +178,20 @@ function buildUpdateData(data: UpdateEventInput): {
     changedFields.push('recurrenceFreq');
   }
 
+  if (data.recurrenceUntil !== undefined) {
+    updateData.recurrenceUntil = data.recurrenceUntil;
+    changedFields.push('recurrenceUntil');
+  }
+}
+
+/**
+ * Helper: Process JSON fields (byWeekday, times)
+ */
+function processJsonFields(
+  data: UpdateEventInput,
+  updateData: Prisma.EventUpdateInput,
+  changedFields: string[]
+): void {
   if (data.byWeekday !== undefined) {
     if (data.byWeekday === null) {
       updateData.byWeekdayJson = Prisma.JsonNull;
@@ -101,11 +209,22 @@ function buildUpdateData(data: UpdateEventInput): {
     }
     changedFields.push('times');
   }
+}
 
-  if (data.recurrenceUntil !== undefined) {
-    updateData.recurrenceUntil = data.recurrenceUntil;
-    changedFields.push('recurrenceUntil');
-  }
+/**
+ * Helper: Build update data from validated input
+ */
+function buildUpdateData(data: UpdateEventInput): {
+  updateData: Prisma.EventUpdateInput;
+  changedFields: string[];
+} {
+  const updateData: Prisma.EventUpdateInput = {};
+  const changedFields: string[] = [];
+
+  processTextFields(data, updateData, changedFields);
+  processDescriptionFields(data, updateData, changedFields);
+  processBasicFields(data, updateData, changedFields);
+  processJsonFields(data, updateData, changedFields);
 
   return { updateData, changedFields };
 }
@@ -203,33 +322,8 @@ export const PATCH = createApiHandler(
       },
     });
 
-    // Audit log
-    await auditLog({
-      action: 'event.updated',
-      resourceType: 'event',
-      resourceId: id,
-      userId,
-      details: {
-        title: updated.title,
-        changedFields,
-        newStatus: updated.status,
-      },
-    });
-
-    // Check if event was just published
-    const wasPublished = updated.status === 'Published' && existing.status !== 'Published';
-
-    if (wasPublished) {
-      await auditLog({
-        action: 'event.published',
-        resourceType: 'event',
-        resourceId: id,
-        userId,
-        details: {
-          title: updated.title,
-        },
-      });
-    }
+    // Audit log and check if published
+    const wasPublished = await logUpdateAudit(id, userId, updated, existing, changedFields);
 
     log.info('Event updated successfully', {
       eventId: id,
@@ -239,26 +333,7 @@ export const PATCH = createApiHandler(
     });
 
     // Trigger webhook (async, fire-and-forget)
-    const webhookEvent = wasPublished ? WEBHOOK_EVENTS.EVENT_PUBLISHED : WEBHOOK_EVENTS.EVENT_UPDATED;
-
-    triggerWebhook(
-      webhookEvent,
-      {
-        id: updated.id,
-        title: updated.title,
-        category: updated.category,
-        status: updated.status,
-        startAt: updated.startAt.toISOString(),
-        endAt: updated.endAt.toISOString(),
-      },
-      userId ? { userId } : undefined
-    ).catch((err) =>
-      log.error('Webhook trigger failed for event update', {
-        error: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
-        eventId: id,
-      })
-    );
+    triggerUpdateWebhook(wasPublished, updated, userId);
 
     return NextResponse.json(
       {

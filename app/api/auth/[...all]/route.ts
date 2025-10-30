@@ -9,18 +9,22 @@ export const dynamic = "force-dynamic";
  * Better-Auth Catch-All Handler
  * 
  * This route handles all Better-Auth endpoints:
- * - /api/auth/sign-in/* - Authentication endpoints
- * - /api/auth/sign-out - Sign out endpoint  
+ * - /api/auth/sign-in/email - Email/password authentication
+ * - /api/auth/sign-in/social - OAuth social authentication
+ * - /api/auth/sign-out - Sign out endpoint
  * - /api/auth/session - Session management
  * - /api/auth/callback/* - OAuth callbacks
+ * - /api/auth/verify-2fa - Two-factor authentication
  * - And other Better-Auth internal routes
  * 
- * IMPORTANT: Do not heavily modify this file.
- * Better-Auth manages its own security, rate limiting, and functionality.
+ * IMPORTANT: Do not modify this file.
+ * Better-Auth manages its own:
+ * - Security and CSRF protection
+ * - Rate limiting
+ * - Session management
+ * - Cookie handling
+ * - Input validation
  * 
- * For custom auth logic, use:
- * - /api/login (our proxy with custom rate limiting)
- * - /api/logout (our proxy with custom cookie clearing)
- * - /api/auth/session-check (our middleware validation endpoint)
+ * For custom auth logic or middleware, use Next.js middleware.ts
  */
 export const { GET, POST } = toNextJsHandler(auth);
