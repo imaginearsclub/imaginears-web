@@ -12,16 +12,103 @@ import { triggerWebhook, WEBHOOK_EVENTS } from '@/lib/webhooks';
 import { log } from '@/lib/logger';
 import { sanitizeInput, sanitizeDescription } from '@/lib/input-sanitization';
 import { auditLog } from '@/lib/audit-logger';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import {
   EventIdSchema,
   UpdateEventSchema,
-  type EventIdParam,
   type UpdateEventInput,
 } from '../schemas';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+/**
+ * Helper: Build update data from validated input
+ */
+function buildUpdateData(data: UpdateEventInput): {
+  updateData: Prisma.EventUpdateInput;
+  changedFields: string[];
+} {
+  const updateData: Prisma.EventUpdateInput = {};
+  const changedFields: string[] = [];
+
+  if (data.title !== undefined) {
+    updateData.title = sanitizeInput(data.title, 200);
+    changedFields.push('title');
+  }
+
+  if (data.world !== undefined) {
+    updateData.world = sanitizeInput(data.world, 100);
+    changedFields.push('world');
+  }
+
+  if (data.shortDescription !== undefined) {
+    updateData.shortDescription = data.shortDescription
+      ? sanitizeDescription(data.shortDescription, 500) || null
+      : null;
+    changedFields.push('shortDescription');
+  }
+
+  if (data.details !== undefined) {
+    updateData.details = data.details ? sanitizeDescription(data.details, 50000) || null : null;
+    changedFields.push('details');
+  }
+
+  if (data.category !== undefined) {
+    updateData.category = data.category;
+    changedFields.push('category');
+  }
+
+  if (data.status !== undefined) {
+    updateData.status = data.status;
+    changedFields.push('status');
+  }
+
+  if (data.startAt !== undefined) {
+    updateData.startAt = data.startAt;
+    changedFields.push('startAt');
+  }
+
+  if (data.endAt !== undefined) {
+    updateData.endAt = data.endAt;
+    changedFields.push('endAt');
+  }
+
+  if (data.timezone !== undefined) {
+    updateData.timezone = data.timezone;
+    changedFields.push('timezone');
+  }
+
+  if (data.recurrenceFreq !== undefined) {
+    updateData.recurrenceFreq = data.recurrenceFreq;
+    changedFields.push('recurrenceFreq');
+  }
+
+  if (data.byWeekday !== undefined) {
+    if (data.byWeekday === null) {
+      updateData.byWeekdayJson = Prisma.JsonNull;
+    } else {
+      updateData.byWeekdayJson = data.byWeekday;
+    }
+    changedFields.push('byWeekday');
+  }
+
+  if (data.times !== undefined) {
+    if (data.times === null) {
+      updateData.timesJson = Prisma.JsonNull;
+    } else {
+      updateData.timesJson = data.times;
+    }
+    changedFields.push('times');
+  }
+
+  if (data.recurrenceUntil !== undefined) {
+    updateData.recurrenceUntil = data.recurrenceUntil;
+    changedFields.push('recurrenceUntil');
+  }
+
+  return { updateData, changedFields };
+}
 
 /**
  * PATCH /api/events/[id]
@@ -64,9 +151,15 @@ export const PATCH = createApiHandler(
     }
     const { id } = idResult.data;
 
+    // Ensure userId is defined (auth middleware should guarantee this)
+    if (!userId) {
+      log.error('Missing userId in authenticated request');
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
     // Permission check
-    const hasPermission = await checkPermission(userId, 'events:write');
-    if (!hasPermission) {
+    const permitted = await checkPermission(userId, 'events:write');
+    if (!permitted) {
       log.warn('Event update forbidden - insufficient permissions', {
         userId,
         eventId: id,
@@ -92,75 +185,7 @@ export const PATCH = createApiHandler(
     }
 
     // Build update data (only include provided fields)
-    const updateData: Prisma.EventUpdateInput = {};
-    const changedFields: string[] = [];
-
-    if (data.title !== undefined) {
-      updateData.title = sanitizeInput(data.title, 200);
-      changedFields.push('title');
-    }
-
-    if (data.world !== undefined) {
-      updateData.world = sanitizeInput(data.world, 100);
-      changedFields.push('world');
-    }
-
-    if (data.shortDescription !== undefined) {
-      updateData.shortDescription = data.shortDescription
-        ? sanitizeDescription(data.shortDescription, 500) || null
-        : null;
-      changedFields.push('shortDescription');
-    }
-
-    if (data.details !== undefined) {
-      updateData.details = data.details ? sanitizeDescription(data.details, 50000) || null : null;
-      changedFields.push('details');
-    }
-
-    if (data.category !== undefined) {
-      updateData.category = data.category;
-      changedFields.push('category');
-    }
-
-    if (data.status !== undefined) {
-      updateData.status = data.status;
-      changedFields.push('status');
-    }
-
-    if (data.startAt !== undefined) {
-      updateData.startAt = data.startAt;
-      changedFields.push('startAt');
-    }
-
-    if (data.endAt !== undefined) {
-      updateData.endAt = data.endAt;
-      changedFields.push('endAt');
-    }
-
-    if (data.timezone !== undefined) {
-      updateData.timezone = data.timezone;
-      changedFields.push('timezone');
-    }
-
-    if (data.recurrenceFreq !== undefined) {
-      updateData.recurrenceFreq = data.recurrenceFreq;
-      changedFields.push('recurrenceFreq');
-    }
-
-    if (data.byWeekday !== undefined) {
-      updateData.byWeekdayJson = data.byWeekday;
-      changedFields.push('byWeekday');
-    }
-
-    if (data.times !== undefined) {
-      updateData.timesJson = data.times;
-      changedFields.push('times');
-    }
-
-    if (data.recurrenceUntil !== undefined) {
-      updateData.recurrenceUntil = data.recurrenceUntil;
-      changedFields.push('recurrenceUntil');
-    }
+    const { updateData, changedFields } = buildUpdateData(data);
 
     // Perform the update
     const updated = await prisma.event.update({
@@ -184,7 +209,7 @@ export const PATCH = createApiHandler(
       resourceType: 'event',
       resourceId: id,
       userId,
-      metadata: {
+      details: {
         title: updated.title,
         changedFields,
         newStatus: updated.status,
@@ -200,7 +225,7 @@ export const PATCH = createApiHandler(
         resourceType: 'event',
         resourceId: id,
         userId,
-        metadata: {
+        details: {
           title: updated.title,
         },
       });
@@ -226,7 +251,7 @@ export const PATCH = createApiHandler(
         startAt: updated.startAt.toISOString(),
         endAt: updated.endAt.toISOString(),
       },
-      { userId }
+      userId ? { userId } : undefined
     ).catch((err) =>
       log.error('Webhook trigger failed for event update', {
         error: err instanceof Error ? err.message : String(err),

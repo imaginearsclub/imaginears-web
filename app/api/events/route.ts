@@ -146,6 +146,12 @@ export const POST = createApiHandler(
     validateBody: CreateEventSchema,
   },
   async (_req, { userId, validatedBody }) => {
+    // Ensure userId is defined (auth middleware should guarantee this)
+    if (!userId) {
+      log.error('Missing userId in authenticated request');
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
     // Permission check
     const hasPermission = await checkPermission(userId, 'events:write');
     if (!hasPermission) {
@@ -201,7 +207,7 @@ export const POST = createApiHandler(
       resourceType: 'event',
       resourceId: created.id,
       userId,
-      metadata: {
+      details: {
         title: created.title,
         category: sanitizedData.category,
         status: sanitizedData.status,
@@ -227,7 +233,7 @@ export const POST = createApiHandler(
         startAt: created.startAt.toISOString(),
         endAt: created.endAt.toISOString(),
       },
-      { userId }
+      userId ? { userId } : undefined
     ).catch((err) =>
       log.error('Webhook trigger failed for event creation', {
         error: err instanceof Error ? err.message : String(err),
