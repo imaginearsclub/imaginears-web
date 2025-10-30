@@ -98,7 +98,14 @@ export default [
       // TypeScript security and performance rules
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/prefer-readonly': 'warn',
-      '@typescript-eslint/no-unused-vars': ['error', { 'argsIgnorePattern': '^_' }],
+      '@typescript-eslint/no-unused-vars': ['error', { 
+        'argsIgnorePattern': '^_',
+        'varsIgnorePattern': '^_',
+        'caughtErrorsIgnorePattern': '^_',
+        'destructuredArrayIgnorePattern': '^_',
+        'args': 'after-used', // Only flag unused params after the last used param
+        'ignoreRestSiblings': true
+      }],
       '@typescript-eslint/explicit-function-return-type': 'off',
       
       // Performance and maintainability rules (relaxed for existing codebase)
