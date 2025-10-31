@@ -15,6 +15,8 @@ import { createApiHandler } from '@/lib/api-middleware';
 import { userHasPermissionAsync } from '@/lib/rbac-server';
 import { getSyncHistory, getSyncStatistics } from '@/lib/sync-scheduler';
 import { syncHistoryQuerySchema, type SyncHistoryQuery } from '../schemas';
+import { jsonOk, jsonError } from '@/app/api/admin/sessions/response';
+import { tryConditionalGet } from '@/lib/http';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -117,28 +119,25 @@ export const GET = createApiHandler(
         totalCount,
       });
 
-      return NextResponse.json(
-        {
-          success: true,
-          data: {
-            history,
-            totalCount,
-            statistics,
-            pagination: {
-              limit: query.limit,
-              offset: query.offset,
-              hasMore,
-              nextOffset: hasMore ? query.offset + query.limit : null,
-            },
+      const payload = {
+        success: true,
+        data: {
+          history,
+          totalCount,
+          statistics,
+          pagination: {
+            limit: query.limit,
+            offset: query.offset,
+            hasMore,
+            nextOffset: hasMore ? query.offset + query.limit : null,
           },
         },
-        {
-          headers: {
-            'X-Response-Time': `${duration}ms`,
-            'X-Total-Count': totalCount.toString(),
-          },
-        }
-      );
+      } as const;
+      const decision = tryConditionalGet(_req, payload, { 'X-Total-Count': totalCount.toString() });
+      if (decision.status === 304) {
+        return jsonOk(_req, null, { headers: decision.headers, status: 304 as unknown as number });
+      }
+      return jsonOk(_req, payload, { headers: { ...decision.headers, 'X-Response-Time': `${duration}ms` } });
     } catch (error) {
       const duration = Date.now() - startTime;
 
@@ -150,10 +149,7 @@ export const GET = createApiHandler(
       });
 
       // Security: Generic error message
-      return NextResponse.json(
-        { error: 'Failed to fetch sync history' },
-        { status: 500 }
-      );
+      return jsonError(_req, 'Failed to fetch sync history', 500);
     }
   }
 );

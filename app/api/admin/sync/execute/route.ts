@@ -7,13 +7,13 @@
  * Security: Requires sync:execute permission, rate limited to prevent abuse
  * Performance: Async operation with duration tracking, timeout protection
  */
-
-import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { log } from '@/lib/logger';
 import { createApiHandler } from '@/lib/api-middleware';
 import { userHasPermissionAsync } from '@/lib/rbac-server';
 import { executeScheduledSync } from '@/lib/sync-scheduler';
+import { jsonOk, jsonError } from '@/app/api/admin/sessions/response';
+import { cache } from '@/lib/cache';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -55,10 +55,7 @@ export const POST = createApiHandler(
 
       if (!user) {
         log.warn('Sync execute - user not found', { userId });
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404 }
-        );
+        return jsonError(_req, 'User not found', 404);
       }
 
       // RBAC: Check sync:execute permission
@@ -74,10 +71,16 @@ export const POST = createApiHandler(
           role: user.role,
           email: user.email,
         });
-        return NextResponse.json(
-          { error: 'Forbidden: Insufficient permissions to execute sync' },
-          { status: 403 }
-        );
+        return jsonError(_req, 'Forbidden: Insufficient permissions to execute sync', 403);
+      }
+
+      // Idempotency: avoid duplicate manual triggers within a short window
+      const idemKey = _req.headers.get('idempotency-key');
+      if (idemKey) {
+        const prior = await cache.get<{ response: unknown }>(`idemp:sync-exec:${userId}:${idemKey}`);
+        if (prior?.response) {
+          return jsonOk(_req, prior.response, { headers: { 'X-Idempotent-Replay': '1' } });
+        }
       }
 
       // Check if a sync is already running to prevent concurrent execution
@@ -93,16 +96,7 @@ export const POST = createApiHandler(
           runningSyncId: runningSync.id,
           runningSince,
         });
-        return NextResponse.json(
-          { 
-            error: 'A sync operation is already in progress',
-            details: {
-              syncId: runningSync.id,
-              startedAt: runningSync.startedAt,
-            },
-          },
-          { status: 409 } // Conflict
-        );
+        return jsonError(_req, 'A sync operation is already in progress', 409, { syncId: runningSync.id, startedAt: runningSync.startedAt });
       }
 
       // Execute the sync operation
@@ -126,28 +120,29 @@ export const POST = createApiHandler(
       }
 
       // Security: Audit log the manual sync execution
+      const rObj = result as Record<string, unknown>;
+      const hasMetrics =
+        typeof rObj['synced'] === 'number' && typeof rObj['linked'] === 'number' && typeof rObj['errors'] === 'number';
+      const metrics = hasMetrics
+        ? { synced: rObj['synced'] as number, linked: rObj['linked'] as number, errors: rObj['errors'] as number }
+        : { error: (rObj['error'] as string) };
       log.info('Manual sync executed successfully', {
         userId,
         email: user.email,
         name: user.name,
         duration,
-        synced: result.synced,
-        linked: result.linked,
-        errors: result.errors,
+        ...metrics,
       });
 
-      return NextResponse.json(
-        {
-          success: true,
-          message: 'Sync executed successfully',
-          data: result,
-        },
-        {
-          headers: {
-            'X-Response-Time': `${duration}ms`,
-          },
-        }
-      );
+      const responseBody = {
+        success: true,
+        message: 'Sync executed successfully',
+        data: result,
+      };
+      if (idemKey) {
+        await cache.set(`idemp:sync-exec:${userId}:${idemKey}`, { response: responseBody }, 60);
+      }
+      return jsonOk(_req, responseBody, { headers: { 'X-Response-Time': `${duration}ms` } });
     } catch (error) {
       const duration = Date.now() - startTime;
 
@@ -159,14 +154,7 @@ export const POST = createApiHandler(
       });
 
       // Security: Generic error message to avoid information leakage
-      return NextResponse.json(
-        { 
-          error: 'Failed to execute sync operation',
-          // Include generic troubleshooting info
-          hint: 'Please check sync configuration and try again. Contact support if the issue persists.',
-        },
-        { status: 500 }
-      );
+      return jsonError(_req, 'Failed to execute sync operation', 500, { hint: 'Please check sync configuration and try again. Contact support if the issue persists.' });
     }
   }
 );

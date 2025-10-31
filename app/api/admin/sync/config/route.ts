@@ -18,6 +18,43 @@ import {
   updateSyncConfiguration,
 } from '@/lib/sync-scheduler';
 import { syncConfigUpdateSchema, type SyncConfigUpdate } from '../schemas';
+import { jsonOk, jsonError } from '@/app/api/admin/sessions/response';
+import { tryConditionalGet } from '@/lib/http';
+import { cache } from '@/lib/cache';
+
+/**
+ * Helper: Build typed update payload for sync configuration
+ */
+function buildSyncUpdatePayload(updates: SyncConfigUpdate): {
+  enabled?: boolean;
+  frequency?: string;
+  time?: string;
+  dayOfWeek?: number | null;
+  notifyOnFailure?: boolean;
+  notifyOnSuccess?: boolean;
+  retryOnFailure?: boolean;
+  maxRetries?: number;
+} {
+  const payload: {
+    enabled?: boolean;
+    frequency?: string;
+    time?: string;
+    dayOfWeek?: number | null;
+    notifyOnFailure?: boolean;
+    notifyOnSuccess?: boolean;
+    retryOnFailure?: boolean;
+    maxRetries?: number;
+  } = {};
+  if (updates.enabled !== undefined) payload.enabled = updates.enabled;
+  if (updates.frequency !== undefined) payload.frequency = updates.frequency;
+  if (updates.time !== undefined) payload.time = updates.time;
+  if (updates.dayOfWeek !== undefined) payload.dayOfWeek = updates.dayOfWeek;
+  if (updates.notifyOnFailure !== undefined) payload.notifyOnFailure = updates.notifyOnFailure;
+  if (updates.notifyOnSuccess !== undefined) payload.notifyOnSuccess = updates.notifyOnSuccess;
+  if (updates.retryOnFailure !== undefined) payload.retryOnFailure = updates.retryOnFailure;
+  if (updates.maxRetries !== undefined) payload.maxRetries = updates.maxRetries;
+  return payload;
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -91,17 +128,12 @@ export const GET = createApiHandler(
         configEnabled: config.enabled,
       });
 
-      return NextResponse.json(
-        {
-          success: true,
-          data: config,
-        },
-        {
-          headers: {
-            'X-Response-Time': `${duration}ms`,
-          },
-        }
-      );
+      const payload = { success: true, data: config } as const;
+      const decision = tryConditionalGet(_req, payload);
+      if (decision.status === 304) {
+        return jsonOk(_req, null, { headers: decision.headers, status: 304 as unknown as number });
+      }
+      return jsonOk(_req, payload, { headers: { ...decision.headers, 'X-Response-Time': `${duration}ms` } });
     } catch (error) {
       const duration = Date.now() - startTime;
 
@@ -113,10 +145,7 @@ export const GET = createApiHandler(
       });
 
       // Security: Generic error message
-      return NextResponse.json(
-        { error: 'Failed to fetch sync configuration' },
-        { status: 500 }
-      );
+      return jsonError(_req, 'Failed to fetch sync configuration', 500);
     }
   }
 );
@@ -153,6 +182,14 @@ export const PATCH = createApiHandler(
     const startTime = Date.now();
 
     try {
+      // Idempotency support
+      const idemKey = _req.headers.get('idempotency-key');
+      if (idemKey) {
+        const prior = await cache.get<{ response: unknown }>(`idemp:sync-config:${idemKey}`);
+        if (prior?.response) {
+          return jsonOk(_req, prior.response, { headers: { 'X-Response-Time': '0ms', 'X-Idempotent-Replay': '1' } });
+        }
+      }
       // Fetch user's role and email for RBAC and audit logging
       const user = await prisma.user.findUnique({
         where: { id: userId! },
@@ -193,7 +230,7 @@ export const PATCH = createApiHandler(
       const previousConfig = await getSyncConfiguration();
 
       // Update configuration
-      const updatedConfig = await updateSyncConfiguration(updates);
+      const updatedConfig = await updateSyncConfiguration(buildSyncUpdatePayload(updates));
 
       const duration = Date.now() - startTime;
 
@@ -210,18 +247,15 @@ export const PATCH = createApiHandler(
         newFrequency: updatedConfig.frequency,
       });
 
-      return NextResponse.json(
-        {
-          success: true,
-          message: 'Sync configuration updated successfully',
-          data: updatedConfig,
-        },
-        {
-          headers: {
-            'X-Response-Time': `${duration}ms`,
-          },
-        }
-      );
+      const responseBody = {
+        success: true,
+        message: 'Sync configuration updated successfully',
+        data: updatedConfig,
+      };
+      if (idemKey) {
+        await cache.set(`idemp:sync-config:${idemKey}`, { response: responseBody }, 60);
+      }
+      return jsonOk(_req, responseBody, { headers: { 'X-Response-Time': `${duration}ms` } });
     } catch (error) {
       const duration = Date.now() - startTime;
 
@@ -234,10 +268,7 @@ export const PATCH = createApiHandler(
       });
 
       // Security: Generic error message
-      return NextResponse.json(
-        { error: 'Failed to update sync configuration' },
-        { status: 500 }
-      );
+      return jsonError(_req, 'Failed to update sync configuration', 500);
     }
   }
 );
