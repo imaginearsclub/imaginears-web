@@ -7,12 +7,12 @@
  * Security: Admin-only access, rate limited, input validated
  * Performance: Database aggregation, efficient queries, response caching headers
  */
-
-import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { log } from '@/lib/logger';
 import { createApiHandler } from '@/lib/api-middleware';
 import { eventsStatsQuerySchema, type EventsStatsQuery, type EventsStatsData } from '../schemas';
+import crypto from 'node:crypto';
+import { jsonOk, jsonError } from '@/app/api/admin/sessions/response';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -154,19 +154,22 @@ export const GET = createApiHandler(
         totalEvents: data.reduce((sum, d) => sum + d.count, 0),
       });
 
-      return NextResponse.json(
-        {
-          success: true,
-          data,
+      // ETag support for conditional GET
+      const payload = { success: true, data } as const;
+      const hash = crypto.createHash('sha1').update(JSON.stringify(payload)).digest('hex');
+      const etag = `W/"${hash}"`;
+      const ifNoneMatch = _req.headers.get('if-none-match');
+      if (ifNoneMatch && ifNoneMatch === etag) {
+        return jsonOk(_req, null, { headers: { 'ETag': etag, 'Cache-Control': 'private, max-age=300' }, status: 304 as unknown as number });
+      }
+
+      return jsonOk(_req, payload, {
+        headers: {
+          'X-Response-Time': `${duration}ms`,
+          'ETag': etag,
+          'Cache-Control': 'private, max-age=300',
         },
-        {
-          headers: {
-            'X-Response-Time': `${duration}ms`,
-            // Cache for 5 minutes to reduce database load
-            'Cache-Control': 'private, max-age=300',
-          },
-        }
-      );
+      });
     } catch (error) {
       const duration = Date.now() - startTime;
 
@@ -179,14 +182,7 @@ export const GET = createApiHandler(
 
       // Return empty data to allow dashboard to load
       // This is more graceful than returning an error
-      return NextResponse.json(
-        {
-          success: false,
-          data: [],
-          error: 'Failed to fetch events statistics',
-        },
-        { status: 500 }
-      );
+      return jsonError(_req, 'Failed to fetch events statistics', 500, { data: [] });
     }
   }
 );

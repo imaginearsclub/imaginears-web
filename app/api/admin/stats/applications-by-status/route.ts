@@ -7,12 +7,12 @@
  * Security: Admin-only access, rate limited
  * Performance: Database aggregation, efficient groupBy query, response caching
  */
-
-import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { log } from '@/lib/logger';
 import { createApiHandler } from '@/lib/api-middleware';
 import type { ApplicationsStatusData } from '../schemas';
+import crypto from 'node:crypto';
+import { jsonOk, jsonError } from '@/app/api/admin/sessions/response';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -82,19 +82,22 @@ export const GET = createApiHandler(
         statusBreakdown: data.map((d) => `${d.status}: ${d.count}`).join(', '),
       });
 
-      return NextResponse.json(
-        {
-          success: true,
-          data,
+      // ETag support for conditional GET
+      const payload = { success: true, data } as const;
+      const hash = crypto.createHash('sha1').update(JSON.stringify(payload)).digest('hex');
+      const etag = `W/"${hash}"`;
+      const ifNoneMatch = _req.headers.get('if-none-match');
+      if (ifNoneMatch && ifNoneMatch === etag) {
+        return jsonOk(_req, null, { headers: { 'ETag': etag, 'Cache-Control': 'private, max-age=300' }, status: 304 as unknown as number });
+      }
+
+      return jsonOk(_req, payload, {
+        headers: {
+          'X-Response-Time': `${duration}ms`,
+          'ETag': etag,
+          'Cache-Control': 'private, max-age=300',
         },
-        {
-          headers: {
-            'X-Response-Time': `${duration}ms`,
-            // Cache for 5 minutes to reduce database load
-            'Cache-Control': 'private, max-age=300',
-          },
-        }
-      );
+      });
     } catch (error) {
       const duration = Date.now() - startTime;
 
@@ -106,14 +109,7 @@ export const GET = createApiHandler(
       });
 
       // Return empty data to allow dashboard to load gracefully
-      return NextResponse.json(
-        {
-          success: false,
-          data: [],
-          error: 'Failed to fetch applications statistics',
-        },
-        { status: 500 }
-      );
+      return jsonError(_req, 'Failed to fetch applications statistics', 500, { data: [] });
     }
   }
 );
