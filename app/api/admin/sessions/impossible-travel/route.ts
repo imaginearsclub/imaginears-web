@@ -15,6 +15,7 @@ import { log } from '@/lib/logger';
 import { createApiHandler } from '@/lib/api-middleware';
 import { checkSessionsPermission, SESSIONS_PERMISSIONS } from '../utils';
 import { jsonOk, jsonError } from '../response';
+import { sanitizeForDisplay, normalizeEmail } from '@/lib/input-sanitization';
 import { isIP } from 'node:net';
 
 export const runtime = 'nodejs';
@@ -35,20 +36,23 @@ interface ImpossibleTravelAlert {
     country: string;
     ip: string;
   };
-  distance: number;
+  distance: number; // km (legacy)
+  distanceKm: number; // km
+  distanceMi: number; // miles
   timeDiff: number;
   requiredSpeed: number;
   timestamp: Date;
   status: 'pending' | 'dismissed' | 'blocked';
+  preferredUnit?: 'km' | 'mi';
 }
 
-async function authorizeViewAnalytics(userId: string): Promise<'ok' | NextResponse> {
+async function authorizeViewAnalytics(userId: string): Promise<NextResponse | null> {
   const has = await checkSessionsPermission(userId, SESSIONS_PERMISSIONS.VIEW_ANALYTICS);
   if (!has) {
     log.warn('Impossible travel - insufficient permissions', { userId });
     return jsonError(new Request(''), 'Forbidden: Insufficient permissions', 403);
   }
-  return 'ok';
+  return null;
 }
 
 function groupSessionsByUser<T extends { userId: string }>(sessions: T[]): Map<string, T[]> {
@@ -65,12 +69,25 @@ function sortSessionsOldestFirst<T extends { createdAt: Date }>(sessions: T[]): 
   return sessions.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 }
 
+function toSessionLite(raw: any): SessionLite | null {
+  if (!raw) return null;
+  return {
+    id: raw.id,
+    userId: raw.userId,
+    createdAt: raw.createdAt,
+    ipAddress: raw.ipAddress,
+    userName: sanitizeForDisplay(raw.user?.name ?? null, 80),
+    userEmail: normalizeEmail(raw.user?.email ?? null) || null,
+  };
+}
+
 interface SessionLite {
   id: string;
   userId: string;
   createdAt: Date;
   ipAddress: string | null;
-  user: { name: string | null; email: string | null };
+  userName: string | null;
+  userEmail: string | null;
 }
 
 function isValidIP(ip: string | null): boolean {
@@ -95,11 +112,13 @@ function buildAlertObject(
   currLoc: { city?: string | null; country?: string | null } | null,
   analysis: { distance?: number; timeDiff?: number; requiredSpeed?: number }
 ): ImpossibleTravelAlert {
+  const km = analysis.distance || 0;
+  const mi = Math.round((km * 0.621371) * 100) / 100;
   return {
     id: `alert-${currSession.id}`,
     userId: currSession.userId,
-    userName: currSession.user.name,
-    userEmail: currSession.user.email,
+    userName: currSession.userName,
+    userEmail: currSession.userEmail,
     previousLocation: {
       city: prevLoc?.city || 'Unknown',
       country: prevLoc?.country || '??',
@@ -110,11 +129,14 @@ function buildAlertObject(
       country: currLoc?.country || '??',
       ip: currSession.ipAddress!,
     },
-    distance: analysis.distance || 0,
+    distance: km,
+    distanceKm: km,
+    distanceMi: mi,
     timeDiff: analysis.timeDiff || 0,
     requiredSpeed: analysis.requiredSpeed || 0,
     timestamp: currSession.createdAt,
     status: 'pending',
+    preferredUnit: 'km',
   };
 }
 
@@ -154,9 +176,9 @@ async function buildImpossibleTravelAlerts(): Promise<ImpossibleTravelAlert[]> {
   for (const userSessions of sessionsByUser.values()) {
     const sorted = sortSessionsOldestFirst(userSessions);
     for (let i = 1; i < sorted.length; i++) {
-      const prev = sorted[i - 1] ?? null;
-      const curr = sorted[i] ?? null;
-      const alert = await maybeBuildAlert(prev as unknown as SessionLite | null, curr as unknown as SessionLite | null);
+      const prev = toSessionLite(sorted[i - 1]);
+      const curr = toSessionLite(sorted[i]);
+      const alert = await maybeBuildAlert(prev, curr);
       if (alert) alerts.push(alert);
     }
   }
@@ -187,12 +209,30 @@ export const GET = createApiHandler(
     const startTime = Date.now();
 
     try {
-      const auth = await authorizeViewAnalytics(userId!);
-      if (auth !== 'ok') {
-        return auth;
+      const authResp = await authorizeViewAnalytics(userId!);
+      if (authResp) {
+        return authResp;
       }
 
       const alerts = await buildImpossibleTravelAlerts();
+
+      // Determine preferred unit: query param > Accept-Language > default km
+      const url = new URL(_req.url);
+      const qpUnit = url.searchParams.get('unit');
+      const acceptLang = _req.headers.get('accept-language') || '';
+
+      const mileCountries = new Set(['US', 'GB', 'LR', 'MM']);
+
+      function inferUnitFromAcceptLanguage(al: string): 'km' | 'mi' {
+        // crude parse: look for region tags like en-US, en-GB
+        const match = al.match(/-([A-Z]{2})/);
+        const region = match?.[1];
+        return region && mileCountries.has(region) ? 'mi' : 'km';
+      }
+
+      const preferredUnit: 'km' | 'mi' = qpUnit === 'mi' ? 'mi' : qpUnit === 'km' ? 'km' : inferUnitFromAcceptLanguage(acceptLang);
+
+      const alertsWithUnit = alerts.map((a) => ({ ...a, preferredUnit }));
 
       const duration = Date.now() - startTime;
 
@@ -207,7 +247,7 @@ export const GET = createApiHandler(
         alertCount: alerts.length 
       });
 
-      return jsonOk(_req, alerts, { headers: { 'X-Response-Time': `${duration}ms` } });
+      return jsonOk(_req, alertsWithUnit, { headers: { 'X-Response-Time': `${duration}ms`, 'X-Distance-Unit': preferredUnit } });
     } catch (error) {
       const duration = Date.now() - startTime;
 
