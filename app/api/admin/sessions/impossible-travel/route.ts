@@ -15,6 +15,7 @@ import { log } from '@/lib/logger';
 import { createApiHandler } from '@/lib/api-middleware';
 import { checkSessionsPermission, SESSIONS_PERMISSIONS } from '../utils';
 import { jsonOk, jsonError } from '../response';
+import { isIP } from 'node:net';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -50,114 +51,116 @@ async function authorizeViewAnalytics(userId: string): Promise<'ok' | NextRespon
   return 'ok';
 }
 
+function groupSessionsByUser<T extends { userId: string }>(sessions: T[]): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  for (const s of sessions) {
+    const list = map.get(s.userId) || [];
+    list.push(s);
+    map.set(s.userId, list);
+  }
+  return map;
+}
+
+function sortSessionsOldestFirst<T extends { createdAt: Date }>(sessions: T[]): T[] {
+  return sessions.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+}
+
+interface SessionLite {
+  id: string;
+  userId: string;
+  createdAt: Date;
+  ipAddress: string | null;
+  user: { name: string | null; email: string | null };
+}
+
+function isValidIP(ip: string | null): boolean {
+  if (!ip) return false;
+  return isIP(ip) !== 0;
+}
+
+function shouldAnalyzePair(prevSession: SessionLite | null, currSession: SessionLite | null): prevSession is SessionLite & { ipAddress: string } {
+  return !!(
+    prevSession &&
+    currSession &&
+    isValidIP(prevSession.ipAddress) &&
+    isValidIP(currSession.ipAddress) &&
+    prevSession.ipAddress !== currSession.ipAddress
+  );
+}
+
+function buildAlertObject(
+  prevSession: SessionLite,
+  currSession: SessionLite,
+  prevLoc: { city?: string | null; country?: string | null } | null,
+  currLoc: { city?: string | null; country?: string | null } | null,
+  analysis: { distance?: number; timeDiff?: number; requiredSpeed?: number }
+): ImpossibleTravelAlert {
+  return {
+    id: `alert-${currSession.id}`,
+    userId: currSession.userId,
+    userName: currSession.user.name,
+    userEmail: currSession.user.email,
+    previousLocation: {
+      city: prevLoc?.city || 'Unknown',
+      country: prevLoc?.country || '??',
+      ip: prevSession.ipAddress!,
+    },
+    currentLocation: {
+      city: currLoc?.city || 'Unknown',
+      country: currLoc?.country || '??',
+      ip: currSession.ipAddress!,
+    },
+    distance: analysis.distance || 0,
+    timeDiff: analysis.timeDiff || 0,
+    requiredSpeed: analysis.requiredSpeed || 0,
+    timestamp: currSession.createdAt,
+    status: 'pending',
+  };
+}
+
+async function maybeBuildAlert(prevSession: SessionLite | null, currSession: SessionLite | null): Promise<ImpossibleTravelAlert | null> {
+  if (!shouldAnalyzePair(prevSession, currSession)) return null;
+  const prev = prevSession as SessionLite;
+  const curr = currSession as SessionLite;
+
+  const travelAnalysis = await detectImpossibleTravel(
+    { ip: prev.ipAddress!, timestamp: prev.createdAt },
+    { ip: curr.ipAddress!, timestamp: curr.createdAt }
+  );
+
+  if (!travelAnalysis.isImpossible) return null;
+
+  const prevLookup = isValidIP(prev.ipAddress) ? getLocationFromIP(prev.ipAddress!).catch(() => null) : Promise.resolve(null);
+  const currLookup = isValidIP(curr.ipAddress) ? getLocationFromIP(curr.ipAddress!).catch(() => null) : Promise.resolve(null);
+  const [prevLoc, currLoc] = await Promise.all([
+    prevLookup,
+    currLookup,
+  ]);
+
+  return buildAlertObject(prev, curr, prevLoc, currLoc, travelAnalysis);
+}
+
 async function buildImpossibleTravelAlerts(): Promise<ImpossibleTravelAlert[]> {
-  // Get all active sessions with user info, ordered by creation time
   const sessions = await prisma.session.findMany({
-    where: {
-      expiresAt: {
-        gt: new Date(),
-      },
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-    take: 500, // Limit to recent sessions for performance
+    where: { expiresAt: { gt: new Date() } },
+    include: { user: { select: { id: true, name: true, email: true } } },
+    orderBy: { createdAt: 'desc' },
+    take: 500,
   });
 
-  // Group sessions by user
-  const sessionsByUser = new Map<string, typeof sessions>();
-  for (const session of sessions) {
-    const uid = session.userId;
-    if (!sessionsByUser.has(uid)) {
-      sessionsByUser.set(uid, []);
-    }
-    sessionsByUser.get(uid)!.push(session);
-  }
-
-  // Detect impossible travel for each user
   const alerts: ImpossibleTravelAlert[] = [];
+  const sessionsByUser = groupSessionsByUser(sessions);
 
   for (const userSessions of sessionsByUser.values()) {
-    // Sort by creation time (oldest first)
-    const sortedSessions = userSessions.sort((a, b) =>
-      a.createdAt.getTime() - b.createdAt.getTime()
-    );
-
-    // Compare consecutive sessions
-    for (let i = 1; i < sortedSessions.length; i++) {
-      const prevSession = sortedSessions[i - 1];
-      const currSession = sortedSessions[i];
-
-      // TypeScript safety: ensure sessions exist
-      if (!prevSession || !currSession) {
-        continue;
-      }
-
-      // Skip if either session doesn't have IP address
-      if (!prevSession.ipAddress || !currSession.ipAddress) {
-        continue;
-      }
-
-      // Skip if same IP
-      if (prevSession.ipAddress === currSession.ipAddress) {
-        continue;
-      }
-
-      // Detect impossible travel
-      const travelAnalysis = await detectImpossibleTravel(
-        {
-          ip: prevSession.ipAddress,
-          timestamp: prevSession.createdAt,
-        },
-        {
-          ip: currSession.ipAddress,
-          timestamp: currSession.createdAt,
-        }
-      );
-
-      // If impossible travel detected, create an alert
-      if (travelAnalysis.isImpossible) {
-        // Enrich with GeoIP city/country (best-effort, do not fail the alert)
-        const [prevLoc, currLoc] = await Promise.all([
-          getLocationFromIP(prevSession.ipAddress).catch(() => null),
-          getLocationFromIP(currSession.ipAddress).catch(() => null),
-        ]);
-
-        alerts.push({
-          id: `alert-${currSession.id}`,
-          userId: currSession.userId,
-          userName: currSession.user.name,
-          userEmail: currSession.user.email,
-          previousLocation: {
-            city: prevLoc?.city || 'Unknown',
-            country: prevLoc?.country || '??',
-            ip: prevSession.ipAddress,
-          },
-          currentLocation: {
-            city: currLoc?.city || 'Unknown',
-            country: currLoc?.country || '??',
-            ip: currSession.ipAddress,
-          },
-          distance: travelAnalysis.distance || 0,
-          timeDiff: travelAnalysis.timeDiff || 0,
-          requiredSpeed: travelAnalysis.requiredSpeed || 0,
-          timestamp: currSession.createdAt,
-          status: 'pending',
-        });
-      }
+    const sorted = sortSessionsOldestFirst(userSessions);
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1] ?? null;
+      const curr = sorted[i] ?? null;
+      const alert = await maybeBuildAlert(prev as unknown as SessionLite | null, curr as unknown as SessionLite | null);
+      if (alert) alerts.push(alert);
     }
   }
 
-  // Sort alerts by severity (highest speed required first)
   alerts.sort((a, b) => b.requiredSpeed - a.requiredSpeed);
   return alerts;
 }
