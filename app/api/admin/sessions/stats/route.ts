@@ -13,7 +13,9 @@ import { prisma } from '@/lib/prisma';
 import * as Sentry from '@sentry/nextjs';
 import { createApiHandler } from '@/lib/api-middleware';
 import { log } from '@/lib/logger';
-import { userHasPermissionAsync } from '@/lib/rbac-server';
+import { checkSessionsPermission, SESSIONS_PERMISSIONS } from '../utils';
+import crypto from 'node:crypto';
+import { jsonOk, jsonError } from '../response';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -49,31 +51,8 @@ export const GET = createApiHandler(
         const startTime = Date.now();
 
         try {
-          // Fetch user's role for RBAC check
-          const user = await prisma.user.findUnique({
-            where: { id: userId! },
-            select: { role: true },
-          });
-
-          if (!user) {
-            log.warn('Session stats - user not found', { userId });
-            return NextResponse.json(
-              { error: 'User not found' },
-              { status: 404 }
-            );
-          }
-
           // RBAC: Check sessions:view_all permission
-          const hasPermission = await userHasPermissionAsync(
-            user.role,
-            'sessions:view_all'
-          );
-
-          if (!hasPermission) {
-            log.warn('Session stats - insufficient permissions', { 
-              userId, 
-              role: user.role 
-            });
+          if (!(await checkSessionsPermission(userId!, SESSIONS_PERMISSIONS.VIEW_ALL))) {
             return NextResponse.json(
               { error: 'Forbidden: Insufficient permissions' },
               { status: 403 }
@@ -184,22 +163,34 @@ export const GET = createApiHandler(
             totalUsers: usersWithStats.length
           });
 
-          return NextResponse.json(
-            {
-              stats: {
-                activeSessions,
-                suspiciousSessions,
-                activeUsers: uniqueActiveUsers.length,
-              },
-              users: usersWithStats,
+          const payload = {
+            stats: {
+              activeSessions,
+              suspiciousSessions,
+              activeUsers: uniqueActiveUsers.length,
             },
-            {
+            users: usersWithStats,
+          };
+          const hash = crypto.createHash('sha1').update(JSON.stringify(payload)).digest('hex');
+          const etag = `W/"${hash}"`;
+          const ifNoneMatch = _req.headers.get('if-none-match');
+          if (ifNoneMatch && ifNoneMatch === etag) {
+            return new NextResponse(null, {
+              status: 304,
               headers: {
+                'ETag': etag,
                 'Cache-Control': `private, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 2}`,
-                'X-Response-Time': `${duration}ms`,
               },
-            }
-          );
+            });
+          }
+
+          return jsonOk(_req, payload, {
+            headers: {
+              'Cache-Control': `private, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 2}`,
+              'X-Response-Time': `${duration}ms`,
+              'ETag': etag,
+            },
+          });
         } catch (error) {
           const duration = Date.now() - startTime;
 
@@ -217,10 +208,7 @@ export const GET = createApiHandler(
           });
 
           // Security: Generic error message
-          return NextResponse.json(
-            { error: 'Failed to fetch session statistics' },
-            { status: 500 }
-          );
+          return jsonError(_req, 'Failed to fetch session statistics', 500);
         }
       }
     );

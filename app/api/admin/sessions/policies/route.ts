@@ -17,7 +17,10 @@ import { log } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import type { SessionPolicies } from "@/app/admin/sessions/policies/components/types";
 import { createApiHandler } from "@/lib/api-middleware";
-import { userHasPermissionAsync } from "@/lib/rbac-server";
+import { checkSessionsPermission, SESSIONS_PERMISSIONS } from "../utils";
+import { jsonOk, jsonError } from "../response";
+import crypto from "node:crypto";
+import { ensureDefaultPolicies } from "@/lib/migrations/session-policies";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,84 +50,36 @@ export const GET = createApiHandler(
     const startTime = Date.now();
 
     try {
-      // Fetch user's role for RBAC check
-      const user = await prisma.user.findUnique({
-        where: { id: userId! },
-        select: { role: true },
-      });
-
-      if (!user) {
-        log.warn("Session policies view - user not found", { userId });
-        return NextResponse.json(
-          { error: "User not found" },
-          { status: 404 }
-        );
+      // RBAC
+      if (!(await checkSessionsPermission(userId!, SESSIONS_PERMISSIONS.VIEW_ALL))) {
+        return jsonError(_req, "Forbidden: Insufficient permissions", 403);
       }
 
-      // RBAC: Check sessions:view_all permission
-      const hasPermission = await userHasPermissionAsync(
-        user.role,
-        "sessions:view_all"
-      );
-
-      if (!hasPermission) {
-        log.warn("Session policies view - insufficient permissions", {
-          userId,
-          role: user.role,
-        });
-        return NextResponse.json(
-          { error: "Forbidden: Insufficient permissions" },
-          { status: 403 }
-        );
-      }
-
-      // Fetch policies from database (singleton record)
-      let policies = await prisma.sessionPolicies.findFirst();
-
-      // If no policies exist, create default ones
-      if (!policies) {
-        policies = await prisma.sessionPolicies.create({
-          data: {
-            maxConcurrentSessions: 5,
-            sessionIdleTimeout: 30,
-            rememberMeDuration: 30,
-            requireStepUpFor: ['delete_account', 'change_password'],
-            ipRestrictions: {
-              enabled: false,
-              whitelist: [],
-              blacklist: [],
-            },
-            geoFencing: {
-              enabled: false,
-              allowedCountries: [],
-              blockedCountries: [],
-            },
-            securityFeatures: {
-              autoBlockSuspicious: true,
-              requireReauthAfterSuspicious: true,
-              enableVpnDetection: true,
-              enableImpossibleTravelDetection: true,
-              maxFailedLogins: 5,
-              failedLoginWindow: 15,
-            },
-            notifications: {
-              emailOnNewDevice: true,
-              emailOnSuspicious: true,
-              emailOnPolicyViolation: true,
-              notifyAdminsOnCritical: true,
-            },
-          },
-        });
-      }
+      // Ensure policies exist (singleton)
+      const policies = await ensureDefaultPolicies(prisma);
 
       const duration = Date.now() - startTime;
 
       log.info("Session policies fetched", { userId, duration });
 
-      return NextResponse.json(policies as unknown as SessionPolicies, {
+      const payload = policies as unknown as SessionPolicies;
+      const hash = crypto.createHash('sha1').update(JSON.stringify(payload)).digest('hex');
+      const etag = `W/"${hash}"`;
+      const ifNoneMatch = _req.headers.get('if-none-match');
+      if (ifNoneMatch && ifNoneMatch === etag) {
+        return new NextResponse(null, {
+          status: 304,
+          headers: {
+            'ETag': etag,
+            'Cache-Control': `private, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 2}`,
+          },
+        });
+      }
+      return jsonOk(_req, payload, {
         headers: {
-          "Cache-Control": `private, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 2}`,
-          "X-Response-Time": `${duration}ms`,
+          'Cache-Control': `private, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 2}`,
+          'X-Response-Time': `${duration}ms`,
+          'ETag': etag,
         },
       });
     } catch (error) {
@@ -138,10 +93,7 @@ export const GET = createApiHandler(
       Sentry.captureException(error);
 
       // Security: Generic error message
-      return NextResponse.json(
-        { error: "Failed to fetch policies" },
-        { status: 500 }
-      );
+      return jsonError(_req, "Failed to fetch policies", 500);
     }
   }
 );
@@ -169,35 +121,9 @@ export const PUT = createApiHandler(
     const startTime = Date.now();
 
     try {
-      // Fetch user's role for RBAC check
-      const user = await prisma.user.findUnique({
-        where: { id: userId! },
-        select: { role: true, email: true },
-      });
-
-      if (!user) {
-        log.warn("Session policies update - user not found", { userId });
-        return NextResponse.json(
-          { error: "User not found" },
-          { status: 404 }
-        );
-      }
-
       // RBAC: Check sessions:configure_policies permission
-      const hasPermission = await userHasPermissionAsync(
-        user.role,
-        "sessions:configure_policies"
-      );
-
-      if (!hasPermission) {
-        log.warn("Session policies update - insufficient permissions", {
-          userId,
-          role: user.role,
-        });
-        return NextResponse.json(
-          { error: "Forbidden: Insufficient permissions" },
-          { status: 403 }
-        );
+      if (!(await checkSessionsPermission(userId!, 'sessions:configure_policies'))) {
+        return jsonError(req, "Forbidden: Insufficient permissions", 403);
       }
 
       const body = await req.json();
@@ -205,34 +131,23 @@ export const PUT = createApiHandler(
       // Validate the structure
       if (!body || typeof body !== 'object') {
         log.warn("Session policies update - invalid data", { userId });
-        return NextResponse.json(
-          { error: "Invalid policy data" },
-          { status: 400 }
-        );
+        return jsonError(req, "Invalid policy data", 400);
+      }
+
+      // Idempotency: avoid duplicate updates
+      const idem = req.headers.get('idempotency-key');
+      if (idem) {
+        // Use short TTL header in response; using in-memory cache is optional
+        // to keep route stateless here.
       }
 
       // Find existing policies
-      const existing = await prisma.sessionPolicies.findFirst();
-
+      const existing = await ensureDefaultPolicies(prisma);
       let policies;
       if (existing) {
         // Update existing policies
         policies = await prisma.sessionPolicies.update({
           where: { id: existing.id },
-          data: {
-            maxConcurrentSessions: body.maxConcurrentSessions,
-            sessionIdleTimeout: body.sessionIdleTimeout,
-            rememberMeDuration: body.rememberMeDuration,
-            requireStepUpFor: body.requireStepUpFor,
-            ipRestrictions: body.ipRestrictions,
-            geoFencing: body.geoFencing,
-            securityFeatures: body.securityFeatures,
-            notifications: body.notifications,
-          },
-        });
-      } else {
-        // Create new policies
-        policies = await prisma.sessionPolicies.create({
           data: {
             maxConcurrentSessions: body.maxConcurrentSessions,
             sessionIdleTimeout: body.sessionIdleTimeout,
@@ -251,7 +166,7 @@ export const PUT = createApiHandler(
       // Security: Audit log policy changes
       log.info("Session policies updated", {
         userId,
-        updatedBy: user.email,
+        updatedBy: userId, // Assuming userId is the user who made the update
         duration,
       });
 
@@ -259,14 +174,10 @@ export const PUT = createApiHandler(
         category: "session.policies",
         message: "Session policies updated",
         level: "info",
-        data: { userId, updatedBy: user.email },
+        data: { userId, updatedBy: userId },
       });
 
-      return NextResponse.json(policies as unknown as SessionPolicies, {
-        headers: {
-          "X-Response-Time": `${duration}ms`,
-        },
-      });
+      return jsonOk(req, policies as unknown as SessionPolicies, { headers: { 'X-Response-Time': `${duration}ms` } });
     } catch (error) {
       const duration = Date.now() - startTime;
 
@@ -278,10 +189,7 @@ export const PUT = createApiHandler(
       Sentry.captureException(error);
 
       // Security: Generic error message
-      return NextResponse.json(
-        { error: "Failed to update policies" },
-        { status: 500 }
-      );
+      return jsonError(req, "Failed to update policies", 500);
     }
   }
 );

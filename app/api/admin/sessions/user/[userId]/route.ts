@@ -12,10 +12,33 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { log } from '@/lib/logger';
 import { createApiHandler } from '@/lib/api-middleware';
-import { userHasPermissionAsync } from '@/lib/rbac-server';
+import { checkSessionsPermission, SESSIONS_PERMISSIONS } from '../../utils';
+import { jsonOk, jsonError } from '../../response';
+import crypto from 'node:crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+function transformSessions(sessions: Array<{ id: string; ipAddress: string | null; userAgent: string | null; country: string | null; city: string | null; isSuspicious: boolean; createdAt: Date; expiresAt: Date; updatedAt: Date; }>) {
+  const now = new Date();
+  return sessions.map((s) => {
+    const isActive = s.expiresAt > now;
+    const isExpired = s.expiresAt <= now;
+    return {
+      id: s.id,
+      ipAddress: s.ipAddress || 'Unknown',
+      userAgent: s.userAgent || 'Unknown',
+      country: s.country || 'Unknown',
+      city: s.city || null,
+      isSuspicious: s.isSuspicious,
+      createdAt: s.createdAt,
+      expiresAt: s.expiresAt,
+      isActive,
+      isExpired,
+      lastActivity: s.updatedAt,
+    };
+  });
+}
 
 /**
  * GET /api/admin/sessions/user/[userId]
@@ -39,35 +62,9 @@ export const GET = createApiHandler(
     const startTime = Date.now();
 
     try {
-      // Fetch user's role for RBAC check
-      const user = await prisma.user.findUnique({
-        where: { id: requestingUserId! },
-        select: { role: true },
-      });
-
-      if (!user) {
-        log.warn('User sessions - requesting user not found', { userId: requestingUserId });
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404 }
-        );
-      }
-
-      // RBAC: Check sessions:view_all permission
-      const hasPermission = await userHasPermissionAsync(
-        user.role,
-        'sessions:view_all'
-      );
-
-      if (!hasPermission) {
-        log.warn('User sessions - insufficient permissions', { 
-          userId: requestingUserId, 
-          role: user.role 
-        });
-        return NextResponse.json(
-          { error: 'Forbidden: Insufficient permissions' },
-          { status: 403 }
-        );
+      // RBAC
+      if (!(await checkSessionsPermission(requestingUserId!, SESSIONS_PERMISSIONS.VIEW_ALL))) {
+        return jsonError(_req, 'Forbidden: Insufficient permissions', 403);
       }
 
       const targetUserId = params!['userId']!;
@@ -88,10 +85,7 @@ export const GET = createApiHandler(
           userId: requestingUserId, 
           targetUserId 
         });
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404 }
-        );
+        return jsonError(_req, 'User not found', 404);
       }
 
       // Fetch all sessions for this user
@@ -100,27 +94,7 @@ export const GET = createApiHandler(
         orderBy: { createdAt: 'desc' },
       });
 
-      const now = new Date();
-
-      // Transform sessions with additional metadata
-      const sessionsWithMeta = sessions.map((s) => {
-        const isActive = s.expiresAt > now;
-        const isExpired = s.expiresAt <= now;
-
-        return {
-          id: s.id,
-          ipAddress: s.ipAddress || 'Unknown',
-          userAgent: s.userAgent || 'Unknown',
-          country: s.country || 'Unknown',
-          city: s.city || null,
-          isSuspicious: s.isSuspicious,
-          createdAt: s.createdAt,
-          expiresAt: s.expiresAt,
-          isActive,
-          isExpired,
-          lastActivity: s.updatedAt,
-        };
-      });
+      const sessionsWithMeta = transformSessions(sessions);
 
       const duration = Date.now() - startTime;
 
@@ -131,17 +105,17 @@ export const GET = createApiHandler(
         sessionCount: sessionsWithMeta.length,
       });
 
-      return NextResponse.json(
-        {
-          user: targetUser,
-          sessions: sessionsWithMeta,
-        },
-        {
-          headers: {
-            'X-Response-Time': `${duration}ms`,
-          },
-        }
-      );
+      const payload = { user: targetUser, sessions: sessionsWithMeta };
+      const hash = crypto.createHash('sha1').update(JSON.stringify(payload)).digest('hex');
+      const etag = `W/"${hash}"`;
+      const ifNoneMatch = _req.headers.get('if-none-match');
+      if (ifNoneMatch && ifNoneMatch === etag) {
+        return new NextResponse(null, {
+          status: 304,
+          headers: { 'ETag': etag },
+        });
+      }
+      return jsonOk(_req, payload, { headers: { 'X-Response-Time': `${duration}ms`, 'ETag': etag } });
     } catch (error) {
       const duration = Date.now() - startTime;
 
@@ -152,10 +126,7 @@ export const GET = createApiHandler(
       });
 
       // Security: Generic error message
-      return NextResponse.json(
-        { error: 'Failed to fetch user sessions' },
-        { status: 500 }
-      );
+      return jsonError(_req, 'Failed to fetch user sessions', 500);
     }
   }
 );

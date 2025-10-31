@@ -15,7 +15,9 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { log } from '@/lib/logger';
 import { createApiHandler } from '@/lib/api-middleware';
-import { userHasPermissionAsync } from '@/lib/rbac-server';
+import { checkSessionsPermission, SESSIONS_PERMISSIONS } from '../utils';
+import { jsonOk, jsonError } from '../response';
+import crypto from 'node:crypto';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
@@ -166,35 +168,9 @@ export const GET = createApiHandler(
     const startTime = Date.now();
 
     try {
-      // Fetch user's role for RBAC check
-      const user = await prisma.user.findUnique({
-        where: { id: userId! },
-        select: { role: true },
-      });
-
-      if (!user) {
-        log.warn('Threat detection - user not found', { userId });
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404 }
-        );
-      }
-
       // RBAC: Check sessions:view_analytics permission
-      const hasPermission = await userHasPermissionAsync(
-        user.role,
-        'sessions:view_analytics'
-      );
-
-      if (!hasPermission) {
-        log.warn('Threat detection - insufficient permissions', { 
-          userId, 
-          role: user.role 
-        });
-        return NextResponse.json(
-          { error: 'Forbidden: Insufficient permissions' },
-          { status: 403 }
-        );
+      if (!(await checkSessionsPermission(userId!, SESSIONS_PERMISSIONS.VIEW_ANALYTICS))) {
+        return jsonError(_req, 'Forbidden: Insufficient permissions', 403);
       }
 
       const now = new Date();
@@ -226,11 +202,13 @@ export const GET = createApiHandler(
         threatCount: threats.length 
       });
 
-      return NextResponse.json(threats, {
-        headers: {
-          'X-Response-Time': `${duration}ms`,
-        },
-      });
+      const hash = crypto.createHash('sha1').update(JSON.stringify(threats)).digest('hex');
+      const etag = `W/"${hash}"`;
+      const ifNoneMatch = _req.headers.get('if-none-match');
+      if (ifNoneMatch && ifNoneMatch === etag) {
+        return new NextResponse(null, { status: 304, headers: { 'ETag': etag } });
+      }
+      return jsonOk(_req, threats, { headers: { 'X-Response-Time': `${duration}ms`, 'ETag': etag } });
     } catch (error) {
       const duration = Date.now() - startTime;
 
@@ -241,10 +219,7 @@ export const GET = createApiHandler(
       });
 
       // Security: Generic error message
-      return NextResponse.json(
-        { error: 'Failed to detect threats' },
-        { status: 500 }
-      );
+      return jsonError(_req, 'Failed to detect threats', 500);
     }
   }
 );
@@ -273,35 +248,9 @@ export const POST = createApiHandler(
     const startTime = Date.now();
 
     try {
-      // Fetch user's role for RBAC check
-      const user = await prisma.user.findUnique({
-        where: { id: userId! },
-        select: { role: true, email: true },
-      });
-
-      if (!user) {
-        log.warn('Threat action - user not found', { userId });
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404 }
-        );
-      }
-
       // RBAC: Check sessions:revoke_any permission
-      const hasPermission = await userHasPermissionAsync(
-        user.role,
-        'sessions:revoke_any'
-      );
-
-      if (!hasPermission) {
-        log.warn('Threat action - insufficient permissions', { 
-          userId, 
-          role: user.role 
-        });
-        return NextResponse.json(
-          { error: 'Forbidden: Insufficient permissions' },
-          { status: 403 }
-        );
+      if (!(await checkSessionsPermission(userId!, SESSIONS_PERMISSIONS.REVOKE_ANY))) {
+        return jsonError(_req, 'Forbidden: Insufficient permissions', 403);
       }
 
       const { threatId, action } = validatedBody as z.infer<typeof threatActionSchema>;
@@ -311,7 +260,6 @@ export const POST = createApiHandler(
       // Security: Audit log threat action
       log.info('Threat action processed', {
         adminId: userId,
-        adminEmail: user.email,
         threatId,
         action,
         duration,
@@ -322,17 +270,7 @@ export const POST = createApiHandler(
       // - Take action based on the threat type (block IPs, revoke sessions, etc.)
       // - Send notifications to admins
 
-      return NextResponse.json(
-        {
-          success: true,
-          message: `Threat ${action} action completed`,
-        },
-        {
-          headers: {
-            'X-Response-Time': `${duration}ms`,
-          },
-        }
-      );
+      return jsonOk(_req, { success: true, message: `Threat ${action} action completed` }, { headers: { 'X-Response-Time': `${duration}ms` } });
     } catch (error) {
       const duration = Date.now() - startTime;
 
@@ -343,10 +281,7 @@ export const POST = createApiHandler(
       });
 
       // Security: Generic error message
-      return NextResponse.json(
-        { error: 'Failed to handle threat action' },
-        { status: 500 }
-      );
+      return jsonError(_req, 'Failed to handle threat action', 500);
     }
   }
 );

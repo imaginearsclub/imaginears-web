@@ -7,12 +7,12 @@
  * Security: Requires sessions:revoke_any permission, rate limited
  * Performance: Single database transaction, audit logging
  */
-
-import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { log } from '@/lib/logger';
 import { createApiHandler } from '@/lib/api-middleware';
-import { userHasPermissionAsync } from '@/lib/rbac-server';
+import { checkSessionsPermission, SESSIONS_PERMISSIONS } from '../../utils';
+import { cache } from '@/lib/cache';
+import { jsonOk, jsonError } from '../../response';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,38 +39,25 @@ export const POST = createApiHandler(
     const startTime = Date.now();
 
     try {
-      // Fetch user's role for RBAC check
-      const user = await prisma.user.findUnique({
-        where: { id: userId! },
-        select: { role: true, email: true },
-      });
-
-      if (!user) {
-        log.warn('Session revoke - user not found', { userId });
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404 }
-        );
+      // Idempotency: Prevent duplicate revocations within a short window
+      const idemKey = _req.headers.get('idempotency-key');
+      const sessionId = params!['sessionId']!;
+      if (idemKey) {
+        const cacheKey = `idemp:revoke:${sessionId}:${idemKey}`;
+        const previous = await cache.get<{ done: boolean }>(cacheKey);
+        if (previous?.done) {
+          return jsonOk(_req, { success: true, message: 'Session revoke already processed' });
+        }
+        // Mark as in-progress/done with short TTL
+        await cache.set(cacheKey, { done: true }, 60);
       }
 
       // RBAC: Check sessions:revoke_any permission
-      const hasPermission = await userHasPermissionAsync(
-        user.role,
-        'sessions:revoke_any'
-      );
-
-      if (!hasPermission) {
-        log.warn('Session revoke - insufficient permissions', { 
-          userId, 
-          role: user.role 
-        });
-        return NextResponse.json(
-          { error: 'Forbidden: Insufficient permissions' },
-          { status: 403 }
-        );
+      if (!(await checkSessionsPermission(userId!, SESSIONS_PERMISSIONS.REVOKE_ANY))) {
+        return jsonError(_req, 'Forbidden: Insufficient permissions', 403);
       }
 
-      const sessionId = params!['sessionId']!;
+      // Already defined above
 
       // Find the session with user info
       const targetSession = await prisma.session.findUnique({
@@ -88,10 +75,7 @@ export const POST = createApiHandler(
 
       if (!targetSession) {
         log.warn('Session revoke - session not found', { userId, sessionId });
-        return NextResponse.json(
-          { error: 'Session not found' },
-          { status: 404 }
-        );
+        return jsonError(_req, 'Session not found', 404);
       }
 
       // Revoke the session by setting expiresAt to now
@@ -107,7 +91,6 @@ export const POST = createApiHandler(
       // Security: Audit log the revocation
       log.warn('Admin revoked user session', {
         adminId: userId,
-        adminEmail: user.email,
         targetUserId: targetSession.userId,
         targetUserEmail: targetSession.user.email,
         sessionId,
@@ -115,17 +98,9 @@ export const POST = createApiHandler(
         duration,
       });
 
-      return NextResponse.json(
-        {
-          success: true,
-          message: 'Session revoked successfully',
-        },
-        {
-          headers: {
-            'X-Response-Time': `${duration}ms`,
-          },
-        }
-      );
+      return jsonOk(_req, { success: true, message: 'Session revoked successfully' }, {
+        headers: { 'X-Response-Time': `${duration}ms` },
+      });
     } catch (error) {
       const duration = Date.now() - startTime;
 
@@ -136,11 +111,7 @@ export const POST = createApiHandler(
       });
 
       // Security: Generic error message
-      return NextResponse.json(
-        { error: 'Failed to revoke session' },
-        { status: 500 }
-      );
+      return jsonError(_req, 'Failed to revoke session', 500);
     }
   }
 );
-

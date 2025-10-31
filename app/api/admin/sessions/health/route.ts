@@ -13,7 +13,9 @@ import { prisma } from '@/lib/prisma';
 import { cache } from '@/lib/cache';
 import { createApiHandler } from '@/lib/api-middleware';
 import { log } from '@/lib/logger';
-import { userHasPermissionAsync } from '@/lib/rbac-server';
+import { checkSessionsPermission, SESSIONS_PERMISSIONS } from '../utils';
+import crypto from 'node:crypto';
+import { jsonOk, jsonError } from '../response';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -132,31 +134,8 @@ export const GET = createApiHandler(
     const startTime = Date.now();
 
     try {
-      // Fetch user's role for RBAC check
-      const user = await prisma.user.findUnique({
-        where: { id: userId! },
-        select: { role: true },
-      });
-
-      if (!user) {
-        log.warn('Session health - user not found', { userId });
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404 }
-        );
-      }
-
       // RBAC: Check sessions:view_all permission
-      const hasPermission = await userHasPermissionAsync(
-        user.role,
-        'sessions:view_all'
-      );
-
-      if (!hasPermission) {
-        log.warn('Session health - insufficient permissions', { 
-          userId, 
-          role: user.role 
-        });
+      if (!(await checkSessionsPermission(userId!, SESSIONS_PERMISSIONS.VIEW_ALL))) {
         return NextResponse.json(
           { error: 'Forbidden: Insufficient permissions' },
           { status: 403 }
@@ -165,6 +144,20 @@ export const GET = createApiHandler(
 
       // Performance: Fetch health metrics with optimized queries
       const metrics = await fetchHealthMetrics();
+
+      // Caching: ETag support for conditional GET
+      const hash = crypto.createHash('sha1').update(JSON.stringify(metrics)).digest('hex');
+      const etag = `W/"${hash}"`;
+      const ifNoneMatch = _req.headers.get('if-none-match');
+      if (ifNoneMatch && ifNoneMatch === etag) {
+        return new NextResponse(null, {
+          status: 304,
+          headers: {
+            'ETag': etag,
+            'Cache-Control': `private, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 2}`,
+          },
+        });
+      }
 
       const duration = Date.now() - startTime;
 
@@ -175,10 +168,11 @@ export const GET = createApiHandler(
 
       log.info('Session health checked', { userId, duration });
 
-      return NextResponse.json(metrics, {
+      return jsonOk(_req, metrics, {
         headers: {
           'Cache-Control': `private, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 2}`,
           'X-Response-Time': `${duration}ms`,
+          'ETag': etag,
         },
       });
     } catch (error) {
@@ -191,10 +185,7 @@ export const GET = createApiHandler(
       });
 
       // Security: Generic error message
-      return NextResponse.json(
-        { error: 'Failed to fetch session health metrics' },
-        { status: 500 }
-      );
+      return jsonError(_req, 'Failed to fetch session health metrics', 500);
     }
   }
 );

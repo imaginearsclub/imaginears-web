@@ -72,6 +72,14 @@ export const POST = createApiHandler(
 
       const alertId = params!['alertId']!;
 
+      // Validate alertId format: expected "alert-{sessionId}"
+      if (!alertId || !alertId.startsWith('alert-')) {
+        return NextResponse.json(
+          { error: 'Invalid alertId format' },
+          { status: 400 }
+        );
+      }
+
       const duration = Date.now() - startTime;
 
       // In a production system, you would:

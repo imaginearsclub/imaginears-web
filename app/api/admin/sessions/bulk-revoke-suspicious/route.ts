@@ -13,39 +13,13 @@ import { prisma } from '@/lib/prisma';
 import { log } from '@/lib/logger';
 import { createNotification } from '@/lib/notifications';
 import { createApiHandler } from '@/lib/api-middleware';
-import { userHasPermissionAsync } from '@/lib/rbac-server';
+import { checkSessionsPermission, SESSIONS_PERMISSIONS } from '../utils';
+import { cache } from '@/lib/cache';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/**
- * Helper: Validate user and check permissions
- */
-async function validateUserPermissions(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { role: true, email: true },
-  });
-
-  if (!user) {
-    log.warn('Bulk revoke - user not found', { userId });
-    return { user: null, hasPermission: false };
-  }
-
-  const hasPermission = await userHasPermissionAsync(
-    user.role,
-    'sessions:revoke_any'
-  );
-
-  if (!hasPermission) {
-    log.warn('Bulk revoke - insufficient permissions', { 
-      userId, 
-      role: user.role 
-    });
-  }
-
-  return { user, hasPermission };
-}
+// Permission check helper now centralized in ../utils
 
 /**
  * Helper: Fetch, revoke suspicious sessions, and notify users
@@ -141,21 +115,28 @@ export const POST = createApiHandler(
     const startTime = Date.now();
 
     try {
-      // Validate user and check permissions
-      const { user, hasPermission } = await validateUserPermissions(userId!);
-
-      if (!user) {
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404 }
-        );
-      }
-
-      if (!hasPermission) {
+      // RBAC: Check sessions:revoke_any permission
+      if (!(await checkSessionsPermission(userId!, SESSIONS_PERMISSIONS.REVOKE_ANY))) {
         return NextResponse.json(
           { error: 'Forbidden: Insufficient permissions' },
           { status: 403 }
         );
+      }
+
+      // Idempotency: prevent duplicate bulk operations
+      const idemKey = _req.headers.get('idempotency-key');
+      if (idemKey) {
+        const cacheKey = `idemp:bulk-revoke:${idemKey}`;
+        const previous = await cache.get<{ done: boolean }>(cacheKey);
+        if (previous?.done) {
+          return NextResponse.json({
+            success: true,
+            message: 'Bulk revoke already processed',
+            revokedCount: 0,
+            affectedUsers: 0,
+          });
+        }
+        await cache.set(cacheKey, { done: true }, 300);
       }
 
       // Revoke suspicious sessions and notify affected users
@@ -185,7 +166,6 @@ export const POST = createApiHandler(
       // Security: Audit log the bulk revoke action
       log.warn('Bulk revoked suspicious sessions', {
         adminId: userId,
-        adminEmail: user.email,
         revokedCount,
         affectedUsers,
         duration,

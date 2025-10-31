@@ -12,7 +12,9 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { log } from '@/lib/logger';
 import { createApiHandler } from '@/lib/api-middleware';
-import { userHasPermissionAsync } from '@/lib/rbac-server';
+import { checkSessionsPermission, SESSIONS_PERMISSIONS } from '../utils';
+import { jsonOk, jsonError } from '../response';
+import crypto from 'node:crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,35 +44,9 @@ export const GET = createApiHandler(
     const startTime = Date.now();
 
     try {
-      // Fetch user's role for RBAC check
-      const user = await prisma.user.findUnique({
-        where: { id: userId! },
-        select: { role: true },
-      });
-
-      if (!user) {
-        log.warn('Session timeline - user not found', { userId });
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404 }
-        );
-      }
-
-      // RBAC: Check sessions:view_all permission
-      const hasPermission = await userHasPermissionAsync(
-        user.role,
-        'sessions:view_all'
-      );
-
-      if (!hasPermission) {
-        log.warn('Session timeline - insufficient permissions', { 
-          userId, 
-          role: user.role 
-        });
-        return NextResponse.json(
-          { error: 'Forbidden: Insufficient permissions' },
-          { status: 403 }
-        );
+      // RBAC
+      if (!(await checkSessionsPermission(userId!, SESSIONS_PERMISSIONS.VIEW_ALL))) {
+        return jsonError(_req, 'Forbidden: Insufficient permissions', 403);
       }
 
       // Get recent sessions (last 24 hours)
@@ -132,10 +108,23 @@ export const GET = createApiHandler(
         eventCount: events.length 
       });
 
-      return NextResponse.json(events, {
+      const hash = crypto.createHash('sha1').update(JSON.stringify(events)).digest('hex');
+      const etag = `W/"${hash}"`;
+      const ifNoneMatch = _req.headers.get('if-none-match');
+      if (ifNoneMatch && ifNoneMatch === etag) {
+        return new NextResponse(null, {
+          status: 304,
+          headers: {
+            'ETag': etag,
+            'Cache-Control': `private, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 2}`,
+          },
+        });
+      }
+      return jsonOk(_req, events, {
         headers: {
           'Cache-Control': `private, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS * 2}`,
           'X-Response-Time': `${duration}ms`,
+          'ETag': etag,
         },
       });
     } catch (error) {
@@ -148,10 +137,7 @@ export const GET = createApiHandler(
       });
 
       // Security: Generic error message
-      return NextResponse.json(
-        { error: 'Failed to fetch timeline events' },
-        { status: 500 }
-      );
+      return jsonError(_req, 'Failed to fetch timeline events', 500);
     }
   }
 );
