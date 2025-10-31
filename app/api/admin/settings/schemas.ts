@@ -6,6 +6,7 @@
 
 import { z } from 'zod';
 import IPCIDR from 'ip-cidr';
+import { SITE_TZ } from '@/app/utils/timezone-client';
 
 /**
  * Hex color validation
@@ -46,28 +47,18 @@ const emailSchema = z
   );
 
 /**
- * Timezone validation
+ * Timezone validation (IANA) using platform-supported values
  */
-const VALID_TIMEZONES = [
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'America/Phoenix',
-  'America/Anchorage',
-  'Pacific/Honolulu',
-  'Europe/London',
-  'Europe/Paris',
-  'Europe/Berlin',
-  'Europe/Rome',
-  'Asia/Tokyo',
-  'Asia/Shanghai',
-  'Asia/Dubai',
-  'Australia/Sydney',
-  'UTC',
-] as const;
-
-const timezoneSchema = z.enum(VALID_TIMEZONES, {
+const supportedTimeZones: readonly string[] = (() => {
+  const intlAny = Intl as unknown as Record<string, unknown>;
+  const fn = intlAny && intlAny['supportedValuesOf'];
+  if (typeof fn === 'function') {
+    return (fn as Function).call(Intl, 'timeZone') as string[];
+  }
+  return [SITE_TZ];
+})();
+const VALID_TZ_SET: ReadonlySet<string> = new Set(supportedTimeZones);
+const timezoneSchema = z.string().refine((val) => VALID_TZ_SET.has(val), {
   message: 'Must be a valid IANA timezone',
 });
 

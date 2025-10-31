@@ -13,11 +13,11 @@ import { prisma } from '@/lib/prisma';
 import { log } from '@/lib/logger';
 import { createApiHandler } from '@/lib/api-middleware';
 import { sanitizeInput } from '@/lib/input-sanitization';
-import {
-  settingsUpdateSchema,
-  SETTINGS_DEFAULTS,
-  type SettingsUpdate,
-} from './schemas';
+import { ensureAppSettings } from '@/lib/migrations/app-settings';
+import crypto from 'node:crypto';
+import { cache } from '@/lib/cache';
+import { jsonOk, jsonError } from '../sessions/response';
+import { settingsUpdateSchema, type SettingsUpdate } from './schemas';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -28,37 +28,7 @@ export const dynamic = 'force-dynamic';
  * Memory Safety: Handles race conditions properly
  * Performance: Uses skipDuplicates for efficiency
  */
-async function ensureSettingsExist() {
-  try {
-    // Try to create with defaults (skipDuplicates handles race conditions)
-    await prisma.appSettings.createMany({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: [SETTINGS_DEFAULTS as any],
-      skipDuplicates: true,
-    });
-
-    // Fetch the settings
-    let settings = await prisma.appSettings.findUnique({
-      where: { id: 'global' },
-    });
-
-    // Fallback: if still not found, create it explicitly
-    if (!settings) {
-      log.warn('Settings not found after createMany, creating explicitly');
-      settings = await prisma.appSettings.create({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        data: SETTINGS_DEFAULTS as any,
-      });
-    }
-
-    return settings;
-  } catch (error) {
-    log.error('Failed to ensure settings exist', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    throw error;
-  }
-}
+async function ensureSettingsExist() { return ensureAppSettings(prisma); }
 
 /**
  * Helper: Sanitize markdown field
@@ -135,6 +105,66 @@ function sanitizeTextInputs(data: Partial<SettingsUpdate>): Partial<SettingsUpda
 }
 
 /**
+ * Helper: Redact sensitive values for audit logs
+ */
+function redactIfSensitive(path: string, value: unknown): unknown {
+  const sensitiveKeys = ['turnstileSiteKey', 'discordWebhookUrl', 'discordApplicationsWebhookUrl', 'discordEventsWebhookUrl'];
+  if (sensitiveKeys.some((k) => path.endsWith(k))) {
+    return value ? '***redacted***' : value;
+  }
+  return value;
+}
+
+/**
+ * Helper: Safely stringify values for comparison
+ */
+function safeStringify(v: unknown): string {
+  try { return JSON.stringify(v); } catch { return String(v); }
+}
+
+const ALLOWED_SETTING_FIELDS = new Set([
+  'siteName',
+  'timezone',
+  'homepageIntro',
+  'footerMarkdown',
+  'aboutMarkdown',
+  'applicationsIntroMarkdown',
+  'branding',
+  'events',
+  'applications',
+  'social',
+  'seo',
+  'features',
+  'notifications',
+  'maintenance',
+  'security',
+]);
+
+/**
+ * Helper: Compute field-level diffs for audit logging
+ */
+function computeSettingsDiff(
+  current: unknown,
+  updated: unknown,
+  sanitized: Partial<SettingsUpdate>
+): Array<{ path: string; from: unknown; to: unknown }> {
+  const diffs: Array<{ path: string; from: unknown; to: unknown }> = [];
+  const currentSafe = (current ?? {}) as Record<string, unknown>;
+  const updatedSafe = (updated ?? {}) as Record<string, unknown>;
+  for (const key of Object.keys(sanitized)) {
+    if (!ALLOWED_SETTING_FIELDS.has(key)) continue;
+    // eslint-disable-next-line security/detect-object-injection
+    const fromVal = Object.prototype.hasOwnProperty.call(currentSafe, key) ? currentSafe[key] : undefined;
+    // eslint-disable-next-line security/detect-object-injection
+    const toVal = Object.prototype.hasOwnProperty.call(updatedSafe, key) ? updatedSafe[key] : undefined;
+    if (safeStringify(fromVal) !== safeStringify(toVal)) {
+      diffs.push({ path: key, from: redactIfSensitive(key, fromVal), to: redactIfSensitive(key, toVal) });
+    }
+  }
+  return diffs;
+}
+
+/**
  * GET /api/admin/settings
  * 
  * Retrieves global application settings
@@ -166,6 +196,21 @@ export const GET = createApiHandler(
       // Ensure settings exist and fetch them
       const settings = await ensureSettingsExist();
 
+      // ETag support for conditional GET
+      const payload = { success: true, data: settings } as const;
+      const hash = crypto.createHash('sha1').update(JSON.stringify(payload)).digest('hex');
+      const etag = `W/"${hash}"`;
+      const ifNoneMatch = _req.headers.get('if-none-match');
+      if (ifNoneMatch && ifNoneMatch === etag) {
+        return NextResponse.json(null, {
+          status: 304,
+          headers: {
+            'ETag': etag,
+            'Cache-Control': 'private, max-age=60',
+          },
+        } as unknown as ResponseInit);
+      }
+
       const duration = Date.now() - startTime;
 
       log.info('Settings retrieved successfully', {
@@ -173,17 +218,13 @@ export const GET = createApiHandler(
         duration,
       });
 
-      return NextResponse.json(
-        {
-          success: true,
-          data: settings,
+      return NextResponse.json(payload, {
+        headers: {
+          'X-Response-Time': `${duration}ms`,
+          'ETag': etag,
+          'Cache-Control': 'private, max-age=60',
         },
-        {
-          headers: {
-            'X-Response-Time': `${duration}ms`,
-          },
-        }
-      );
+      });
     } catch (error) {
       const duration = Date.now() - startTime;
 
@@ -235,6 +276,15 @@ export const PATCH = createApiHandler(
     const startTime = Date.now();
 
     try {
+      // Idempotency support
+      const idemKey = _req.headers.get('idempotency-key');
+      if (idemKey) {
+        const prior = await cache.get<{ response: unknown }>(`idemp:settings:${idemKey}`);
+        if (prior?.response) {
+          return jsonOk(_req, prior.response, { headers: { 'X-Response-Time': '0ms', 'X-Idempotent-Replay': '1' } });
+        }
+      }
+
       // Extract validated data
       const updates = validatedBody as SettingsUpdate;
 
@@ -244,7 +294,16 @@ export const PATCH = createApiHandler(
       });
 
       // Ensure settings exist
-      await ensureSettingsExist();
+      const current = await ensureSettingsExist();
+
+      // Optimistic concurrency with If-Match (ETag of current payload)
+      const currentPayload = { success: true, data: current } as const;
+      const currentHash = crypto.createHash('sha1').update(JSON.stringify(currentPayload)).digest('hex');
+      const currentEtag = `W/"${currentHash}"`;
+      const ifMatch = _req.headers.get('if-match');
+      if (ifMatch && ifMatch !== currentEtag) {
+        return jsonError(_req, 'Precondition Failed', 412, { expected: currentEtag });
+      }
 
       // Sanitize text inputs to prevent XSS
       const sanitizedUpdates = sanitizeTextInputs(updates);
@@ -276,30 +335,31 @@ export const PATCH = createApiHandler(
         });
       }
 
-      // Security: Comprehensive audit logging
+      // Security: Comprehensive audit logging with field diff (redacted where needed)
+      const diffs = computeSettingsDiff(current, updatedSettings, sanitizedUpdates);
+
       log.warn('Settings updated', {
         adminId: userId,
         duration,
         updatedFields: Object.keys(sanitizedUpdates),
-        // Log sensitive field changes for audit
+        diffs,
         maintenanceModeChanged: sanitizedUpdates.maintenance !== undefined,
         maintenanceEnabled: sanitizedUpdates.maintenance?.enabled,
         securitySettingsChanged: sanitizedUpdates.security !== undefined,
         timestamp: new Date().toISOString(),
       });
 
-      return NextResponse.json(
-        {
-          success: true,
-          message: `Successfully updated ${Object.keys(sanitizedUpdates).length} setting(s)`,
-          data: updatedSettings,
-        },
-        {
-          headers: {
-            'X-Response-Time': `${duration}ms`,
-          },
-        }
-      );
+      const responseBody = {
+        success: true,
+        message: `Successfully updated ${Object.keys(sanitizedUpdates).length} setting(s)`,
+        data: updatedSettings,
+      };
+
+      if (idemKey) {
+        await cache.set(`idemp:settings:${idemKey}`, { response: responseBody }, 60);
+      }
+
+      return jsonOk(_req, responseBody, { headers: { 'X-Response-Time': `${duration}ms` } });
     } catch (error) {
       const duration = Date.now() - startTime;
 
@@ -311,10 +371,7 @@ export const PATCH = createApiHandler(
       });
 
       // Security: Generic error message
-      return NextResponse.json(
-        { error: 'Failed to update settings' },
-        { status: 500 }
-      );
+      return jsonError(_req, 'Failed to update settings', 500);
     }
   }
 );
