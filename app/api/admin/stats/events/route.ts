@@ -11,8 +11,8 @@ import { prisma } from '@/lib/prisma';
 import { log } from '@/lib/logger';
 import { createApiHandler } from '@/lib/api-middleware';
 import { eventsStatsQuerySchema, type EventsStatsQuery, type EventsStatsData } from '../schemas';
-import crypto from 'node:crypto';
 import { jsonOk, jsonError } from '@/app/api/admin/sessions/response';
+import { tryConditionalGet } from '@/lib/http';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -154,22 +154,12 @@ export const GET = createApiHandler(
         totalEvents: data.reduce((sum, d) => sum + d.count, 0),
       });
 
-      // ETag support for conditional GET
       const payload = { success: true, data } as const;
-      const hash = crypto.createHash('sha1').update(JSON.stringify(payload)).digest('hex');
-      const etag = `W/"${hash}"`;
-      const ifNoneMatch = _req.headers.get('if-none-match');
-      if (ifNoneMatch && ifNoneMatch === etag) {
-        return jsonOk(_req, null, { headers: { 'ETag': etag, 'Cache-Control': 'private, max-age=300' }, status: 304 as unknown as number });
+      const decision = tryConditionalGet(_req, payload, { 'Cache-Control': 'private, max-age=300' });
+      if (decision.status === 304) {
+        return jsonOk(_req, null, { headers: decision.headers, status: 304 as unknown as number });
       }
-
-      return jsonOk(_req, payload, {
-        headers: {
-          'X-Response-Time': `${duration}ms`,
-          'ETag': etag,
-          'Cache-Control': 'private, max-age=300',
-        },
-      });
+      return jsonOk(_req, payload, { headers: { ...decision.headers, 'X-Response-Time': `${duration}ms` } });
     } catch (error) {
       const duration = Date.now() - startTime;
 
