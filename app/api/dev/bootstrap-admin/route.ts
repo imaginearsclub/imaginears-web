@@ -14,136 +14,16 @@ import { headers as nextHeaders } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { log } from '@/lib/logger';
 import { createApiHandler } from '@/lib/api-middleware';
+import { upsertSystemRoles } from '@/lib/migrations/roles';
 
 export const runtime = 'nodejs';
 
-/**
- * System roles with permissions
- */
-const SYSTEM_ROLES = [
-  {
-    slug: 'OWNER',
-    name: 'Owner',
-    description: 'Full system access. Can manage everything including critical settings.',
-    permissions: JSON.stringify([
-      'events:read',
-      'events:write',
-      'events:delete',
-      'events:publish',
-      'applications:read',
-      'applications:write',
-      'applications:delete',
-      'applications:approve',
-      'players:read',
-      'players:write',
-      'players:ban',
-      'users:read',
-      'users:write',
-      'users:delete',
-      'users:manage_roles',
-      'settings:read',
-      'settings:write',
-      'settings:security',
-      'dashboard:view',
-      'dashboard:stats',
-      'system:maintenance',
-      'system:logs',
-    ]),
-    isSystem: true,
-    color: '#DC2626',
-  },
-  {
-    slug: 'ADMIN',
-    name: 'Administrator',
-    description: 'Can manage most features, users, and settings. Cannot access critical security settings.',
-    permissions: JSON.stringify([
-      'events:read',
-      'events:write',
-      'events:delete',
-      'events:publish',
-      'applications:read',
-      'applications:write',
-      'applications:delete',
-      'applications:approve',
-      'players:read',
-      'players:write',
-      'players:ban',
-      'users:read',
-      'users:write',
-      'settings:read',
-      'settings:write',
-      'dashboard:view',
-      'dashboard:stats',
-      'system:logs',
-    ]),
-    isSystem: true,
-    color: '#16A34A',
-  },
-  {
-    slug: 'MODERATOR',
-    name: 'Moderator',
-    description: 'Can manage events, applications, and players. Limited settings access.',
-    permissions: JSON.stringify([
-      'events:read',
-      'events:write',
-      'events:publish',
-      'applications:read',
-      'applications:write',
-      'applications:approve',
-      'players:read',
-      'players:write',
-      'users:read',
-      'settings:read',
-      'dashboard:view',
-      'dashboard:stats',
-    ]),
-    isSystem: true,
-    color: '#3B82F6',
-  },
-  {
-    slug: 'STAFF',
-    name: 'Staff Member',
-    description: 'Can view and assist with events and applications. Read-only for most features.',
-    permissions: JSON.stringify([
-      'events:read',
-      'events:write',
-      'applications:read',
-      'applications:write',
-      'players:read',
-      'users:read',
-      'settings:read',
-      'dashboard:view',
-    ]),
-    isSystem: true,
-    color: '#8B5CF6',
-  },
-  {
-    slug: 'USER',
-    name: 'User',
-    description: 'Basic authenticated access. Can view own information and public content.',
-    permissions: JSON.stringify(['dashboard:view']),
-    isSystem: true,
-    color: '#64748B',
-  },
-];
 
 /**
  * Helper: Initialize system roles
  */
 async function initializeSystemRoles() {
-  for (const role of SYSTEM_ROLES) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (prisma as any).customRole.upsert({
-      where: { slug: role.slug },
-      update: {},
-      create: role,
-    });
-  }
-
-  log.info('System roles initialized', {
-    rolesCount: SYSTEM_ROLES.length,
-    roles: SYSTEM_ROLES.map((r) => r.slug),
-  });
+  await upsertSystemRoles(prisma);
 }
 
 /**

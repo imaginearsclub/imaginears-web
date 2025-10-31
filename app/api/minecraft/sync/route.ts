@@ -3,6 +3,7 @@ import { getServerSession } from "@/lib/session";
 import { userHasPermissionAsync } from "@/lib/rbac-server";
 import { syncPlayersFromAPI } from "@/lib/minecraft-analytics-api";
 import { prisma } from "@/lib/prisma";
+import { triggerWebhook, WEBHOOK_EVENTS } from "@/lib/webhooks";
 
 /**
  * POST /api/minecraft/sync
@@ -34,6 +35,24 @@ export async function POST() {
     }
 
     const result = await syncPlayersFromAPI();
+
+    // Trigger webhook based on result
+    if (result.success) {
+      triggerWebhook(WEBHOOK_EVENTS.SYNC_COMPLETED, {
+        synced: result.synced,
+        linked: result.linked,
+        errors: result.errors || 0,
+        message: result.message,
+      }, {
+        userId: session.user.id,
+      }).catch(err => console.error("[MC Sync] Webhook trigger failed:", err));
+    } else {
+      triggerWebhook(WEBHOOK_EVENTS.SYNC_FAILED, {
+        message: result.message,
+      }, {
+        userId: session.user.id,
+      }).catch(err => console.error("[MC Sync] Webhook trigger failed:", err));
+    }
 
     return NextResponse.json(result);
   } catch (error) {

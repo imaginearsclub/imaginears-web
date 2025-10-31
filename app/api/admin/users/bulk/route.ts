@@ -14,13 +14,13 @@
  * Security: Permission-based access, rate limited, input validated
  * Performance: Batch operations, Promise.allSettled for parallel processing
  */
-
-import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { log } from '@/lib/logger';
 import { auditLog } from '@/lib/audit-logger';
 import { createApiHandler } from '@/lib/api-middleware';
 import { checkPermission } from '@/lib/role-security';
+import { jsonOk, jsonError } from '@/app/api/admin/sessions/response';
+import { cache } from '@/lib/cache';
 import {
   bulkUserOperationSchema,
   type BulkUserOperation,
@@ -49,6 +49,37 @@ function getActionDescription(operation: BulkUserOperation): string {
     default:
       return 'Unknown operation';
   }
+}
+
+/**
+ * Helper: Aggregate bulk results from Promise.allSettled
+ */
+function aggregateBulkResults(
+  results: Array<PromiseSettledResult<{ success: boolean; error?: string }>>,
+  operation: BulkUserOperation
+): BulkOperationResult {
+  const aggregated: BulkOperationResult = {
+    success: 0,
+    failed: 0,
+    total: operation.users.length,
+    operation: operation.operation,
+    errors: [],
+  };
+
+  for (const r of results) {
+    if (r.status === 'fulfilled') {
+      if (r.value.success) {
+        aggregated.success++;
+      } else {
+        aggregated.failed++;
+        if (r.value.error) aggregated.errors.push(r.value.error);
+      }
+    } else {
+      aggregated.failed++;
+      aggregated.errors.push(`Unexpected error: ${String(r.reason)}`);
+    }
+  }
+  return aggregated;
 }
 
 /**
@@ -110,7 +141,7 @@ async function processSendEmail(
   userId: string,
   email: string,
   subject: string,
-  body: string
+  _body: string
 ): Promise<void> {
   // In production, send email
   // await sendEmail({
@@ -119,6 +150,7 @@ async function processSendEmail(
   //   body,
   // });
   
+  void _body;
   log.info('Email sent (placeholder)', { userId, email, subject });
 }
 
@@ -173,11 +205,10 @@ async function processUserOperation(
         );
         break;
 
-      default:
-        return {
-          success: false,
-          error: `Unknown operation: ${operation.operation}`,
-        };
+      default: {
+        const op = (operation as Record<string, unknown>)["operation"];
+        return { success: false, error: `Unknown operation: ${String(op)}` };
+      }
     }
 
     return { success: true };
@@ -234,7 +265,7 @@ export const POST = createApiHandler(
     const startTime = Date.now();
     const operation = validatedBody as BulkUserOperation;
 
-    try {
+    // --- Permission check ---
       // Check if user has the specific permission for this operation
       const requiredPermission = OPERATION_PERMISSIONS[operation.operation];
       const hasPermission = await checkPermission(userId!, requiredPermission);
@@ -245,81 +276,37 @@ export const POST = createApiHandler(
           operation: operation.operation,
           requiredPermission,
         });
-
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Forbidden: Missing permission '${requiredPermission}'`,
-          },
-          { status: 403 }
-        );
+        return jsonError(_req, `Forbidden: Missing permission '${requiredPermission}'`, 403);
       }
 
-      log.info('Bulk user operation started', {
+    log.info('Bulk user operation started', {
         userId,
         operation: operation.operation,
         userCount: operation.users.length,
         dryRun: operation.dryRun,
       });
 
-      // Dry run mode - preview without executing
-      if (operation.dryRun) {
-        const preview = operation.users.map((email) => ({
-          email,
-          action: getActionDescription(operation),
-        }));
+    // Idempotency: avoid duplicate bulk runs for same payload
+    const idemKey = _req.headers.get('idempotency-key');
+    if (idemKey && !operation.dryRun) {
+      const prior = await cache.get<{ response: unknown }>(`idemp:bulk:${userId}:${idemKey}`);
+      if (prior?.response) return jsonOk(_req, prior.response, { headers: { 'X-Idempotent-Replay': '1' } });
+    }
 
-        const duration = Date.now() - startTime;
-
-        log.info('Bulk operation dry run completed', {
-          userId,
-          operation: operation.operation,
-          affectedUsers: operation.users.length,
-          duration,
-        });
-
-        return NextResponse.json({
-          success: true,
-          dryRun: true,
-          operation: operation.operation,
-          affectedUsers: operation.users.length,
-          preview,
-        });
-      }
+    // Dry run mode - preview without executing
+    if (operation.dryRun) {
+      const preview = operation.users.map((email) => ({ email, action: getActionDescription(operation) }));
+      const duration = Date.now() - startTime;
+      log.info('Bulk operation dry run completed', { userId, operation: operation.operation, affectedUsers: operation.users.length, duration });
+      return jsonOk(_req, { success: true, dryRun: true, operation: operation.operation, affectedUsers: operation.users.length, preview });
+    }
 
       // Process all users in parallel for performance
       // Using Promise.allSettled to handle all operations and collect results
-      const results = await Promise.allSettled(
-        operation.users.map((email) => processUserOperation(email, operation))
-      );
+    const results = await Promise.allSettled(operation.users.map((email) => processUserOperation(email, operation)));
+    const aggregated = aggregateBulkResults(results, operation);
 
-      // Aggregate results
-      const aggregated: BulkOperationResult = {
-        success: 0,
-        failed: 0,
-        total: operation.users.length,
-        operation: operation.operation,
-        errors: [],
-      };
-
-      for (const result of results) {
-        if (result.status === 'fulfilled') {
-          if (result.value.success) {
-            aggregated.success++;
-          } else {
-            aggregated.failed++;
-            if (result.value.error) {
-              aggregated.errors.push(result.value.error);
-            }
-          }
-        } else {
-          // Promise rejected - should rarely happen due to error handling in processUserOperation
-          aggregated.failed++;
-          aggregated.errors.push(`Unexpected error: ${result.reason}`);
-        }
-      }
-
-      const duration = Date.now() - startTime;
+    const duration = Date.now() - startTime;
 
       // Performance: Log slow operations
       if (duration > 5000) {
@@ -333,60 +320,26 @@ export const POST = createApiHandler(
       }
 
       // Audit log for bulk operations
-      await auditLog({
-        userId: userId!,
-        action: `bulk_${operation.operation}`,
-        resourceType: 'user',
-        resourceId: 'bulk',
-        details: {
-          operation: operation.operation,
-          totalUsers: aggregated.total,
-          successful: aggregated.success,
-          failed: aggregated.failed,
-          duration,
-        },
-        ipAddress: _req.headers.get('x-forwarded-for') || undefined,
-        userAgent: _req.headers.get('user-agent') || undefined,
-      });
+    await auditLog({
+      userId: userId!,
+      action: `bulk_${operation.operation}`,
+      resourceType: 'user',
+      resourceId: 'bulk',
+      details: { operation: operation.operation, totalUsers: aggregated.total, successful: aggregated.success, failed: aggregated.failed, duration },
+      ipAddress: _req.headers.get('x-forwarded-for') || _req.headers.get('x-real-ip') || '',
+      userAgent: _req.headers.get('user-agent') || '',
+    });
 
       log.info('Bulk user operation completed', {
         userId,
-        operation: operation.operation,
+        op: operation.operation,
         duration,
         ...aggregated,
       });
 
-      return NextResponse.json(
-        {
-          success: true,
-          ...aggregated,
-        },
-        {
-          headers: {
-            'X-Response-Time': `${duration}ms`,
-          },
-        }
-      );
-    } catch (error) {
-      const duration = Date.now() - startTime;
-
-      log.error('Bulk user operation failed', {
-        userId,
-        operation: operation.operation,
-        userCount: operation.users.length,
-        duration,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Internal server error during bulk operation',
-        },
-        { status: 500 }
-      );
-    }
+    const responseBody = { success: true, result: aggregated };
+    if (idemKey) await cache.set(`idemp:bulk:${userId}:${idemKey}`, { response: responseBody }, 60);
+    return jsonOk(_req, responseBody, { headers: { 'X-Response-Time': `${duration}ms` } });
   }
 );
 

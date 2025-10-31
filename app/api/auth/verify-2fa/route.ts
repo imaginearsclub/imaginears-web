@@ -15,6 +15,7 @@ import { log } from '@/lib/logger';
 import { createApiHandler } from '@/lib/api-middleware';
 import { verifyTOTPToken, verifyBackupCode, decryptSecret } from '@/lib/two-factor';
 import { verify2FASchema, type Verify2FARequest } from '../schemas';
+import { verifyPassword } from '@/lib/password';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,8 +48,7 @@ async function verifyCredentials(email: string, password: string) {
     return { valid: false, user: null };
   }
 
-  const bcrypt = require('bcryptjs');
-  const isValidPassword = await bcrypt.compare(password, account.password);
+  const isValidPassword = await verifyPassword(account.password, password);
 
   return { valid: isValidPassword, user: isValidPassword ? user : null };
 }

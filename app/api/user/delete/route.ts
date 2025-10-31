@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
+import { verifyPassword } from "@/lib/password";
 
 /**
  * GDPR Account Deletion
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     });
 
     if (account?.password) {
-      const isValidPassword = await bcrypt.compare(password, account.password);
+      const isValidPassword = await verifyPassword(account.password, password);
       if (!isValidPassword) {
         return NextResponse.json(
           { error: "Incorrect password" },

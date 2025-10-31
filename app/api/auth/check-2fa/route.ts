@@ -13,6 +13,7 @@ import { prisma } from '@/lib/prisma';
 import { log } from '@/lib/logger';
 import { createApiHandler } from '@/lib/api-middleware';
 import { check2FASchema, type Check2FARequest } from '../schemas';
+import { verifyPassword } from '@/lib/password';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,9 +55,8 @@ async function verifyCredentials(email: string, password: string) {
     return { valid: false, requires2FA: false };
   }
 
-  // Verify password
-  const bcrypt = require('bcryptjs');
-  const isValidPassword = await bcrypt.compare(password, account.password);
+  // Verify password (supports both bcrypt and Argon2id)
+  const isValidPassword = await verifyPassword(account.password, password);
 
   if (!isValidPassword) {
     return { valid: false, requires2FA: false };
