@@ -13,7 +13,7 @@ import { z } from "zod";
 import { cleanupOldJobs } from "@/lib/redis-monitor";
 import { createApiHandler } from "@/lib/api-middleware";
 import { log } from "@/lib/logger";
-import { prisma } from "@/lib/prisma";
+import { checkRedisPermission } from "../utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,27 +50,8 @@ export const POST = createApiHandler(
     const startTime = Date.now();
 
     try {
-      // Fetch user's role for RBAC check
-      const user = await prisma.user.findUnique({
-        where: { id: userId! },
-        select: { role: true, email: true },
-      });
-
-      if (!user) {
-        log.warn("Redis cleanup - user not found", { userId });
-        return NextResponse.json(
-          { error: "User not found" },
-          { status: 404 }
-        );
-      }
-
-      // RBAC: Only Owner/Admin can trigger manual cleanup
-      if (user.role !== "OWNER" && user.role !== "ADMIN") {
-        log.warn("Redis cleanup - forbidden", { 
-          userId, 
-          role: user.role,
-          email: user.email 
-        });
+      // Check permission
+      if (!(await checkRedisPermission(userId!))) {
         return NextResponse.json(
           { error: "Forbidden: Redis cleanup is restricted to Owners and Admins" },
           { status: 403 }
@@ -84,8 +65,6 @@ export const POST = createApiHandler(
       // Performance: Track cleanup operation
       log.info("Redis cleanup started", {
         userId,
-        email: user.email,
-        role: user.role,
         options: { completedAge, failedAge, completedCount, failedCount },
       });
 
@@ -110,7 +89,6 @@ export const POST = createApiHandler(
 
       log.info("Redis cleanup completed", {
         userId,
-        email: user.email,
         duration,
         cleaned: result.cleaned,
         options: { completedAge, failedAge, completedCount, failedCount },

@@ -12,7 +12,7 @@ import { NextResponse } from "next/server";
 import { testRedisConnection } from "@/lib/redis-monitor";
 import { createApiHandler } from "@/lib/api-middleware";
 import { log } from "@/lib/logger";
-import { prisma } from "@/lib/prisma";
+import { checkRedisPermission } from "../utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,27 +39,8 @@ export const GET = createApiHandler(
     const startTime = Date.now();
 
     try {
-      // Fetch user's role for RBAC check
-      const user = await prisma.user.findUnique({
-        where: { id: userId! },
-        select: { role: true, email: true },
-      });
-
-      if (!user) {
-        log.warn("Redis test - user not found", { userId });
-        return NextResponse.json(
-          { error: "User not found" },
-          { status: 404 }
-        );
-      }
-
-      // RBAC: Only Owner/Admin can test Redis
-      if (user.role !== "OWNER" && user.role !== "ADMIN") {
-        log.warn("Redis test - forbidden", { 
-          userId, 
-          role: user.role,
-          email: user.email 
-        });
+      // Check permission
+      if (!(await checkRedisPermission(userId!))) {
         return NextResponse.json(
           { error: "Forbidden: Redis testing is restricted to Owners and Admins" },
           { status: 403 }
@@ -78,7 +59,6 @@ export const GET = createApiHandler(
 
       log.info("Redis connection tested", {
         userId,
-        email: user.email,
         duration,
         success: result.success,
         latency: result.latency,
